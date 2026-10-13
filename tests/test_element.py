@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from arraytx.config import load_config, config_from_dict
-from arraytx.element import (ElementChain, build_elements, draw_element_errors,
+from arraytx.element import (build_elements, draw_element_errors,
                              reference_full_scale)
 from arraytx.lo import ClockProfileLO
 from arraytx.seeds import SeedTree

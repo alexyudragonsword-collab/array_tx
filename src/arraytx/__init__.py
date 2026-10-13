@@ -6,3 +6,9 @@ array-level DPD) and reads every acceptance metric in the far field.
 """
 
 __version__ = "0.1.0"
+
+from .config import ArrayConfig, default_config, form_fields, load_config  # noqa: E402
+from .sim import ArrayResult, ArraySim  # noqa: E402
+
+__all__ = ["ArrayConfig", "ArrayResult", "ArraySim", "default_config",
+           "form_fields", "load_config", "__version__"]
