@@ -12,6 +12,9 @@
 - 指纹：`fingerprint.py record` 换 pin 前后 168 项 0 差异——`nr_waveform` 与手拼配置逐位同一波形，所有链路输出不变。
 - ROADMAP：B1（polar_tx 内部随机流）了结——抖动/LO 这一对已修，`montecarlo.py` 的位置抽取与本库无关不动；B3 改为"rfdac DPD 能跑但无压缩可校"。
 - pin 在 polar_tx 的开发分支上、尚未进其 main；CI 用全 SHA + fetch-depth 0 取，分支名变动不影响（polar_tx 对 PA_DPD 的 44cbcb3 走过同一条路）。
+- 上游 CI 补记：008cc90 推上去后 polar_tx 只有 `test-gui` 红，两次都是 Streamlit AppTest 里的 Bus error；逐项比对安装清单，唯一差异是
+  PySide6 6.11.2 → 6.12.0，本地用 6.12.0 在未动的 main 上同样崩、6.11.2 两边都过。polar_tx 又加一提交 0ff8ea8（`guiqt` 钉 `<6.12`，
+  不碰本库 vendor 的任何文件），其 CI 第 110 次 12 个任务全绿。本库 pin 保持 008cc90，不需要动。
 - 测试 88 项。
 
 ## 2026-10-13 · 共用 LO 接真实时钟剖面：28 GHz 上 64-QAM 对 LO 的要求，EVM 跟带内相噪、ACLR 跟远端底
