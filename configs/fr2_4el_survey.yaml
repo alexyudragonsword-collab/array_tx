@@ -1,0 +1,87 @@
+# array_tx default: 4-element lambda/2 linear array, FR2 28 GHz / 400 MHz,
+# coupling from the published survey, no DPD (examples switch dpd.scheme).
+# Numbers without a {value, source, ref} mapping are design choices
+# (source: assumed).  See AGENTS.md for the provenance rule.
+arraytx_config: 1
+seed: 1
+standard: fr2_nr400
+
+array:
+  n_elements: 4
+  spacing_lambda: 0.5          # design choice (assumed); the survey values below are for lambda/2 pitch
+  element_pattern: isotropic   # assumed: no element pattern in milestone 1
+
+element:
+  topology: polar
+  errors:
+    enabled: true
+    gain_sigma_db: 0.5
+    phase_sigma_deg: 5.0
+    delay_sigma_ps: 2.0
+    pa_dev_sigma: 0.05
+  pa:
+    n_bits: 10
+    n_thermo: 6
+    sigma_cell: 0.002
+    amam: rapp
+    rapp_p: 2.0
+    rapp_drive: 1.0
+    ampm_deg_at_fs: 8.0
+  lo:
+    shared: true
+    clock_profile: null
+    loop_bw_hz: 400000.0
+
+coupling:
+  source: survey
+  scale_db: 0.0
+  analytic:
+    c1_db: -16.0
+    c1_deg: 180.0
+    c2_rel_db: -6.0
+  survey:
+    c1_db:
+      value: -16.0
+      source: survey
+      ref: "abstract-level only (full texts unreachable from the build environment, see ROADMAP A1); arXiv:2407.09944 — 28 GHz FR-2 linear patch array, elements at ~lambda0/2, CATR OTA measurements; adjacent coupling in the -13..-16 dB class for uncompensated lambda/2 patches; US patent 10910732 — 28 GHz array, measured mutual coupling better than -16 dB; Int. J. Electron. Commun. (ScienceDirect S1434841126001263) — lambda/2 (5.4 mm) SIW endfire array, adjacent coupling below -15 dB in the lower band"
+    c1_deg_at_f0:
+      value: 180.0
+      source: survey
+      ref: "sign convention only: the adjacent coupled wave arrives half a wavelength (pi) later at f0 for lambda/2 pitch; the papers above do not publish the phase"
+    c2_rel_db:
+      value: -6.0
+      source: survey
+      ref: "next-adjacent coupling 6 dB below adjacent is the common reading of published S-parameter plots for lambda/2 patch rows (free-space 1/r over twice the distance); no paper-level number"
+    path_delay_from_spacing: true
+  touchstone:
+    path: null
+
+beam:
+  steering: phase
+  scan_deg: [0.0, 30.0, 60.0]
+  sidelobe: auto
+
+dpd:
+  scheme: none
+  n_iterations: 2
+  regularization: 1.0e-9
+  gmp:
+    order: 5
+    memory_depth: 3
+    lag_order: 1
+    lag_memory: 2
+    lag_span: 1
+    lead_order: 0
+    lead_memory: 0
+    lead_span: 0
+  per_element_observe: pa_output
+
+metrics:
+  aclr_offsets: [1, 2]
+  evm_equalize: scalar
+
+sim:
+  n_symbols: 8
+  smoke_n_symbols: 2
+  noise: true
+  cfr_papr_db: 8.5
