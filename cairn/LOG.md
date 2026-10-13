@@ -12,7 +12,9 @@
   现在的规则：该块每个数必须写明来历（survey 带引文，assumed / derived 带原因），裸标量不许进。`c1_deg_at_f0` 与 `c2_rel_db` 改标 assumed。
 - 其余：`beam.sidelobe` 接受数字并校验、`scan_deg` 非空且在 (−90, 90)；antenna_port 观测的每单元训练从 O(n²) 链路运行降到 O(n)；
   ex01 不再自带第二份几何与 fs；banner 不再为打印引擎名多跑一次链路（`ElementChain.engine` 直接给出 `dtc_openloop`）。
-- 里程碑数字不受影响（默认 polar 拓扑、scalar EVM、4 端口 touchstone 都不走改动的分支）；测试 80 项。
+- 里程碑数字不受影响（默认 polar 拓扑、scalar EVM、4 端口 touchstone 都不走改动的分支）。
+- B3 顺手了结一半：outphasing / rfdac 在 FR2 建链并有测试；rfdac 选 DPD 直接拒绝（满刻度钉不住）；outphasing 的 DPD 可跑但无用
+  （−44.70 → −44.62 dBc），原因写在 ROADMAP B3。测试 82 项。
 
 ## 2026-10-13 · GMP 默认值改为无记忆 7 阶：ACLR2 的损失来自记忆抽头，不是阶数（ROADMAP B5 了结）
 

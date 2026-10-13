@@ -22,8 +22,11 @@ DTC 的抖动与 LO 相噪共用一个 rng（`dtc_openloop.py`），切换抖动
 polar_tx ROADMAP B1：event 引擎 LTE-20 带宽已 29 % 相位推进不可用。FR2 400 MHz 只能用 response / dtc_openloop，
 杂散与互调结论一律标"线性化引擎，不能背书"。
 
-### B3. outphasing / rfdac 拓扑只在 sub-6 冒烟
-polar_tx 的这两个预设是 WiFi 定制（5.9 GHz）。FR2 下只保证 polar。
+### B3. outphasing / rfdac 拓扑：能跑 FR2，但 DPD 方案对它们没有意义
+两者已按 FR2 的载频和 LO 建链并有测试（`tests/test_element.py::test_other_topologies_run_at_fr2`）。
+rfdac：`CartesianTX` 每个突发按峰值重标定满刻度、没有 `fs_scale_fixed`，DPD 会被静默抵消，所以 `dpd.scheme != none` 直接拒绝。
+outphasing：a_max 已钉住，DPD 能跑，但分支恒包络、DPA 在满刻度，没有压缩可校——无 DPD −44.7 dBc，DPD 后 −44.6（2 单元冒烟）。
+要让这两种拓扑的 DPD 有意义，得先给 RF-DAC 加可钉的满刻度（属 polar_tx），给 outphasing 加合路器 / 分支失配的校正（不是 ILA-GMP 这类）。
 
 ### B4. 线性泄漏下每单元 DPD 对互耦不敏感——需要负载依赖的 PA 才能分开两种 DPD
 里程碑 1 实测（`cairn/LOG.md`）：互耦从 0 扫到相邻 −10 dB，三种方案在波束方向的 OTA ACLR 只动 0.02–0.04 dB；

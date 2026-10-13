@@ -182,3 +182,28 @@ def test_integrated_jitter_runs_on_this_numpy():
     lo = ClockProfileLO("tests/data/clock_profile_test.yaml", fout_hz=7e9)
     j = lo.integrated_jitter_s(1e3, 1e8)
     assert 0 < j < 1e-9
+
+
+@pytest.mark.parametrize("topology", ["outphasing", "rfdac"])
+def test_other_topologies_run_at_fr2(topology):
+    """ROADMAP B3: the non-polar topologies build and run on the FR2 plan
+    (28 GHz carrier, polar_tx's FR2 LO) with the config's array."""
+    from arraytx import ArraySim
+    cfg = config_from_dict({"array": {"n_elements": 2}, "element": {"topology": topology}})
+    sim = ArraySim(cfg)
+    r = sim.run(30.0, "none")
+    assert np.isfinite(r.beam.evm_db) and r.beam.aclr1_db < -25.0
+    pm_or_dac = sim.elements[0].tx.rfdac.cfg if topology == "rfdac" else sim.elements[0].tx.tx.phasemod.cfg
+    assert pm_or_dac.fout == 28e9
+    assert pm_or_dac.lo_pn is not None and pm_or_dac.lo_pn.f0 == 28e9
+    if topology == "outphasing":
+        # pinned a_max, so the DPD RUNS -- but it has nothing to correct: the
+        # branches are constant-envelope and the DPA sits at full scale, so
+        # the residual is combiner / DTC / LO, not compression.  Measured
+        # (smoke, 2 elements): none -44.70, array -44.62, per-element -44.66
+        # dBc.  The scheme must not make it worse.
+        r2 = sim.run(30.0, "array")
+        assert abs(r2.beam.aclr1_db - r.beam.aclr1_db) < 0.5
+    else:
+        with pytest.raises(ValueError, match="rfdac"):
+            sim.run(30.0, "array")
