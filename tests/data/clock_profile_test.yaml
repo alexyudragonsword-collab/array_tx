@@ -1,0 +1,6 @@
+# hand-written test profile in pll_simulator's clock-profile format
+f0_hz: 7000000000.0
+f_hz: [100.0, 1000.0, 10000.0, 100000.0, 1000000.0, 10000000.0, 100000000.0, 3500000000.0]
+l_dbc_hz: [-60.0, -80.0, -95.0, -105.0, -115.0, -135.0, -150.0, -155.0]
+spurs: []
+source: "arraytx test fixture (synthetic)"

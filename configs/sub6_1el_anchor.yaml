@@ -24,7 +24,7 @@ element:
     rapp_drive: 1.0
     ampm_deg_at_fs: 0.0
   lo:
-    shared: true
+    shared: false
     clock_profile: null
     loop_bw_hz: 400000.0
 coupling:
