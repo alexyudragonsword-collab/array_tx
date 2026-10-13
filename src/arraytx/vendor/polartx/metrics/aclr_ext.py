@@ -1,4 +1,4 @@
-# Vendored from polar_tx@8a10480: src/polartx/metrics/aclr_ext.py
+# Vendored from polar_tx@008cc90: src/polartx/metrics/aclr_ext.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Multi-offset ACLR with cellular measurement conventions.
 

@@ -1,4 +1,4 @@
-# Vendored from polar_tx@8a10480: src/polartx/waveforms/edr.py
+# Vendored from polar_tx@008cc90: src/polartx/waveforms/edr.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Bluetooth EDR DPSK payload waveforms (stylized: payload symbols only).
 

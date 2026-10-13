@@ -1,4 +1,4 @@
-# Vendored from polar_tx@8a10480: src/polartx/metrics/masks.py
+# Vendored from polar_tx@008cc90: src/polartx/metrics/masks.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Spectral masks per application (stylized engineering templates, not
 conformance clauses — same caveat as the vendored WiFi mask)."""

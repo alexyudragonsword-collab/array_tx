@@ -1,4 +1,4 @@
-# Vendored from polar_tx@8a10480: src/polartx/cal/memory_dpd.py
+# Vendored from polar_tx@008cc90: src/polartx/cal/memory_dpd.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Cartesian memory DPD wrapped around the whole polar chain.
 

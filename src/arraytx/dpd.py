@@ -76,13 +76,6 @@ def train(cfg: ArrayConfig, scheme: str, *, elements: list[ElementChain], x: np.
     bank = DPDBank(scheme)
     if scheme == "none":
         return bank
-    if cfg.element.topology == "rfdac":
-        # CartesianTX re-derives its full scale from each burst's peak and
-        # has no fs_scale_fixed: a predistorted (peak-expanded) drive would be
-        # re-normalised and the DPD silently undone.  Refuse rather than
-        # report a number that means nothing (ROADMAP B3).
-        raise ValueError("DPD schemes need a pinned full scale; the rfdac topology "
-                         "re-normalises per burst (polar_tx CartesianTX) -- use dpd.scheme: none")
     drives = steer(x, geom, theta0_deg, fs, cfg.beam.steering)
 
     if scheme == "per_element":

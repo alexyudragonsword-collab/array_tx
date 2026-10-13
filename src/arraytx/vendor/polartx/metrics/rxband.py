@@ -1,4 +1,4 @@
-# Vendored from polar_tx@8a10480: src/polartx/metrics/rxband.py
+# Vendored from polar_tx@008cc90: src/polartx/metrics/rxband.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """RX-band noise at the duplex offset — the classic FDD polar-TX budget.
 

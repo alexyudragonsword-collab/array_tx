@@ -1,4 +1,4 @@
-# Vendored from polar_tx@8a10480: src/polartx/fir.py
+# Vendored from polar_tx@008cc90: src/polartx/fir.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Mixed-domain 2-tap FIR filtering in a polar DTX (Borokhovich, Socher,
 Degani, RFIC 2026).

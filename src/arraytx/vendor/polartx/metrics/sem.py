@@ -1,4 +1,4 @@
-# Vendored from polar_tx@8a10480: src/polartx/metrics/sem.py
+# Vendored from polar_tx@008cc90: src/polartx/metrics/sem.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Spectrum-emission-mask checking with the conventions instruments use.
 

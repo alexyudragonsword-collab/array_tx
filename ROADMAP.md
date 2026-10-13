@@ -14,28 +14,15 @@
 
 ## B. 已知模型缺口
 
-### B1. polar_tx 内部随机流不独立（继承的限制）
-DTC 的抖动与 LO 相噪共用一个 rng（`dtc_openloop.py`），切换抖动开关会换 LO 相噪实例。本库在阵列层用 `SeedSequence` 派生，
-并且不切换 polar_tx 内部开关；polar_tx 层面的修法属于上游。
-
 ### B2. 事件引擎在 FR2 不可用
 polar_tx ROADMAP B1：event 引擎 LTE-20 带宽已 29 % 相位推进不可用。FR2 400 MHz 只能用 response / dtc_openloop，
 杂散与互调结论一律标"线性化引擎，不能背书"。
 
-### B3. outphasing / rfdac 拓扑：能跑 FR2，但 DPD 方案对它们没有意义
-两者已按 FR2 的载频和 LO 建链并有测试（`tests/test_element.py::test_other_topologies_run_at_fr2`）。
-rfdac：`CartesianTX` 每个突发按峰值重标定满刻度、没有 `fs_scale_fixed`，DPD 会被静默抵消，所以 `dpd.scheme != none` 直接拒绝。
-outphasing：a_max 已钉住，DPD 能跑，但分支恒包络、DPA 在满刻度，没有压缩可校——无 DPD −44.7 dBc，DPD 后 −44.6（2 单元冒烟）。
-要让这两种拓扑的 DPD 有意义，得先给 RF-DAC 加可钉的满刻度（属 polar_tx），给 outphasing 加合路器 / 分支失配的校正（不是 ILA-GMP 这类）。
-
-### B4. 线性泄漏下每单元 DPD 对互耦不敏感——需要负载依赖的 PA 才能分开两种 DPD
-里程碑 1 实测（`cairn/LOG.md`）：互耦从 0 扫到相邻 −10 dB，三种方案在波束方向的 OTA ACLR 只动 0.02–0.04 dB；
-全阵列与每单元 DPD 在波束方向差 0.07–0.12 dB，只在旁瓣方向差 0.3–0.7 dB。原因在 `cairn/architecture-invariants.md`
-"被推翻的预期"。要让"每单元 DPD 比互耦为零时差"这句话有可能成立，PA 模型要先有负载依赖（A2）。
-
-### B6. 时钟剖面里的离散杂散没注入
-18 个随包剖面中 9 个带 `spurs:`（参考杂散，频偏与 dBc），`lo.ClockProfileLO.psd` 只插值 L(f) 曲线。Halo 的做法是
-按正弦叠加、相位随机抽取（`tx/clock.py`）；这里要加就得给它一条自己的种子流（铁律 5），并且算进 ACLR 的是杂散落到邻道的那部分。
+### B3. outphasing / rfdac 拓扑：能跑 FR2，DPD 能跑但没有东西可校
+两者按 FR2 的载频和 LO 建链并有测试（`tests/test_element.py::test_other_topologies_run_at_fr2`）。
+rfdac：polar_tx@008cc90 起 `CartesianTX` 读 `fs_scale_fixed`，满刻度钉住、DPD 能跑；但 polar_tx 的 RF-DAC 模型只有失配没有压缩，无可校之处。
+outphasing：分支恒包络、DPA 在满刻度——无 DPD −44.7 dBc，DPD 后 −44.6（2 单元冒烟）。
+要让这两种拓扑的 DPD 有意义，得给 RF-DAC 加压缩模型（属 polar_tx），给 outphasing 加合路器 / 分支失配的校正（不是 ILA-GMP 这类）。
 
 ## C. 工程维护
 

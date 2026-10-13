@@ -1,4 +1,4 @@
-# Vendored from polar_tx@8a10480: src/polartx/metrics/ble_metrics.py
+# Vendored from polar_tx@008cc90: src/polartx/metrics/ble_metrics.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """BLE modulation-quality metrics (stylized RF-PHY test-suite versions).
 

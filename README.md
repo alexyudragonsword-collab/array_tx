@@ -65,7 +65,7 @@ print(r.info["engine_line"]); print(r.beam.row()); print(r.sidelobe.row())
 | 模块 | 职责 | 铁律 |
 |---|---|---|
 | `config.py` | YAML → 数据类树，provenance，表单字段声明 | 1 |
-| `standards.py` | `fr2_nr400`（TS 38.101-2 出处）、`sub6_nr100`（polar_tx 原样） | — |
+| `standards.py` | `fr2_nr400`（TS 38.101-2 出处，波形走 polar_tx `nr_waveform`）、`sub6_nr100`（polar_tx 原样） | — |
 | `seeds.py` | `SeedSequence` 派生：每单元、每损伤独立流 | 5 |
 | `element.py` / `lo.py` | polar_tx 预设建链、固定 fs_scale、单元误差抽了再置零、共用 LO；`bundled:<preset>` 时钟剖面按 (f_c/f0)² 换算到载频 | 5 |
 | `geometry.py` / `beam.py` | 线阵几何、相移 / 真延时导向、频域远场合成、斜视解析式 | 4 |

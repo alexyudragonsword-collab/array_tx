@@ -1,4 +1,4 @@
-# Vendored from polar_tx@8a10480: src/polartx/metrics/ofdm_rx.py
+# Vendored from polar_tx@008cc90: src/polartx/metrics/ofdm_rx.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Standard-receiver-style OFDM EVM: pilot CPE tracking and
 preamble-based channel estimation.

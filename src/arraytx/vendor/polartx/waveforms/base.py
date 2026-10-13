@@ -1,4 +1,4 @@
-# Vendored from polar_tx@8a10480: src/polartx/waveforms/base.py
+# Vendored from polar_tx@008cc90: src/polartx/waveforms/base.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Common waveform container for the polar TX chain."""
 from __future__ import annotations

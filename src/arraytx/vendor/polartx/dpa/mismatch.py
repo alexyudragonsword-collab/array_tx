@@ -1,4 +1,4 @@
-# Vendored from polar_tx@8a10480: src/polartx/dpa/mismatch.py
+# Vendored from polar_tx@008cc90: src/polartx/dpa/mismatch.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Segmented DPA unit-cell array: per-code amplitude with mismatch.
 

@@ -1,4 +1,4 @@
-# Vendored from polar_tx@8a10480: src/polartx/dpa/characteristics.py
+# Vendored from polar_tx@008cc90: src/polartx/dpa/characteristics.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """DPA AM-AM / AM-PM characteristics versus normalized amplitude.
 

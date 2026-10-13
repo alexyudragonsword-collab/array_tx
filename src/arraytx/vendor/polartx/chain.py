@@ -1,4 +1,4 @@
-# Vendored from polar_tx@8a10480: src/polartx/chain.py
+# Vendored from polar_tx@008cc90: src/polartx/chain.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """The composable polar TX chain shared by both flavors.
 

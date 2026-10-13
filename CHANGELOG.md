@@ -4,6 +4,12 @@
 
 ## 未发布 / Unreleased
 
+### 换 pin 到 polar_tx@008cc90：四处修正回馈上游后，FR2 波形改用 polar_tx 自己的数字表（2026-10-13）
+
+- polar_tx 侧（其开发分支）：NR 400 MHz 数字表、`nr_dtc.fs_bb`、`CartesianTX` 可钉满刻度、抖动"抽了再置零"。
+- 本库：vendor 整体到 008cc90；`standards.py` 的 FR2 波形改用 `nr_waveform`；rfdac 拓扑允许 DPD；ROADMAP B1 删、B3 改。
+- 指纹换 pin 前后 168 项逐位相同。
+
 ### 共用 LO 接真实时钟剖面：pll_simulator 的 18 个预设随包提供，EVM / ACLR 随 LO 扫描（2026-10-13）
 
 - `src/arraytx/data/clock_profiles/`：pll_simulator@00e48a2 用自己的 `export --clock-profile` 导出的全部 18 个预设（文件内 `source:` 行带提交号），未经编辑。

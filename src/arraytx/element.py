@@ -105,7 +105,9 @@ def reference_full_scale(tx: Any, topology: str, x: np.ndarray, wf: Waveform) ->
         return c.env_headroom * float(env.max())
     if topology == "outphasing":
         return float(np.abs(x).max())            # OutphasingTX.a_max
-    return float("nan")                          # rfdac: per-run axis scale (not pinnable)
+    # rfdac: CartesianTX's per-axis full scale (polar_tx@008cc90 reads
+    # fs_scale_fixed, so this is pinnable like the others)
+    return float(max(np.abs(x.real).max(), np.abs(x.imag).max()))
 
 
 class ElementChain:
@@ -161,8 +163,8 @@ class ElementChain:
     def _pin(self) -> None:
         """Freeze the full scale and set the LO seed on the chain in place."""
         tx = self.tx
-        if self.topology in ("polar", "outphasing") and self.fs_scale is not None:
-            base = tx if self.topology == "polar" else tx.tx
+        if self.fs_scale is not None:
+            base = tx.tx if self.topology == "outphasing" else tx      # OutphasingTX wraps a PolarTX
             base.cfg = replace(base.cfg, fs_scale_fixed=float(self.fs_scale))
         if self.lo_pn_seed is not None and self.topology == "polar":
             pm: Any = copy.copy(tx.phasemod)

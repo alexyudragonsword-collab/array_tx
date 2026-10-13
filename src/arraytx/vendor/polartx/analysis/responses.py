@@ -1,4 +1,4 @@
-# Vendored from polar_tx@8a10480: src/polartx/analysis/responses.py
+# Vendored from polar_tx@008cc90: src/polartx/analysis/responses.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Analytic companions to the time-domain chain: closed-form levels the
 tests and design charts check the simulation against."""

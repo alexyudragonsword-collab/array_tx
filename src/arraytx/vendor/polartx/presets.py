@@ -1,4 +1,4 @@
-# Vendored from polar_tx@8a10480: src/polartx/presets.py
+# Vendored from polar_tx@008cc90: src/polartx/presets.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """End-to-end transmitter presets: technology-plausible defaults wired
 into ready-to-run PolarTX chains (pllsim.presets convention)."""
@@ -556,4 +556,12 @@ def nr_dtc(bw: float = 100e6, *, scs: float | None = None,
         from .waveforms.ofdm import nr_waveform
         return nr_waveform(bw, scs, qam, n_symbols=n_symbols, seed=seed)
 
-    return TxPreset(tx=p.tx, fs_bb=p.fs_bb, make_waveform=make_waveform)
+    # The NR waveform runs on the FFT grid (fft * scs * oversampling), not on
+    # bw * oversampling like the WiFi plan: 100 MHz @ 30 kHz is 491.52 MS/s,
+    # not 400.  Report the rate the waveform actually has, and fail here --
+    # not inside make_waveform -- for a (bw, scs) the table does not carry.
+    from .waveforms.ofdm import NR_NUMEROLOGY
+    if (bw, scs) not in NR_NUMEROLOGY:
+        raise ValueError(f"nr_dtc: (bw, scs) must be one of {sorted(NR_NUMEROLOGY)}")
+    fs_bb = NR_NUMEROLOGY[(bw, scs)][0] * scs * oversampling
+    return TxPreset(tx=p.tx, fs_bb=fs_bb, make_waveform=make_waveform)

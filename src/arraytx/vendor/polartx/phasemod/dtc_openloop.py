@@ -1,4 +1,4 @@
-# Vendored from polar_tx@8a10480: src/polartx/phasemod/dtc_openloop.py
+# Vendored from polar_tx@008cc90: src/polartx/phasemod/dtc_openloop.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Wideband phase modulator: open-loop DTC / phase interpolator.
 
@@ -182,9 +182,13 @@ class DTCPhaseModulator(PhaseModulator):
         diag = {"mode": "dtc_openloop", "code": code,
                 "lsb_rad": c.lsb_rad}
         if noise:
-            if c.jitter_rms_s > 0.0:
-                out = out + rng.normal(0.0, TWOPI * c.fout * c.jitter_rms_s,
-                                       out.size)
+            # Drawn even at jitter_rms_s == 0 (a zero-scale draw consumes the
+            # same stream positions): the LO sample below comes off the same
+            # generator when lo_pn_seed is None, and switching the jitter off
+            # must not hand the LO a different realization.  At sigma > 0
+            # this is the same draw as before, bit for bit.
+            out = out + rng.normal(0.0, TWOPI * c.fout * c.jitter_rms_s,
+                                   out.size)
             if c.lo_pn is not None:
                 src = c.lo_pn.leeson("lo")
                 # locked-LO approximation: inside the PLL loop BW the

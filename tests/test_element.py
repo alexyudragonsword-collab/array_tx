@@ -205,5 +205,12 @@ def test_other_topologies_run_at_fr2(topology):
         r2 = sim.run(30.0, "array")
         assert abs(r2.beam.aclr1_db - r.beam.aclr1_db) < 0.5
     else:
-        with pytest.raises(ValueError, match="rfdac"):
-            sim.run(30.0, "array")
+        # polar_tx@008cc90: the DAC full scale is pinned, so the DPD runs; the
+        # RF-DAC model has mismatch but no compression, so it has nothing to
+        # correct either -- it must not make things worse
+        assert sim.elements[0].tx.cfg.fs_scale_fixed is not None
+        r2 = sim.run(30.0, "array")
+        assert abs(r2.beam.aclr1_db - r.beam.aclr1_db) < 0.5
+        r3 = sim.run(30.0, "none")
+        assert [e.info["element"]["fs_scale"] for e in r3.element_results] == \
+               [e.info["element"]["fs_scale"] for e in r2.element_results]

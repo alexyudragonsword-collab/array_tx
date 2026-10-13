@@ -1,4 +1,4 @@
-# Vendored from polar_tx@8a10480: src/polartx/cal/skew.py
+# Vendored from polar_tx@008cc90: src/polartx/cal/skew.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """AM/PM path delay-skew estimation and correction.
 

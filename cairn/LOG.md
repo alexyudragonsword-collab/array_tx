@@ -2,6 +2,18 @@
 
 本文件按时间倒序记录实质进展——新条目在顶。每条只写摘要与指针（数字写原值）；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-10-13 · 四处修正回馈 polar_tx 并换 pin 到 008cc90：指纹 168 项逐位相同，B1 了结、B3 更新
+
+- 上游（polar_tx `claude/digital-polar-tx-dev-r0c338`，4 个提交 3bdb092…008cc90，其测试 307 项全绿）：
+  NR 数字表补 120 kHz 的 50 / 400 MHz 行；`nr_dtc` 的 `fs_bb` 从 `bw·os` 改为波形真实速率（FR1 100 MHz：400 → 491.52 MS/s）并在建预设时拒绝表外组合；
+  `CartesianTX` 读 `fs_scale_fixed`（钉到自身峰值时逐位同默认）；DTC 与 RF-DAC 的抖动在 σ=0 时照抽，关抖动不再换 LO 实例（抖动 > 0 的既有结果逐位不变）。
+- 本库：vendor 树整体换到 008cc90（36 个 polar_tx 文件新头，嵌套的 padpd / pllsim 副本不动，`--strict` 无漂移）；FR2 波形改用 polar_tx 的
+  `nr_waveform(400e6, 120e3)`，`standards.py` 不再自己拼 `GenOFDMConfig`，并校验表与出处数字一致；rfdac 满刻度钉住、DPD 不再拒绝。
+- 指纹：`fingerprint.py record` 换 pin 前后 168 项 0 差异——`nr_waveform` 与手拼配置逐位同一波形，所有链路输出不变。
+- ROADMAP：B1（polar_tx 内部随机流）了结——抖动/LO 这一对已修，`montecarlo.py` 的位置抽取与本库无关不动；B3 改为"rfdac DPD 能跑但无压缩可校"。
+- pin 在 polar_tx 的开发分支上、尚未进其 main；CI 用全 SHA + fetch-depth 0 取，分支名变动不影响（polar_tx 对 PA_DPD 的 44cbcb3 走过同一条路）。
+- 测试 88 项。
+
 ## 2026-10-13 · 共用 LO 接真实时钟剖面：28 GHz 上 64-QAM 对 LO 的要求，EVM 跟带内相噪、ACLR 跟远端底
 
 - 数据：pll_simulator@00e48a2 用自己的 `export --clock-profile` 导出全部 18 个预设，随包提供（`bundled:<preset>`），按 (28 GHz / f0)² 换算。

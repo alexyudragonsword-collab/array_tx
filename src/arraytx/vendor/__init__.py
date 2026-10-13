@@ -8,7 +8,9 @@ every CI run.  Code outside this tree imports only through
 
 Pins
 ----
-* ``polartx/`` — polar_tx @ ``8a10480584e61af62c432f3fc2848745167056a3``,
+* ``polartx/`` — polar_tx @ ``008cc90baf180b5519453ffdecf15d20ff51582d`` (its
+  ``claude/digital-polar-tx-dev-r0c338`` branch: the four array_tx-driven fixes,
+  not yet on polar_tx main),
   ``src/polartx`` minus the GUI surfaces (``guiqt/``, ``guiutil.py``,
   ``appbridge.py``).  Everything else is verbatim, package ``__init__``
   included.  polar_tx's own nested vendor tree comes along unchanged, with

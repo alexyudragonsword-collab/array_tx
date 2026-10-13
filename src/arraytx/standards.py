@@ -7,9 +7,9 @@ Two coexist from day one:
   the "bit-identical to one polar_tx chain" regression anchor.  Nothing here
   is re-derived: the preset factory and its waveform maker are polar_tx's.
 * ``fr2_nr400`` — 5G NR FR2, 28 GHz carrier, 400 MHz channel, 120 kHz SCS.
-  polar_tx's ``nr_dtc`` already carries the FR2 element chain (28 GHz, 120 kHz,
-  64-QAM, mmWave LO) but its numerology table stops at 200 MHz, so the
-  waveform is built here with the 400 MHz numerology.
+  polar_tx's ``nr_dtc`` carries the FR2 element chain (28 GHz, 120 kHz,
+  64-QAM, mmWave LO) and, since polar_tx@008cc90, the 400 MHz numerology
+  row too; the waveform is polar_tx's own ``nr_waveform``.
 
 Sources are listed per number; ``survey`` means read from the cited spec
 clause (the clause text itself could not be re-opened from this environment,
@@ -23,7 +23,7 @@ from typing import Any
 from .vendor.polartx import nr_dtc
 from .vendor.polartx.presets import TxPreset
 from .vendor.polartx.waveforms.base import Waveform
-from .vendor.polartx.waveforms.ofdm import GenOFDMConfig, ofdm_waveform
+from .vendor.polartx.waveforms.ofdm import NR_NUMEROLOGY, nr_waveform
 
 TS38101_2 = "3GPP TS 38.101-2 (NR UE radio transmission and reception; Part 2: Range 2 Standalone)"
 
@@ -87,15 +87,16 @@ class Standard:
     def make_waveform(self, n_symbols: int, seed: int) -> Waveform:
         if self.polartx_native:
             return self.preset().make_waveform(n_symbols=n_symbols, seed=seed)
-        return ofdm_waveform(GenOFDMConfig(
-            bandwidth_hz=float(self.bandwidth_hz.value),
-            qam_order=int(self.qam.value), n_symbols=int(n_symbols),
-            oversampling=int(self.oversampling.value), seed=int(seed),
-            scs_hz=float(self.scs_hz.value),
-            fft_size_override=int(self.fft_size.value),
-            n_active_tones=self.n_active_tones,
-            # NR normal CP and the window polar_tx's nr_waveform uses
-            cp_fraction=144 / 2048, window_fraction=1 / 64))
+        # polar_tx@008cc90 carries the 400 MHz @ 120 kHz row, so the FR2
+        # waveform is polar_tx's own nr_waveform; the table's FFT / RB must
+        # agree with this standard's sourced numbers (tested).
+        fft, n_rb = NR_NUMEROLOGY[(float(self.bandwidth_hz.value), float(self.scs_hz.value))]
+        if (fft, n_rb) != (int(self.fft_size.value), int(self.n_rb.value)):
+            raise ValueError(f"{self.name}: polar_tx numerology {(fft, n_rb)} disagrees with "
+                             f"the standard's {(self.fft_size.value, self.n_rb.value)}")
+        return nr_waveform(float(self.bandwidth_hz.value), float(self.scs_hz.value),
+                           int(self.qam.value), n_symbols=int(n_symbols),
+                           oversampling=int(self.oversampling.value), seed=int(seed))
 
 
 FR2_NR400 = Standard(
