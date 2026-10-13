@@ -14,21 +14,20 @@ import numpy as np
 
 from _common import OUT, SCHEME_COLORS, SCHEME_LABELS, SOURCE_COLORS, banner, done, plt, smoke
 from arraytx import ArraySim, load_config
-from arraytx.coupling import build_coupling, write_matrix_touchstone
-from arraytx.geometry import LinearArray
+from arraytx.coupling import write_matrix_touchstone
 from arraytx.report import table
 
 cfgs = {"analytic": load_config("configs/fr2_4el_analytic.yaml"),
         "survey": load_config("configs/fr2_4el_survey.yaml")}
-geom = LinearArray(4, 0.5, 28e9)
-fs = 4096 * 120e3 * 4
-s4p = os.path.join(OUT, "analytic_4el.s4p")
-write_matrix_touchstone(s4p, build_coupling(cfgs["analytic"], geom, fs), comments=("ex01: written from the analytic config",))
+sim_a = ArraySim(cfgs["analytic"])           # geometry and fs come from the config, not a second copy here
+geom, fs = sim_a.geom, sim_a.fs
+s4p = os.path.join(OUT, f"analytic_{geom.n}el.s{geom.n}p")
+write_matrix_touchstone(s4p, sim_a.coupling, comments=("ex01: written from the analytic config",))
 ct = load_config("configs/fr2_4el_touchstone.yaml")
 ct.coupling.touchstone.path = s4p
 cfgs["touchstone"] = ct
 
-sims = {k: ArraySim(c) for k, c in cfgs.items()}
+sims = {"analytic": sim_a, **{k: ArraySim(c) for k, c in cfgs.items() if k != "analytic"}}
 t0 = banner("ex01  coupling sources: analytic / survey / touchstone", sims["survey"])
 
 print("\nPart 1 — S at f0 (adjacent S21, next-adjacent S31), dB / deg:")

@@ -46,12 +46,12 @@ coupling:
       ref: "abstract-level only (full texts unreachable from the build environment, see ROADMAP A1); arXiv:2407.09944 — 28 GHz FR-2 linear patch array, elements at ~lambda0/2, CATR OTA measurements; adjacent coupling in the -13..-16 dB class for uncompensated lambda/2 patches; US patent 10910732 — 28 GHz array, measured mutual coupling better than -16 dB; Int. J. Electron. Commun. (ScienceDirect S1434841126001263) — lambda/2 (5.4 mm) SIW endfire array, adjacent coupling below -15 dB in the lower band"
     c1_deg_at_f0:
       value: 180.0
-      source: survey
-      ref: "sign convention only: the adjacent coupled wave arrives half a wavelength (pi) later at f0 for lambda/2 pitch; the papers above do not publish the phase"
+      source: assumed
+      ref: "assumed: sign convention only -- the adjacent coupled wave arrives half a wavelength (pi) later at f0 for lambda/2 pitch; the papers above do not publish the phase"
     c2_rel_db:
       value: -6.0
-      source: survey
-      ref: "next-adjacent coupling 6 dB below adjacent is the common reading of published S-parameter plots for lambda/2 patch rows (free-space 1/r over twice the distance); no paper-level number"
+      source: assumed
+      ref: "assumed: next-adjacent coupling 6 dB below adjacent is the common reading of published S-parameter plots for lambda/2 patch rows (free-space 1/r over twice the distance); no paper-level number"
     path_delay_from_spacing: true
   touchstone:
     path: null

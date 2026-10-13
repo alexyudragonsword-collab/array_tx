@@ -80,14 +80,19 @@ def train(cfg: ArrayConfig, scheme: str, *, elements: list[ElementChain], x: np.
 
     if scheme == "per_element":
         observe = cfg.dpd.per_element_observe
+        ys_fixed = None
+        if observe == "antenna_port":
+            # the neighbours' drives do not change while element k trains:
+            # run them once and substitute row k inside the loop (O(n), not O(n^2))
+            ys_fixed = _run_all(elements, drives, wf, noise)
         for k, el in enumerate(elements):
             if observe == "pa_output":
                 pa: Callable[[np.ndarray], np.ndarray] = lambda u, el=el: el.run(u, wf, noise=noise).y
             else:   # antenna_port: own PA plus the leakage from the neighbours' steered drives
-                def pa(u, k=k):
-                    ds = list(drives)
-                    ds[k] = u
-                    return apply_coupling(_run_all(elements, ds, wf, noise), coupling, fs, f0)[k]
+                def pa(u, k=k, el=el):
+                    ys = ys_fixed.copy()
+                    ys[k] = el.run(u, wf, noise=noise).y
+                    return apply_coupling(ys, coupling, fs, f0)[k]
             ila = make_ila(cfg)
             ila.fit(pa, drives[k])
             bank.per_element.append(ila)

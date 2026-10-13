@@ -37,13 +37,19 @@ def test_type_coercion_and_inf():
         config_from_dict({"sim": {"noise": "yes"}})
 
 
-def test_survey_numbers_must_be_cited():
+def test_survey_numbers_must_carry_a_written_provenance():
+    """A bare scalar in the survey block does not load; survey needs a
+    citation; an honest assumed/derived label with a note is allowed."""
     with pytest.raises(ValueError, match="coupling.survey"):
         config_from_dict({"coupling": {"survey": {"c1_db": -15.0}}})
     with pytest.raises(ValueError, match="coupling.survey"):
         config_from_dict({"coupling": {"survey": {"c1_db": {"value": -15.0, "source": "survey"}}}})
     cfg = config_from_dict({"coupling": {"survey": {"c1_db": {"value": -15.0, "source": "survey", "ref": "paper X"}}}})
     assert cfg.provenance["coupling.survey.c1_db"].ref == "paper X"
+    cfg = config_from_dict({"coupling": {"survey": {"c1_deg_at_f0": {"value": 90.0, "source": "assumed", "ref": "why"}}}})
+    assert cfg.provenance["coupling.survey.c1_deg_at_f0"].source == "assumed"
+    with pytest.raises(ValueError, match="needs a ref"):
+        config_from_dict({"coupling": {"survey": {"c1_deg_at_f0": {"value": 90.0, "source": "assumed"}}}})
 
 
 def test_all_numbers_sourced_in_shipped_configs():
@@ -58,7 +64,9 @@ def test_all_numbers_sourced_in_shipped_configs():
                 src = cfg.provenance[ff.path].source
                 assert src in ("survey", "derived", "assumed", "measured"), (p, ff.path, src)
                 if ff.path.startswith("coupling.survey."):
-                    assert src == "survey" and cfg.provenance[ff.path].ref, (p, ff.path)
+                    assert cfg.provenance[ff.path].ref, (p, ff.path)
+                    if src == "assumed":
+                        assert cfg.provenance[ff.path].ref.startswith("assumed"), (p, ff.path)
 
 
 def test_form_fields_cover_every_leaf_with_help_and_unit_keys():
@@ -99,3 +107,24 @@ def test_shipped_survey_refs_equal_declared_refs():
     for ff in form_fields():
         if ff.path.startswith("coupling.survey.") and ff.source:
             assert cfg.provenance[ff.path].ref == ff.ref, ff.path
+
+
+def test_list_defaults_are_not_shared_between_configs():
+    a = default_config()
+    a.beam.scan_deg.append(45.0)
+    a.metrics.aclr_offsets[0] = 9
+    b = default_config()
+    assert b.beam.scan_deg == [0.0, 30.0, 60.0] and b.metrics.aclr_offsets == [1, 2]
+    assert form_fields()[[f.path for f in form_fields()].index("beam.scan_deg")].default == [0.0, 30.0, 60.0]
+
+
+def test_sidelobe_and_scan_deg_validation():
+    cfg = config_from_dict({"beam": {"sidelobe": -45.0}})
+    assert cfg.beam.sidelobe == -45.0
+    assert config_from_dict({"beam": {"sidelobe": "auto"}}).beam.sidelobe == "auto"
+    with pytest.raises(ValueError, match="sidelobe"):
+        config_from_dict({"beam": {"sidelobe": "left"}})
+    with pytest.raises(ValueError, match="scan_deg"):
+        config_from_dict({"beam": {"scan_deg": []}})
+    with pytest.raises(ValueError, match="scan_deg"):
+        config_from_dict({"beam": {"scan_deg": [0.0, 90.0]}})

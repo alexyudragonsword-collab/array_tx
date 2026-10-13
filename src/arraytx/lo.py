@@ -65,5 +65,6 @@ class ClockProfileLO:
     def integrated_jitter_s(self, f_lo: float, f_hi: float, n: int = 4000) -> float:
         """rms jitter from the profile between two offsets (diagnostic)."""
         f = np.geomspace(max(f_lo, self.f_grid[0]), min(f_hi, self.f0_hz / 2), n)
-        var = np.trapezoid(self.psd(f) / self.scale, f)      # rad^2, at f0
+        trap = getattr(np, "trapezoid", None) or np.trapz    # numpy 1.x has only trapz
+        var = trap(self.psd(f) / self.scale, f)              # rad^2, at f0
         return float(np.sqrt(var) / (2 * np.pi * self.f0_hz))

@@ -56,3 +56,15 @@ def test_engine_line_and_table():
     assert DISCLAIMER not in engine_line(["event"], "polar")
     t = table([{"a": 1.23456, "b": "x"}, {"a": 2.0, "b": "yy"}])
     assert "1.23" in t and "yy" in t
+
+
+def test_evm_equalize_follows_polartx_convention(fr2_sim):
+    """metrics.evm_equalize is PolarResult.evm's equalize: per_tone gives a
+    different (per-tone-equalised) number than scalar, as in polar_tx."""
+    r = fr2_sim.run(0.0, "none")
+    e = r.far["beam"][1]
+    scalar = ota_metrics(e, fr2_sim.wf, 0.0, "beam", equalize="scalar", with_sem=False)
+    tone = ota_metrics(e, fr2_sim.wf, 0.0, "beam", equalize="per_tone", with_sem=False)
+    assert scalar.evm_db != tone.evm_db
+    assert abs(scalar.evm_db - fr2_sim.elements[0].run(fr2_sim.x, fr2_sim.wf).raw.evm("scalar").db) > 0   # different signals
+    assert tone.evm_db < scalar.evm_db                                   # equalising can only help

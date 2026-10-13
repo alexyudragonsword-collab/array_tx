@@ -7,8 +7,8 @@
                ``domain="conducted"`` so a table cannot quietly present one
                as the other.
 
-The metric functions themselves are polar_tx's (``evm_rx``, ``aclr_multi``,
-``check_sem``): same conventions as a single chain, applied to a different
+The metric functions themselves are polar_tx's (``PolarResult.evm``'s
+``evm_of_signal``, ``aclr_multi``, ``check_sem``): same conventions as a single chain, applied to a different
 signal.  Every function here expects the signal sample-aligned with the
 waveform reference, which the far-field synthesis guarantees in the beam
 direction (array phase centre at the origin, steering compensated).
@@ -22,9 +22,8 @@ import numpy as np
 
 from .vendor.polartx.metrics.aclr_ext import aclr_multi
 from .vendor.polartx.metrics.masks import default_mask_spec
-from .vendor.polartx.metrics.ofdm_rx import evm_rx
 from .vendor.polartx.metrics.sem import check_sem
-from .vendor.polartx.vendor.padpd.metrics import psd
+from .vendor.polartx.vendor.padpd.metrics import evm_of_signal, psd
 from .vendor.polartx.waveforms.base import Waveform
 
 
@@ -65,7 +64,8 @@ def _measure(y: np.ndarray, wf: Waveform, *, offsets, equalize: str, with_sem: b
     y = np.asarray(y)
     if y.shape != wf.x.shape:
         raise ValueError(f"signal {y.shape} does not match the waveform {wf.x.shape}")
-    e = evm_rx(y, wf, track_cpe=(equalize == "per_tone"))
+    # polar_tx's PolarResult.evm convention: scalar | per_tone equalisation
+    e = evm_of_signal(y, wf.require_ofdm_ref(), equalize=equalize)
     ac = aclr_multi(y, wf.fs, wf.bw, offsets=tuple(int(o) for o in offsets))
     sem: dict[str, Any] = {}
     if with_sem:

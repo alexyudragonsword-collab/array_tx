@@ -2,6 +2,18 @@
 
 本文件按时间倒序记录实质进展——新条目在顶。每条只写摘要与指针（数字写原值）；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-10-13 · 评审修正：10 条发现，5 条真缺陷，survey 块的出处规则与 AGENTS 对齐
+
+- 真缺陷：`_f()` 的列表默认值被所有配置实例共享（改一个 `scan_deg` 会漏进之后的 `default_config()`）；`metrics.evm_equalize` 接到对
+  无导频波形无效的 `track_cpe` 上（改为 polar_tx `PolarResult.evm` 同款 `evm_of_signal(equalize=)`，per_tone 现在真的不同）；
+  rfdac 拓扑丢掉整个 `element.pa` 块和每单元失配种子（四个单元同一张 seed-0 阵列，违反铁律 1/5；现按 config 建 `RFDACConfig`、每单元自己的种子）；
+  `np.trapezoid` 在 numpy 1.x 不存在（polar_tx CI 踩过反向的坑，改 `getattr` 回退 `trapz`）；Touchstone v1 的 2 端口块是列序 S11 S21 S12 S22，读写都按行序会把 S21/S12 读反。
+- 规则修正：原校验强迫 `coupling.survey` 块里每个数都标 survey，和 AGENTS"没有出处就标 assumed，不许冒充 survey"矛盾。
+  现在的规则：该块每个数必须写明来历（survey 带引文，assumed / derived 带原因），裸标量不许进。`c1_deg_at_f0` 与 `c2_rel_db` 改标 assumed。
+- 其余：`beam.sidelobe` 接受数字并校验、`scan_deg` 非空且在 (−90, 90)；antenna_port 观测的每单元训练从 O(n²) 链路运行降到 O(n)；
+  ex01 不再自带第二份几何与 fs；banner 不再为打印引擎名多跑一次链路（`ElementChain.engine` 直接给出 `dtc_openloop`）。
+- 里程碑数字不受影响（默认 polar 拓扑、scalar EVM、4 端口 touchstone 都不走改动的分支）；测试 80 项。
+
 ## 2026-10-13 · GMP 默认值改为无记忆 7 阶：ACLR2 的损失来自记忆抽头，不是阶数（ROADMAP B5 了结）
 
 - 扫描：order ∈ {3,5,7,9} × memory_depth ∈ {1,3,5} × 滞后交叉项开/关，全阵列 DPD、30° 波束、survey 互耦、8 符号。

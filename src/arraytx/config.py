@@ -23,6 +23,7 @@ survey value without a citation is not allowed into the config (AGENTS.md).
 """
 from __future__ import annotations
 
+import copy
 import dataclasses
 import math
 from dataclasses import dataclass, field, fields, is_dataclass
@@ -47,7 +48,9 @@ def _f(default, unit: str, help: str, choices: tuple | None = None,
         md["source"] = source
         md["ref"] = ref or ""
     if isinstance(default, (list, dict, tuple)):
-        return field(default_factory=lambda: default, metadata=md, **kw)
+        # a fresh copy per instance: a shared list would let one config's
+        # mutation leak into every later default_config()
+        return field(default_factory=lambda: copy.deepcopy(default), metadata=md, **kw)
     return field(default=default, metadata=md, **kw)
 
 
@@ -106,18 +109,18 @@ SURVEY_REF_C1 = ("abstract-level only (full texts unreachable from the build env
                  "US patent 10910732 — 28 GHz array, measured mutual coupling better than -16 dB; "
                  "Int. J. Electron. Commun. (ScienceDirect S1434841126001263) — lambda/2 (5.4 mm) SIW endfire array, "
                  "adjacent coupling below -15 dB in the lower band")
-SURVEY_REF_PHASE = ("sign convention only: the adjacent coupled wave arrives half a wavelength (pi) later at f0 for "
-                    "lambda/2 pitch; the papers above do not publish the phase")
-SURVEY_REF_C2 = ("next-adjacent coupling 6 dB below adjacent is the common reading of published S-parameter plots "
-                 "for lambda/2 patch rows (free-space 1/r over twice the distance); no paper-level number")
+SURVEY_REF_PHASE = ("assumed: sign convention only -- the adjacent coupled wave arrives half a wavelength (pi) later "
+                    "at f0 for lambda/2 pitch; the papers above do not publish the phase")
+SURVEY_REF_C2 = ("assumed: next-adjacent coupling 6 dB below adjacent is the common reading of published S-parameter "
+                 "plots for lambda/2 patch rows (free-space 1/r over twice the distance); no paper-level number")
 
 
 @dataclass
 class CouplingSurveyCfg:
     c1_db: float = _f(-16.0, "dB", "adjacent-element coupling magnitude at f0 from published lambda/2 patch arrays at 28 GHz",
                       source="survey", ref=SURVEY_REF_C1)
-    c1_deg_at_f0: float = _f(180.0, "deg", "adjacent coupling phase at f0", source="survey", ref=SURVEY_REF_PHASE)
-    c2_rel_db: float = _f(-6.0, "dB", "next-adjacent coupling relative to c1", source="survey", ref=SURVEY_REF_C2)
+    c1_deg_at_f0: float = _f(180.0, "deg", "adjacent coupling phase at f0", source="assumed", ref=SURVEY_REF_PHASE)
+    c2_rel_db: float = _f(-6.0, "dB", "next-adjacent coupling relative to c1", source="assumed", ref=SURVEY_REF_C2)
     path_delay_from_spacing: bool = _f(True, "", "phase slope vs frequency = free-space delay over the element pitch (linear phase)")
 
 
@@ -139,7 +142,7 @@ class CouplingCfg:
 class BeamCfg:
     steering: str = _f("phase", "", "phase shifters (aligned at f0, squints) or true time delay", ("phase", "ttd"))
     scan_deg: list = _f([0.0, 30.0, 60.0], "deg", "scan angles to evaluate")
-    sidelobe: str = _f("auto", "", "sidelobe direction for the second metric set: auto = highest sidelobe of the array factor at f0")
+    sidelobe: "float | str" = _f("auto", "deg", "sidelobe direction for the second metric set: auto = highest sidelobe of the array factor at f0, or an angle")
 
 
 @dataclass
@@ -211,12 +214,27 @@ class ArrayConfig:
             raise ValueError("coupling.source=touchstone needs coupling.touchstone.path")
         if self.dpd.n_iterations < 1:
             raise ValueError("dpd.n_iterations must be >= 1")
-        # survey numbers must be cited (AGENTS.md: no uncited survey value)
+        # the survey block: every number carries a WRITTEN provenance.  A value
+        # read from a paper says survey + citation; one that is not in any
+        # paper says assumed (or derived) + why.  A bare scalar, or survey
+        # without a ref, does not load (AGENTS.md: no uncited number may
+        # call itself survey, and nothing enters this block without a note).
         for p, s in self.provenance.items():
             if p.startswith("coupling.survey.") and isinstance(_get(self, p), (int, float)) \
                     and not isinstance(_get(self, p), bool):
-                if s.source != "survey" or not s.ref:
-                    raise ValueError(f"{p}: coupling.survey numbers must carry source: survey and a ref (got {s.source!r})")
+                if not s.ref:
+                    raise ValueError(f"{p}: every coupling.survey number needs a ref (source {s.source!r}); "
+                                     "write {value, source, ref} -- survey with a citation, or assumed/derived with why")
+        if self.beam.sidelobe != "auto":
+            try:
+                float(self.beam.sidelobe)
+            except (TypeError, ValueError):
+                raise ValueError(f"beam.sidelobe must be 'auto' or a number, got {self.beam.sidelobe!r}") from None
+        if not self.beam.scan_deg:
+            raise ValueError("beam.scan_deg must list at least one angle")
+        for a in self.beam.scan_deg:
+            if not isinstance(a, (int, float)) or isinstance(a, bool) or not -90.0 < a < 90.0:
+                raise ValueError(f"beam.scan_deg entries must be numbers in (-90, 90), got {a!r}")
 
     def to_dict(self) -> dict:
         d = _asdict_public(self)
@@ -274,6 +292,12 @@ def _coerce(value, typ: str, path: str):
         if "None" in typ:
             return None
         raise ValueError(f"{path}: null not allowed")
+    if typ == "float | str":              # beam.sidelobe: 'auto' or an angle
+        if isinstance(value, str):
+            return value
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(f"{path}: expected 'auto' or a number, got {value!r}")
+        return float(value)
     if typ.startswith("bool"):
         if not isinstance(value, bool):
             raise ValueError(f"{path}: expected bool, got {value!r}")

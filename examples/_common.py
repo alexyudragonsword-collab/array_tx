@@ -36,8 +36,7 @@ def banner(title: str, sim) -> float:
     print("=" * 78)
     print(title)
     print("=" * 78)
-    print(sim.run(sim.cfg.beam.scan_deg[0], "none", conducted_diagnostics=False).info["engine_line"]
-          if False else _engine(sim))
+    print(_engine(sim))
     print(f"standard {sim.standard.name}: f0 {sim.f0 / 1e9:.1f} GHz, BW {sim.wf.bw / 1e6:.0f} MHz, "
           f"fs {sim.fs / 1e9:.5f} GS/s, {sim.n_symbols} OFDM symbols ({sim.wf.n} samples)"
           + ("  [ARRAYTX_SMOKE: short burst]" if smoke() else ""))
@@ -48,8 +47,7 @@ def banner(title: str, sim) -> float:
 
 def _engine(sim) -> str:
     from arraytx.report import engine_line
-    r = sim.elements[0].run(sim.x, sim.wf, noise=sim.cfg.sim.noise)
-    return engine_line([r.phasemod_mode], sim.cfg.element.topology)
+    return engine_line([e.engine for e in sim.elements], sim.cfg.element.topology)
 
 
 def done(t0: float, fig, name: str) -> None:

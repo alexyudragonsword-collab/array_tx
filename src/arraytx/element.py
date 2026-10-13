@@ -34,6 +34,7 @@ from .vendor.polartx import DPAConfig
 from .vendor.polartx.impairments import fractional_delay
 from .vendor.polartx.polar.split import polar_split
 from .vendor.polartx.presets import wifi_outphasing, wifi_rfdac
+from .vendor.polartx.rfdac import RFDACConfig
 from .vendor.polartx.vendor.pllsim.blocks.oscillator import OscConfig
 from .vendor.polartx.waveforms.base import Waveform
 
@@ -138,8 +139,21 @@ class ElementChain:
                        fout=fout, oversampling=int(standard.oversampling.value))
             if lo_obj is None and not standard.polartx_native:
                 kw2["lo_pn"] = fr2_lo_like_polartx(fout)
-            fac = wifi_outphasing if self.topology == "outphasing" else wifi_rfdac
-            self.preset = fac(**kw2)
+            if self.topology == "outphasing":
+                self.preset = wifi_outphasing(**kw2)
+            else:
+                # the RF-DAC is the element's array: the config's PA block
+                # (bits, thermometer MSBs, mismatch) and THIS element's
+                # mismatch seed, on the plan's LO.  wifi_rfdac's own default
+                # would give every element the same seed-0 array.
+                probe = wifi_rfdac(**kw2)
+                pm_cfg = probe.polar_tx.phasemod.cfg
+                pa = cfg.element.pa
+                kw2["rfdac"] = RFDACConfig(
+                    n_bits=pa.n_bits, n_thermo=pa.n_thermo, sigma_cell=pa.sigma_cell,
+                    seed=int(mismatch_seed), jitter_rms_s=pm_cfg.jitter_rms_s,
+                    fout=pm_cfg.fout, lo_pn=pm_cfg.lo_pn, lo_loop_bw=pm_cfg.lo_loop_bw)
+                self.preset = wifi_rfdac(**kw2)
             self.tx = self.preset.tx
         self._pin()
 
@@ -161,10 +175,21 @@ class ElementChain:
 
     @property
     def engine(self) -> str:
-        pm = getattr(self.tx, "phasemod", None) or getattr(getattr(self.tx, "tx", None), "phasemod", None)
-        if pm is None:
+        """The phase-modulation engine name as the run diagnostics report it
+        (``dtc_openloop`` / ``response`` / ``event``), or ``rfdac``."""
+        if self.topology == "rfdac":
             return "rfdac"
-        return getattr(getattr(pm, "cfg", None), "mode", None) or type(pm).__name__
+        pm = getattr(self.tx, "phasemod", None) or getattr(getattr(self.tx, "tx", None), "phasemod", None)
+        mode = getattr(getattr(pm, "cfg", None), "mode", None)
+        if mode:
+            return str(mode)
+        return "dtc_openloop" if type(pm).__name__ == "DTCPhaseModulator" else type(pm).__name__
+
+    @property
+    def pa_deviation_effective(self) -> bool:
+        """The PA deviation applies to the DPA's AM-AM / AM-PM; the RF-DAC has
+        neither, so for rfdac the draw is made (stream stability) but inert."""
+        return self.topology != "rfdac"
 
     # --------------------------------------------------------------- run
     def run(self, x_drive: np.ndarray, wf: Waveform, *, noise: bool = True) -> "ElementResult":
@@ -181,7 +206,9 @@ class ElementChain:
         info = dict(r.info)
         info["element"] = {"k": self.k, "errors": e, "run_seed": self.run_seed,
                            "lo_pn_seed": self.lo_pn_seed, "fs_scale": self.fs_scale,
-                           "dpa_mismatch_seed": self.dpa_cfg.seed}
+                           "dpa_mismatch_seed": self.dpa_cfg.seed,
+                           "pa_deviation_effective": self.pa_deviation_effective,
+                           "shared_lo_effective": self.shared_lo_effective}
         return ElementResult(y=y, info=info, raw=r)
 
 

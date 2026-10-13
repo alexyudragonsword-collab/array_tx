@@ -157,3 +157,28 @@ def test_three_topologies_run_sub6(topology):
     r = els[1].run(wf.x, wf)
     assert r.y.shape == wf.x.shape and np.isfinite(r.y).all()
     assert els[1].engine in ("dtc_openloop", "rfdac", "DTCPhaseModulator")
+
+
+def test_rfdac_elements_get_the_configs_array_and_their_own_seed():
+    """Invariants 1 and 5 for the RF-DAC topology: the config's PA block
+    sizes the DAC and each element draws its own mismatch."""
+    cfg = config_from_dict({"standard": "sub6_nr100", "array": {"n_elements": 2},
+                           "element": {"topology": "rfdac", "pa": {"n_bits": 9, "n_thermo": 4, "sigma_cell": 0.01}}})
+    st = get_standard(cfg.standard)
+    t = SeedTree(cfg.seed, 2)
+    wf = st.make_waveform(NSYM, 0)
+    els = build_elements(cfg, st, t, wf.x, wf)
+    r0, r1 = els[0].tx.rfdac, els[1].tx.rfdac
+    assert r0.cfg.n_bits == 9 and r0.cfg.n_thermo == 4 and r0.cfg.sigma_cell == 0.01
+    assert r0.cfg.seed != r1.cfg.seed and r0.cfg.seed == t.int_seed("dpa_mismatch", 0)
+    assert els[0].engine == "rfdac" and not els[0].pa_deviation_effective
+    off = config_from_dict({"standard": "sub6_nr100", "array": {"n_elements": 2},
+                           "element": {"topology": "rfdac", "errors": {"enabled": False}}})
+    els2 = build_elements(off, st, SeedTree(off.seed, 2), wf.x, wf)
+    assert els2[0].tx.rfdac.cfg.seed == els2[1].tx.rfdac.cfg.seed == 0
+
+
+def test_integrated_jitter_runs_on_this_numpy():
+    lo = ClockProfileLO("tests/data/clock_profile_test.yaml", fout_hz=7e9)
+    j = lo.integrated_jitter_s(1e3, 1e8)
+    assert 0 < j < 1e-9

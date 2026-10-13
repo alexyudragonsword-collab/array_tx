@@ -46,6 +46,7 @@
 ## 本仓库特有的硬规矩
 
 - 外部来源的每个数字都带 `source`（survey / derived / assumed / measured）和出处；没有出处就标 `assumed`，不许冒充 survey。
+  `coupling.survey` 块里每个数字都要写明来历（survey 带引文，assumed / derived 带原因），裸标量不许进。
 - `src/arraytx/vendor/` 是可校验的改编副本，不是 fork：pin 到上游完整 SHA，`tools/vendor_check.py --strict` 必须绿。
 - response / dtc_openloop 引擎出的杂散、互调结论一律标"线性化引擎，不能背书"；每个示例打印用的引擎。
 - 互耦在里程碑 1 只是线性泄漏；负载调制等 PA_DPD 的 load-pull，不在这里编。

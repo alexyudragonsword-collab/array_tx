@@ -3,7 +3,7 @@
 Only what the coupling matrix needs: the option line (frequency unit,
 ``S``, ``RI`` / ``MA`` / ``DB`` format, reference impedance), comment lines,
 and the per-frequency blocks.  For N >= 3 ports a block is N rows of N
-complex pairs (Touchstone wraps rows beyond four pairs; the reader just
+complex pairs (2-port blocks use the v1 column order S11 S21 S12 S22) (Touchstone wraps rows beyond four pairs; the reader just
 keeps reading numbers until it has N*N pairs, so any wrapping is fine).
 
 The writer emits ``Hz`` and ``RI`` with ``repr`` floats so a matrix written
@@ -72,6 +72,11 @@ def read_touchstone(path: str | Path) -> Touchstone:
     freqs = blocks[:, 0] * unit
     a = blocks[:, 1::2].reshape(-1, n, n)
     b = blocks[:, 2::2].reshape(-1, n, n)
+    if n == 2:
+        # Touchstone v1 writes 2-port blocks as S11 S21 S12 S22 (column
+        # order), unlike the row order used for 3+ ports
+        a = a.transpose(0, 2, 1)
+        b = b.transpose(0, 2, 1)
     if fmt == "RI":
         s = a + 1j * b
     elif fmt == "MA":
@@ -100,7 +105,8 @@ def write_touchstone(path: str | Path, freqs_hz, s, *, z0: float = 50.0,
         for row in range(n):
             vals = []
             for col in range(n):
-                v = s[fi, row, col]
+                # 2-port files are column-ordered (S11 S21 S12 S22), see reader
+                v = s[fi, col, row] if n == 2 else s[fi, row, col]
                 vals.append(f"{float(v.real)!r} {float(v.imag)!r}")
             fr = repr(float(f))
             head = f"{fr} " if row == 0 else " " * (len(fr) + 1)
