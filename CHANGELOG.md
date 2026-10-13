@@ -18,7 +18,7 @@
 - `geometry.py` / `beam.py`：频域逐频点远场合成（斜视真算）、相移 / 真延时导向、斜视解析式、最高旁瓣方向。
 - `coupling.py` / `touchstone.py`：analytic / survey / touchstone 三来源同一 `CouplingMatrix`、同一 `apply_coupling`；S=0 原样返回；.sNp 读写回读逐位。
 - `metrics.py` / `dpd.py` / `sim.py`：OTA 与导通两域指标；none / per_element（导通口 ILA-GMP）/ array（远场 ILA-GMP）；`ArraySim.run_matrix`。
-- 示例 ex00–ex04、`tools/fingerprint.py`（record / compare）、 项测试。
+- 示例 ex00–ex04、`tools/fingerprint.py`（record / compare）、74 项测试。
 
 **为什么这样做**
 

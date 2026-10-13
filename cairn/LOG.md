@@ -4,7 +4,7 @@
 
 ## 2026-10-13 · 里程碑 1 完成：4 单元 FR2 线阵、三种互耦、三种 DPD、OTA 指标（ccr-411c6423-uxcjms）
 
-- 验收逐条（全尺寸 8 符号，fs 1.96608 GS/s；`tests/`  项、`tools/vendor_check.py --strict` 86 文件无漂移）：
+- 验收逐条（全尺寸 8 符号，fs 1.96608 GS/s；`tests/` 74 项、`tools/vendor_check.py --strict` 86 文件无漂移）：
   (1) sub-6 / S=0 / 1 单元与 polar_tx `nr_dtc().run()` 逐位相同：True，EVM −39.91 dB 两边一致（ex00）。
   (2) 互耦→0 时每单元 vs 全阵列 DPD 的 OTA ACLR1 差 0.03 dB（< 0.5，ex02）。
   (4) 带边斜视：30° 实测 ±0.24/−0.23°、60° ±0.72/−0.70°，与 asin(sinθ0·f0/(f0+Δf)) 误差 0.00 %（ex03）。
