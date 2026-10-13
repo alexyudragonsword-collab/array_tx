@@ -1,0 +1,15 @@
+version: 0.1
+project:
+  name: "arraytx"
+  summary: "多单元阵列发射机行为级仿真框架：vendored polar_tx 单元链路 + 互耦进链路 + 真实带宽波束斜视 + 阵列级 DPD，指标只在远场（OTA）方向上读"
+cairn:
+  knowledge_dir: "cairn"
+  skill_spec_date: "2026-08-07"
+  # git_policy: track | ignore | private_sync — 本仓库公开，cairn/ 随仓库提交
+  git_policy: "track"
+  language: "zh"
+graduation:
+  # 暂缓对接：首次 graduation 时再收集 provider 决策
+  provider: none
+history:
+  migration_mode: "start_fresh"

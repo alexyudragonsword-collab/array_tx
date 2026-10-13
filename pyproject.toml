@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arraytx"
+version = "0.1.0"
+description = "Behavioral simulation of multi-element array transmitters: vendored polar_tx element chains, mutual coupling inside the chain, true-bandwidth beam squint, array-level DPD, metrics read over the air (far field)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Telecommunications Industry",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering",
+]
+keywords = ["phased array", "transmitter", "mutual coupling", "beam squint",
+            "DPD", "OTA", "EVM", "ACLR", "behavioral simulation", "RF"]
+
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "matplotlib>=3.7",
+    "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+# Pinned so CI and a laptop agree on the version (polar_tx CONTRIBUTING 8.1).
+dev = ["ruff==0.16.8"]
+
+[project.urls]
+Repository = "https://github.com/alexyudragonsword-collab/array_tx"
+Changelog = "https://github.com/alexyudragonsword-collab/array_tx/blob/main/CHANGELOG.md"
+Sister = "https://github.com/alexyudragonsword-collab/polar_tx"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+# src/arraytx/vendor/ is a verifiable adapted copy of polar_tx (which itself
+# carries PA_DPD and pll_simulator) plus one pll_simulator file.  Linting it
+# would push toward edits whose only purpose is silencing a warning, and every
+# such edit has to be declared in tools/vendor_manifest.json or the drift
+# checker fails.  Upstream's style is upstream's business.
+extend-exclude = ["src/arraytx/vendor"]
+
+[tool.ruff.lint]
+ignore = [
+    "E702",   # semicolon-compacted plotting lines in examples
+    "E731",   # a lambda in a table-driven test reads better than a def
+    "E741",   # `l` as a loop variable
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Examples import next to the plot panel they serve, so the narrative reads
+# top to bottom.
+"examples/*" = ["E402"]
