@@ -4,6 +4,14 @@
 
 ## 未发布 / Unreleased
 
+### 共用 LO 接真实时钟剖面：pll_simulator 的 18 个预设随包提供，EVM / ACLR 随 LO 扫描（2026-10-13）
+
+- `src/arraytx/data/clock_profiles/`：pll_simulator@00e48a2 用自己的 `export --clock-profile` 导出的全部 18 个预设（文件内 `source:` 行带提交号），未经编辑。
+  config 里 `element.lo.clock_profile: "bundled:<preset>"`，或相对 config 文件的路径。
+- `lo.py`：`resolve_profile`、`list_bundled`、`rms_phase_rad`（可按 DTC 的锁定近似在环路带宽以下压平）。剖面按 (f_c / f0)² 换算到载频。
+- 示例 ex05 与 5 项测试。数字见 `cairn/LOG.md`。
+- 为什么：FR2 链的 EVM 完全由 LO 决定（上一条 LOG），而共用 LO 这条路此前只用合成夹具测过。
+
 ### 里程碑 1：4 单元 FR2 线阵、三种互耦来源、三种 DPD 方案、OTA 指标（2026-10-13）
 
 **做了什么**

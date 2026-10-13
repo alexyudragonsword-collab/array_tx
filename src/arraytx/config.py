@@ -84,7 +84,7 @@ class ElementPACfg:
 @dataclass
 class ElementLOCfg:
     shared: bool = _f(True, "", "one physical LO for all elements (identical LO phase-noise sample; jitter stays per element)")
-    clock_profile: str | None = _f(None, "path", "pll_simulator clock-profile YAML for the shared LO; null = polar_tx preset LO")
+    clock_profile: str | None = _f(None, "path", "pll_simulator clock-profile YAML for the shared LO: a path, or bundled:<preset> for one shipped with arraytx; null = polar_tx preset LO")
     loop_bw_hz: float = _f(400e3, "Hz", "LO PLL loop bandwidth below which the profile is flattened (polar_tx convention)")
 
 
@@ -380,10 +380,14 @@ def load_config(path: str | Path) -> ArrayConfig:
     with open(path, "r", encoding="utf-8") as fh:
         data = yaml.safe_load(fh) or {}
     cfg = config_from_dict(data, str(path))
-    # a touchstone path is relative to the config file
+    # file paths are relative to the config file; "bundled:<name>" is a
+    # clock profile shipped with the package (arraytx.lo)
     ts = cfg.coupling.touchstone.path
     if ts and not Path(ts).is_absolute():
         cfg.coupling.touchstone.path = str((path.parent / ts).resolve())
+    cp = cfg.element.lo.clock_profile
+    if cp and not cp.startswith("bundled:") and not Path(cp).is_absolute():
+        cfg.element.lo.clock_profile = str((path.parent / cp).resolve())
     return cfg
 
 

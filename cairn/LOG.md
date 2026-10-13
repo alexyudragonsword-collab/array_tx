@@ -2,6 +2,22 @@
 
 本文件按时间倒序记录实质进展——新条目在顶。每条只写摘要与指针（数字写原值）；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-10-13 · 共用 LO 接真实时钟剖面：28 GHz 上 64-QAM 对 LO 的要求，EVM 跟带内相噪、ACLR 跟远端底
+
+- 数据：pll_simulator@00e48a2 用自己的 `export --clock-profile` 导出全部 18 个预设，随包提供（`bundled:<preset>`），按 (28 GHz / f0)² 换算。
+- 扫 8 个剖面 + polar_tx FR2 预设 LO，30° 波束、survey 互耦、8 符号（rms 相位 = 带内 100 Hz..200 MHz，环路带宽 400 kHz 以下压平；dB / dBc）：
+  dartizio23 ADPLL-BB 9.25 GHz：10.9 mrad，EVM −29.85 / DPD 后 −35.20，ACLR1 −36.9 / −41.9；
+  adpll_100m_10g：23.4 mrad，−28.52 / −31.75，ACLR −35.0 / −37.6；ilcm_250m_12g：24.2 mrad，−27.94 / −30.65，ACLR −30.9 / −31.8；
+  sspll_19p2m_4p8g：25.7 mrad，−28.21 / −31.08，ACLR −37.8 / −45.4；markulic16：29.7 mrad，−27.61 / −30.00；cppll_frac：32.0 mrad，−27.31 / −29.47；
+  adpll_bb_100m_10g：36.2 mrad，−26.73 / −28.65，ACLR −29.2 / −29.8；spll_100m_8g：36.3 mrad，−26.71 / −28.53；polar_tx 预设：39.6 mrad，−26.41 / −28.09。
+- 结论：(1) 九个 LO 全部满足 64-QAM 8 %（−21.9 dB）且余量 ≥ 4.5 dB；最干净的（dartizio23）DPD 后到 −35.2 dB。
+  (2) EVM 只认带内积分：按 100 Hz..fs/2 积分时 ilcm 排最差却不是最差 EVM，改为 100 Hz..BW/2 后 9 个点拟合残差 0.25 dB。
+  (3) ACLR 认 300 MHz 处的 L(f)：ilcm −118、adpll_bb −112 dBc/Hz 对应 ACLR1 −31 / −29 dBc，DPD 对它们无能为力（−31.8 / −29.8）；
+  其余剖面远端 −134…−141 dBc/Hz，ACLR 回到 DPD 残余的 −45。
+  (4) 斜率：无 DPD 0.31（PA 主导），DPD 后 0.64——仍不到 1，说明 DPD 残余 + 数据通路底在最干净端还占一部分。
+- 缺口：9 个剖面带离散 `spurs` 条目（参考杂散），`ClockProfileLO.psd` 只用 L(f) 曲线，没注入这些杂散（ROADMAP B6）。
+- 测试 88 项。耗时 ex05 全尺寸 22.6 s。
+
 ## 2026-10-13 · FR2 链的底在哪：EVM 由 LO 相噪与抖动定，ACLR 由 DPD 残余与噪声底合成
 
 - 分解（FR2 survey 配置、单元误差关、30° 波束、8 符号，OTA 波束方向；EVM dB / ACLR1 dBc / ACLR2 dBc）：

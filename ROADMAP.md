@@ -33,6 +33,10 @@ outphasing：a_max 已钉住，DPD 能跑，但分支恒包络、DPA 在满刻�
 全阵列与每单元 DPD 在波束方向差 0.07–0.12 dB，只在旁瓣方向差 0.3–0.7 dB。原因在 `cairn/architecture-invariants.md`
 "被推翻的预期"。要让"每单元 DPD 比互耦为零时差"这句话有可能成立，PA 模型要先有负载依赖（A2）。
 
+### B6. 时钟剖面里的离散杂散没注入
+18 个随包剖面中 9 个带 `spurs:`（参考杂散，频偏与 dBc），`lo.ClockProfileLO.psd` 只插值 L(f) 曲线。Halo 的做法是
+按正弦叠加、相位随机抽取（`tx/clock.py`）；这里要加就得给它一条自己的种子流（铁律 5），并且算进 ACLR 的是杂散落到邻道的那部分。
+
 ## C. 工程维护
 
 ### C1. GUI / Android 表单接入

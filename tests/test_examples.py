@@ -9,8 +9,9 @@ import pytest
 EXAMPLES = sorted(glob.glob("examples/ex*.py"))
 
 
-def test_there_are_five_examples():
-    assert [os.path.basename(p)[:4] for p in EXAMPLES] == ["ex00", "ex01", "ex02", "ex03", "ex04"]
+def test_the_examples_are_numbered_without_gaps():
+    assert [os.path.basename(p)[:4] for p in EXAMPLES] == [f"ex{i:02d}" for i in range(len(EXAMPLES))]
+    assert len(EXAMPLES) >= 6
 
 
 @pytest.mark.parametrize("path", EXAMPLES, ids=[os.path.basename(p) for p in EXAMPLES])

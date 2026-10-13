@@ -40,6 +40,9 @@ Sister = "https://github.com/alexyudragonsword-collab/polar_tx"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+arraytx = ["data/clock_profiles/*.yaml", "data/clock_profiles/README.md"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

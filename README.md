@@ -13,7 +13,7 @@ polar_tx 的姊妹库（polar_tx ROADMAP D：GUI 里不再加架构、不做接�
 pip install -e ".[test,dev]"
 python examples/ex00_single_element_equals_polartx.py   # sub-6、S=0、1 单元：与 polar_tx 逐位相同
 python examples/ex03_scan_angle_x_dpd.py                # 扫描角 × DPD 方案的 OTA EVM / ACLR 表
-pytest -q                                               # 82 项
+pytest -q                                               # 88 项
 ARRAYTX_SMOKE=1 python examples/ex04_aclr_vs_direction.py   # 短突发（CI 用的尺寸）
 ```
 
@@ -58,6 +58,7 @@ print(r.info["engine_line"]); print(r.beam.row()); print(r.sidelobe.row())
 | `ex02_coupling_strength_sweep` | 互耦从 0 扫到 −10 dB，三方案 OTA ACLR / EVM；S=0 时收敛 |
 | `ex03_scan_angle_x_dpd` | 0 / 30 / 60° × 三方案，波束与旁瓣方向；带边斜视 vs 解析；导通诊断 |
 | `ex04_aclr_vs_direction` | ACLR 随方向：非线性互调往哪辐射（方向图零点已标出） |
+| `ex05_lo_profiles` | 共用 LO 换成 pll_simulator 导出的 18 个时钟剖面之一（随包提供，`bundled:<preset>`），EVM / ACLR 随 LO |
 
 ## 模块
 
@@ -66,7 +67,7 @@ print(r.info["engine_line"]); print(r.beam.row()); print(r.sidelobe.row())
 | `config.py` | YAML → 数据类树，provenance，表单字段声明 | 1 |
 | `standards.py` | `fr2_nr400`（TS 38.101-2 出处）、`sub6_nr100`（polar_tx 原样） | — |
 | `seeds.py` | `SeedSequence` 派生：每单元、每损伤独立流 | 5 |
-| `element.py` / `lo.py` | polar_tx 预设建链、固定 fs_scale、单元误差抽了再置零、共用 LO / 时钟剖面 | 5 |
+| `element.py` / `lo.py` | polar_tx 预设建链、固定 fs_scale、单元误差抽了再置零、共用 LO；`bundled:<preset>` 时钟剖面按 (f_c/f0)² 换算到载频 | 5 |
 | `geometry.py` / `beam.py` | 线阵几何、相移 / 真延时导向、频域远场合成、斜视解析式 | 4 |
 | `coupling.py` / `touchstone.py` | 三来源 → `CouplingMatrix` → 唯一的 `apply_coupling`；.sNp 读写 | 3 |
 | `metrics.py` | `ota_metrics`（验收）与 `conducted_metrics`（诊断） | 2 |
