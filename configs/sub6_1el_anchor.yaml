@@ -60,11 +60,11 @@ dpd:
   n_iterations: 2
   regularization: 1.0e-09
   gmp:
-    order: 5
-    memory_depth: 3
-    lag_order: 1
-    lag_memory: 2
-    lag_span: 1
+    order: 7
+    memory_depth: 1
+    lag_order: 0
+    lag_memory: 0
+    lag_span: 0
     lead_order: 0
     lead_memory: 0
     lead_span: 0

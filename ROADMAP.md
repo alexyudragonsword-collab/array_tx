@@ -26,13 +26,9 @@ polar_tx ROADMAP B1：event 引擎 LTE-20 带宽已 29 % 相位推进不可用�
 polar_tx 的这两个预设是 WiFi 定制（5.9 GHz）。FR2 下只保证 polar。
 
 ### B4. 线性泄漏下每单元 DPD 对互耦不敏感——需要负载依赖的 PA 才能分开两种 DPD
-里程碑 1 实测（`cairn/LOG.md`）：互耦从 0 扫到相邻 −10 dB，三种方案在波束方向的 OTA ACLR 只动 0.02–0.08 dB；
-全阵列与每单元 DPD 在波束方向差 0.01–0.03 dB，只在旁瓣方向差约 1 dB。原因在 `cairn/architecture-invariants.md`
+里程碑 1 实测（`cairn/LOG.md`）：互耦从 0 扫到相邻 −10 dB，三种方案在波束方向的 OTA ACLR 只动 0.02–0.04 dB；
+全阵列与每单元 DPD 在波束方向差 0.07–0.12 dB，只在旁瓣方向差 0.3–0.7 dB。原因在 `cairn/architecture-invariants.md`
 "被推翻的预期"。要让"每单元 DPD 比互耦为零时差"这句话有可能成立，PA 模型要先有负载依赖（A2）。
-
-### B5. GMP 5 阶 DPD 把 ACLR2 变差
-ACLR1 追回 7.2 dB 的同时 ACLR2 从 −50.6 变到 −47.5 dBc（ex03，全尺寸）：5 阶基的频谱再生落在第二邻道，fs/BW = 4.9 已足够不是采样问题。
-该比较 GMP 阶数 / 记忆深度与 ACLR2 的关系，再定默认值；config 的 `dpd.gmp` 已可改。
 
 ## C. 工程维护
 

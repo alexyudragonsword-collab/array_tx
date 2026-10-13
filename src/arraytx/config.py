@@ -144,11 +144,16 @@ class BeamCfg:
 
 @dataclass
 class GMPCfg:
-    order: int = _f(5, "", "GMP aligned nonlinearity order")
-    memory_depth: int = _f(3, "taps", "GMP aligned memory depth")
-    lag_order: int = _f(1, "", "GMP lagging cross-term order (0 disables)")
-    lag_memory: int = _f(2, "taps", "GMP lagging memory")
-    lag_span: int = _f(1, "taps", "GMP lagging span")
+    """Defaults from the milestone-1 sweep (cairn/LOG.md 2026-10-13): the
+    element chain is nearly memoryless (DPA + DTC, no measured memory model),
+    so memory taps only fit noise and cost ACLR2 (order 9: -48.3 dBc at one
+    tap, -44.8 at five); a memoryless 7th order is the best of the 24
+    settings tried on ACLR1, ACLR2 and EVM alike, with 7 coefficients."""
+    order: int = _f(7, "", "GMP aligned nonlinearity order")
+    memory_depth: int = _f(1, "taps", "GMP aligned memory depth (1 = memoryless)")
+    lag_order: int = _f(0, "", "GMP lagging cross-term order (0 disables)")
+    lag_memory: int = _f(0, "taps", "GMP lagging memory")
+    lag_span: int = _f(0, "taps", "GMP lagging span")
     lead_order: int = _f(0, "", "GMP leading cross-term order (0 disables)")
     lead_memory: int = _f(0, "taps", "GMP leading memory")
     lead_span: int = _f(0, "taps", "GMP leading span")
