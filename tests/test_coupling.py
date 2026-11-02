@@ -162,3 +162,26 @@ def test_two_port_touchstone_uses_v1_column_order(tmp_path):
     write_touchstone(g, t.freqs_hz, t.s)
     assert np.array_equal(read_touchstone(g).s, t.s)
     assert "0.5 0.0" in g.read_text().split("\n")[1].split("  ")[1]   # second pair on the line is S21
+
+
+def test_pair_sparse_leak_equals_the_dense_einsum_bit_for_bit():
+    """apply_coupling accumulates over the non-zero pairs only (so 64+
+    elements do not allocate an (N, n, n) array); the dense form it replaced
+    is reproduced bit for bit because real and imaginary parts are
+    accumulated separately in j order, as numpy's complex einsum does."""
+    rng = np.random.default_rng(11)
+    n, nsamp = 5, 2048
+    f = np.array([27.6e9, 28.4e9])
+    s = (rng.standard_normal((2, n, n)) + 1j * rng.standard_normal((2, n, n))) * 0.05
+    s[:, 1, 3] = 0.0                                   # one identically-zero pair, skipped
+    m = CouplingMatrix(f, s, "dense")
+    ys = rng.standard_normal((n, nsamp)) + 1j * rng.standard_normal((n, nsamp))
+    got = apply_coupling(ys, m, 1.96608e9, 28e9)
+    Y = np.fft.fft(ys, axis=1)
+    f_rf = 28e9 + np.fft.fftfreq(nsamp, 1.0 / 1.96608e9)
+    dense = m.at(f_rf)
+    idx = np.arange(n)
+    dense[:, idx, idx] = 0.0
+    ref = np.fft.ifft(Y + np.einsum("fkj,jf->kf", dense, Y), axis=1)
+    assert np.array_equal(got, ref)
+    assert (1, 3) not in m.nonzero_pairs() and len(m.nonzero_pairs()) == n * n - 1

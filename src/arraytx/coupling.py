@@ -77,13 +77,28 @@ class CouplingMatrix:
         f_rf = np.asarray(f_rf, dtype=float)
         if self.freqs_hz.size == 1:
             return np.broadcast_to(self.s[0], f_rf.shape + self.s.shape[1:]).copy()
-        out = np.empty(f_rf.shape + self.s.shape[1:], dtype=complex)
-        for k in range(self.n):
-            for j in range(self.n):
-                re = np.interp(f_rf, self.freqs_hz, self.s[:, k, j].real)
-                im = np.interp(f_rf, self.freqs_hz, self.s[:, k, j].imag)
-                out[..., k, j] = re + 1j * im
+        out = np.zeros(f_rf.shape + self.s.shape[1:], dtype=complex)
+        for k, j in self.nonzero_pairs():
+            out[..., k, j] = self.at_pair(k, j, f_rf)
         return out
+
+    def nonzero_pairs(self) -> list[tuple[int, int]]:
+        """(k, j) pairs whose S_kj is not identically zero over the grid, in
+        row-major order.  A zero column interpolates to exactly 0, so the
+        pairs left out contribute nothing; skipping them is what keeps the
+        neighbour-only matrices O(n) instead of O(n^2) at 64+ elements."""
+        nz = np.any(self.s != 0.0, axis=0)
+        return [(int(k), int(j)) for k, j in zip(*np.nonzero(nz))]
+
+    def at_pair(self, k: int, j: int, f_rf) -> np.ndarray:
+        """S_kj interpolated onto ``f_rf`` (real and imaginary parts
+        separately, ends held) -- the one interpolation every path uses."""
+        f_rf = np.asarray(f_rf, dtype=float)
+        if self.freqs_hz.size == 1:
+            return np.full(f_rf.shape, self.s[0, k, j], dtype=complex)
+        re = np.interp(f_rf, self.freqs_hz, self.s[:, k, j].real)
+        im = np.interp(f_rf, self.freqs_hz, self.s[:, k, j].imag)
+        return re + 1j * im
 
     def scaled(self, db: float) -> "CouplingMatrix":
         """Off-diagonal terms scaled by ``db`` (``-inf`` -> zero coupling)."""
@@ -184,8 +199,21 @@ def apply_coupling(ys, m: CouplingMatrix, fs: float, f0: float) -> np.ndarray:
         return ys
     Y = np.fft.fft(ys, axis=1)                                  # (n, N)
     f_rf = f0 + np.fft.fftfreq(ys.shape[1], 1.0 / fs)
-    s = m.at(f_rf)                                              # (N, n, n)
-    idx = np.arange(m.n)
-    s[:, idx, idx] = 0.0
-    leak = np.einsum("fkj,jf->kf", s, Y)
-    return np.fft.ifft(Y + leak, axis=1)
+    # leak_k(f) = sum_j S_kj(f) Y_j(f), accumulated pair by pair in j order
+    # over the non-zero off-diagonal pairs only: the same sum as a dense
+    # (N, n, n) @ Y, term for term (a zero term adds exactly 0), without
+    # the n^2 x N array that would be 9 GB at 64 elements and 8 symbols.
+    # Real and imaginary parts are accumulated separately, which is what
+    # numpy's complex einsum does; the dense form this replaced is then
+    # reproduced bit for bit (a complex multiply-then-add differs in the
+    # last bit).  Checked by tools/fingerprint.py, not assumed.
+    leak_re = np.zeros(Y.shape)
+    leak_im = np.zeros(Y.shape)
+    for k, j in m.nonzero_pairs():
+        if k == j:
+            continue
+        skj = m.at_pair(k, j, f_rf)
+        ar, ai, br, bi = skj.real, skj.imag, Y[j].real, Y[j].imag
+        leak_re[k] += ar * br - ai * bi
+        leak_im[k] += ar * bi + ai * br
+    return np.fft.ifft(Y + (leak_re + 1j * leak_im), axis=1)

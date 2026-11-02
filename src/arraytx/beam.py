@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .geometry import LinearArray
+from .geometry import C0, LinearArray
 
 TWO_PI = 2.0 * np.pi
 
@@ -160,3 +160,90 @@ def highest_sidelobe_direction(geom: LinearArray, theta0_deg: float, mode: str,
         return None
     best = max(side, key=lambda i: af[i])
     return float(th[best])
+
+
+# ------------------------------------------------- squint as a beam EVM
+def tone_frequencies_hz(wf) -> np.ndarray:
+    """Baseband frequency of every active subcarrier of an OFDM waveform, in
+    the order ``tx_symbols`` uses (``tone_indices`` x subcarrier spacing)."""
+    ref = wf.require_ofdm_ref()
+    c = ref.config
+    scs = wf.fs / (c.fft_size * c.oversampling)
+    return np.asarray(ref.tone_indices, dtype=float) * scs
+
+
+def beam_response(geom: LinearArray, theta0_deg: float, f_bb_hz, mode: str) -> np.ndarray:
+    """The frequency response the far field in the BEAM direction sees after
+    steering to theta0 with an ideal, identical element behind every port:
+
+        H(f) = (1/n) sum_k W_k(f) exp(+j 2 pi (f0 + f) tau_k(theta0))
+
+    For ``ttd`` this is 1 at every f; for ``phase`` it is the Dirichlet
+    kernel (1/n) sum_k exp(j 2 pi f tau_k(theta0)) -- real for a centred
+    array, 1 at f = 0, drooping towards the band edges.  This is the squint
+    seen from the beam: a LINEAR, deterministic response, not noise."""
+    f = np.atleast_1d(np.asarray(f_bb_hz, dtype=float))
+    tau = geom.delays_s(theta0_deg)
+    if mode == "ttd":
+        return np.ones(f.shape, dtype=complex)
+    if mode != "phase":
+        raise ValueError(mode)
+    return np.exp(1j * TWO_PI * np.outer(f, tau)).sum(axis=1) / geom.n
+
+
+def squint_evm_closed_form_db(geom: LinearArray, theta0_deg: float, f_tones_hz,
+                              equalize: str = "scalar") -> float:
+    """EVM (dB) the phase-steering squint alone costs at the beam, on tones of
+    equal power: the residual of ``beam_response`` after the equaliser the
+    EVM convention allows.  ``scalar`` (one complex gain, polar_tx's
+    default) leaves the droop: EVM^2 = mean |H(f)/g - 1|^2 with g = mean H.
+    ``per_tone`` removes a per-tone linear response entirely: -inf."""
+    if equalize == "per_tone":
+        return -np.inf
+    if equalize != "scalar":
+        raise ValueError(equalize)
+    h = beam_response(geom, theta0_deg, f_tones_hz, "phase")
+    g = h.mean()
+    err = h / g - 1.0
+    rms = float(np.sqrt(np.mean(np.abs(err) ** 2)))
+    return -np.inf if rms == 0.0 else float(20.0 * np.log10(rms))
+
+
+def _af_vectorised(geom: LinearArray, theta0_deg: float, f_offset_hz: float,
+                   thetas_deg: np.ndarray, mode: str) -> np.ndarray:
+    """|AF| as ``array_factor_cw`` computes it, vectorised over theta (used
+    for the fine beamwidth grids; ``array_factor_cw`` is kept as is so the
+    squint / sidelobe numbers it produced do not move)."""
+    tau0 = geom.delays_s(theta0_deg)
+    f_rf = geom.f0_hz + f_offset_hz
+    w = np.exp(-1j * TWO_PI * (geom.f0_hz if mode == "phase" else f_rf) * tau0)
+    s = np.sin(np.deg2rad(thetas_deg))
+    tau = np.outer(s, geom.positions_m) / C0                     # (T, n)
+    af = np.abs(np.exp(1j * TWO_PI * f_rf * tau) @ w) / geom.n
+    g = np.array([geom.element_gain(t) for t in thetas_deg])
+    return af * g
+
+
+def beamwidth_3db_deg(geom: LinearArray, theta0_deg: float, mode: str = "phase",
+                      f_offset_hz: float = 0.0) -> float:
+    """Half-power width of the main lobe (degrees) at f0 + f_offset: the
+    contiguous run around the peak where |AF| >= peak / sqrt(2), on a grid
+    fine enough for the lobe (about 4000 points across 1.5x the textbook
+    width 0.886 lambda / (n d cos theta0), at least 0.5 deg of search)."""
+    if geom.n < 2:
+        return 180.0
+    c = max(np.cos(np.deg2rad(theta0_deg)), 1e-3)
+    guess = np.degrees(0.886 / (geom.n * geom.spacing_lambda * c))
+    half = max(1.5 * guess, 0.5)
+    th = np.linspace(theta0_deg - half, theta0_deg + half, 4001)
+    th = th[(th > -90.0) & (th < 90.0)]
+    af = _af_vectorised(geom, theta0_deg, f_offset_hz, th, mode)
+    i = int(np.argmax(af))
+    lvl = af[i] / np.sqrt(2.0)
+    lo = i
+    while lo > 0 and af[lo - 1] >= lvl:
+        lo -= 1
+    hi = i
+    while hi < th.size - 1 and af[hi + 1] >= lvl:
+        hi += 1
+    return float(th[hi] - th[lo])

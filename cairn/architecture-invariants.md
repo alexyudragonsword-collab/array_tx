@@ -27,13 +27,18 @@ authoring_mode: ai_generated
   `antenna_port` 作为可选项保留。里程碑 1 互耦是线性泄漏，负载调制等上游 PA 有负载依赖（ROADMAP A2）。
 - **工作点固定**：DPD 会扩展峰值，polar_tx 链路默认按峰值重新归一化包络；本库先跑一次参考得到 `fs_scale`，之后一律 `fs_scale_fixed`。
 - **共用 LO**：所有单元同一个 `lo_pn_seed`（DTC 相位调制器的独立 LO 流），抖动仍按单元独立；时钟剖面经适配器注入 PSD，不改 polar_tx。
+- **`apply_coupling` 的累加顺序**：只对非零 S_kj 对累加，实部虚部分开累加以复现 numpy 复数 einsum 的位序；
+  `tests/test_coupling.py::test_pair_sparse_leak_equals_the_dense_einsum_bit_for_bit` 钉住，换成"复数乘再加"会差 1e-15 而不再逐位相同。
 - **逐位相同的边界**：S 恰为全零时 `apply_coupling` 原样返回；单元误差开关关闭时增益 ×1.0、相位 ×(1+0j)、时延 0 跳过分数延时——这三条是"1 单元 = polar_tx 逐位相同"成立的前提。
 
 ## 被推翻的预期（里程碑 1）
 
-- **斜视不进波束方向 EVM**：4 单元 λ/2 在 60° 的带边斜视是 0.7°（与解析式一致），但相移与真延时导向的波束 EVM 只差 0.0002 dB。
-  阵列以相位中心为原点，带边各单元的相位误差 ±0.03 rad 对称抵消，只剩二阶幅度损失。斜视在这个阵列尺寸下是指向效应，不是 EVM 效应
+- **斜视不进波束方向 EVM——只在 n=4 成立**：4 单元 λ/2 在 60° 的带边斜视是 0.7°（与解析式一致），但相移与真延时导向的波束 EVM 只差 0.0002 dB。
+  阵列以相位中心为原点，带边各单元的相位误差 ±0.03 rad 对称抵消，只剩二阶幅度损失
   （`tests/test_sim_dpd.py::test_squint_is_a_pointing_effect_not_a_beam_evm_effect`）。
+  2026-11-02 更正（ex06）：这个二阶损失 ∝ n²，波束方向看到的是线性频响 H(f) = (1/n) Σ_k exp(j2πf τ_k)（`beam.beam_response`）；
+  scalar 均衡下它在 60° 从 n=64 起可测（+0.5 dB）、n=128 达 +4.9 dB，闭式 `squint_evm_closed_form_db` 预测到 0.01 dB；
+  per-tone 均衡全部抹平（`tests/test_scaling.py`）。
 - **线性泄漏不伤每单元 DPD**：DPA 对输入相位旋转协变，单波束下各单元只差一个复权重，泄漏是各单元非线性函数的线性组合；
   每单元 DPD 把各自输出线性化后，波束方向的 ACLR 与互耦无关。数字见 `cairn/LOG.md` 里程碑 1 条目。
 - **方向图零点里的 ACLR**：零点方向主载波被抵消而邻道失真没有，ACLR 可到 −20 dBc；这是真实的但不是任何人发射的方向，

@@ -4,6 +4,14 @@
 
 ## 未发布 / Unreleased
 
+### ex06 单元数扩展：斜视何时进波束 EVM；`apply_coupling` 改按非零对累加（2026-11-02）
+
+- `beam.py`：`beam_response`（相移导向下波束方向看到的线性频响 H(f)，Dirichlet 核）、`squint_evm_closed_form_db`（scalar 均衡残差）、
+  `beamwidth_3db_deg`、`tone_frequencies_hz`。ex06 扫 n = 4…128 × 0/30/60° × phase/ttd，scalar 与 per-tone 两种均衡口径。
+- `coupling.py`：`apply_coupling` 不再构造 (N, n, n) 稠密矩阵（64 单元 8 符号要 9 GB），改为只对非零 S_kj 对累加，实部虚部分开累加
+  以复现 numpy 复数 einsum 的位序——指纹 168 项逐位相同，另有测试钉住；64 单元冒烟一次 run 15.2 s → 2.3 s。
+- 结论与数字见 `cairn/LOG.md`；`cairn/architecture-invariants.md` 的"斜视不进 EVM"改为随 n 的陈述。测试 88 → 93 项。
+
 ### 换 pin 到 polar_tx@008cc90：四处修正回馈上游后，FR2 波形改用 polar_tx 自己的数字表（2026-10-13）
 
 - polar_tx 侧（其开发分支）：NR 400 MHz 数字表、`nr_dtc.fs_bb`、`CartesianTX` 可钉满刻度、抖动"抽了再置零"。

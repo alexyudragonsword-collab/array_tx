@@ -13,7 +13,7 @@ polar_tx 的姊妹库（polar_tx ROADMAP D：GUI 里不再加架构、不做接�
 pip install -e ".[test,dev]"
 python examples/ex00_single_element_equals_polartx.py   # sub-6、S=0、1 单元：与 polar_tx 逐位相同
 python examples/ex03_scan_angle_x_dpd.py                # 扫描角 × DPD 方案的 OTA EVM / ACLR 表
-pytest -q                                               # 88 项
+pytest -q                                               # 93 项
 ARRAYTX_SMOKE=1 python examples/ex04_aclr_vs_direction.py   # 短突发（CI 用的尺寸）
 ```
 
@@ -59,6 +59,7 @@ print(r.info["engine_line"]); print(r.beam.row()); print(r.sidelobe.row())
 | `ex03_scan_angle_x_dpd` | 0 / 30 / 60° × 三方案，波束与旁瓣方向；带边斜视 vs 解析；导通诊断 |
 | `ex04_aclr_vs_direction` | ACLR 随方向：非线性互调往哪辐射（方向图零点已标出） |
 | `ex05_lo_profiles` | 共用 LO 换成 pll_simulator 导出的 18 个时钟剖面之一（随包提供，`bundled:<preset>`），EVM / ACLR 随 LO |
+| `ex06_element_count_squint` | 单元数 4…128 × 0/30/60° × 相移 / 真延时：斜视从指向效应变成波束 EVM 的 n（闭式预测 vs 实测，per-tone 均衡抹平） |
 
 ## 模块
 
