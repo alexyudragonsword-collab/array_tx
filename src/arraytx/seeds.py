@@ -26,9 +26,12 @@ from numpy.random import Generator, SeedSequence, default_rng
 
 #: per-element streams, in a fixed order (the order is the spawn index)
 ELEMENT_STREAMS: tuple[str, ...] = (
-    "gain", "phase", "delay", "pa_dev", "dpa_mismatch", "run")
+    "gain", "phase", "delay", "pa_dev", "dpa_mismatch", "run", "lo_spurs")
 #: array-wide streams
-GLOBAL_STREAMS: tuple[str, ...] = ("lo", "waveform")
+GLOBAL_STREAMS: tuple[str, ...] = ("lo", "waveform", "lo_spurs")
+# ``lo_spurs`` (the start phase of each clock-profile spur) was appended to
+# both tuples later; SeedSequence.spawn is indexed, so the streams before it
+# kept their values bit for bit (fingerprinted).  New streams go at the END.
 
 
 class SeedTree:

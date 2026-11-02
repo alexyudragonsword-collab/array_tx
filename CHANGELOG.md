@@ -4,6 +4,14 @@
 
 ## 未发布 / Unreleased
 
+### B6 了结：时钟剖面的离散杂散注入共用 LO（2026-11-02）
+
+- `lo.py`：`ClockProfileLO.spurs_at_carrier()`（dbc 是单边带杂散电平 → 峰值相位 2·10^(dbc/20)，乘 f_c/f0；频偏不变）、`spur_rms_rad`、
+  `spur_phase_rad`。`element.py`：链输出乘 exp(jφ_spur(t))——polar_tx 把 LO 相位加在 DPA 的相位输入上、DPA 的 AM-AM / AM-PM 只看幅度码，
+  所以 LO 上加相位与输出旋转是同一信号（测试对比"把相位加在驱动上"：差在 DTC 重量化，< −40 dB）。
+- `seeds.py`：`lo_spurs` 流追加在两个元组末尾（spawn 按索引，既有流逐位不动；指纹 168 项相同）；`element.lo.spurs` 开关默认开，关时照抽再置零。
+- 示例 ex07（9 个带杂散剖面，关 / 开，无 DPD 与阵列 DPD）与 3 项测试。数字见 `cairn/LOG.md`。测试 93 → 97 项。
+
 ### ex06 单元数扩展：斜视何时进波束 EVM；`apply_coupling` 改按非零对累加（2026-11-02）
 
 - `beam.py`：`beam_response`（相移导向下波束方向看到的线性频响 H(f)，Dirichlet 核）、`squint_evm_closed_form_db`（scalar 均衡残差）、

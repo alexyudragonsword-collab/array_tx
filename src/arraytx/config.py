@@ -86,6 +86,7 @@ class ElementLOCfg:
     shared: bool = _f(True, "", "one physical LO for all elements (identical LO phase-noise sample; jitter stays per element)")
     clock_profile: str | None = _f(None, "path", "pll_simulator clock-profile YAML for the shared LO: a path, or bundled:<preset> for one shipped with arraytx; null = polar_tx preset LO")
     loop_bw_hz: float = _f(400e3, "Hz", "LO PLL loop bandwidth below which the profile is flattened (polar_tx convention)")
+    spurs: bool = _f(True, "", "inject the clock profile's discrete spurs (reference / fractional, its spurs: table) as sinusoidal LO phase modulation at the carrier, start phase per spur from its own seed stream; off = L(f) curve only (the phases are still drawn)")
 
 
 @dataclass

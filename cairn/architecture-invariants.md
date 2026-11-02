@@ -27,6 +27,9 @@ authoring_mode: ai_generated
   `antenna_port` 作为可选项保留。里程碑 1 互耦是线性泄漏，负载调制等上游 PA 有负载依赖（ROADMAP A2）。
 - **工作点固定**：DPD 会扩展峰值，polar_tx 链路默认按峰值重新归一化包络；本库先跑一次参考得到 `fs_scale`，之后一律 `fs_scale_fixed`。
 - **共用 LO**：所有单元同一个 `lo_pn_seed`（DTC 相位调制器的独立 LO 流），抖动仍按单元独立；时钟剖面经适配器注入 PSD，不改 polar_tx。
+  剖面的离散杂散走不了 PSD（polar_tx 按 PSD 抽随机幅度，杂散是已知幅度的正弦），改为链输出乘 exp(jφ_spur(t))：polar_tx 把 LO 相位加在
+  DPA 的相位输入上、DPA 的 AM-AM / AM-PM 只看幅度码，二者是同一信号（`tests/test_lo_profiles.py::test_spur_rotation_of_the_output_equals_an_lo_phase_added_at_the_drive`）。
+  起始相位来自 `lo_spurs` 流（共用 LO 时全阵一个抽取；新流只追加在元组末尾，既有流逐位不动）。
 - **`apply_coupling` 的累加顺序**：只对非零 S_kj 对累加，实部虚部分开累加以复现 numpy 复数 einsum 的位序；
   `tests/test_coupling.py::test_pair_sparse_leak_equals_the_dense_einsum_bit_for_bit` 钉住，换成"复数乘再加"会差 1e-15 而不再逐位相同。
 - **逐位相同的边界**：S 恰为全零时 `apply_coupling` 原样返回；单元误差开关关闭时增益 ×1.0、相位 ×(1+0j)、时延 0 跳过分数延时——这三条是"1 单元 = polar_tx 逐位相同"成立的前提。

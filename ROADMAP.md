@@ -24,11 +24,6 @@ rfdac：polar_tx@008cc90 起 `CartesianTX` 读 `fs_scale_fixed`，满刻度钉�
 outphasing：分支恒包络、DPA 在满刻度——无 DPD −44.7 dBc，DPD 后 −44.6（2 单元冒烟）。
 要让这两种拓扑的 DPD 有意义，得给 RF-DAC 加压缩模型（属 polar_tx），给 outphasing 加合路器 / 分支失配的校正（不是 ILA-GMP 这类）。
 
-### B6. 时钟剖面里的离散杂散没注入
-18 个随包剖面中 9 个带 `spurs:`（参考杂散，频偏与 dBc），`lo.ClockProfileLO.psd` 只插值 L(f) 曲线。Halo 的做法是
-按正弦叠加、相位随机抽取（`tx/clock.py`）；这里要加就得给它一条自己的种子流（铁律 5），并且算进 ACLR 的是杂散落到邻道的那部分。
-（2026-11-02 补记：此条在换 pin 提交 e8a622a 里被误删，LOG / CHANGELOG 仍引用它，工作并未做。）
-
 ## C. 工程维护
 
 ### C1. GUI / Android 表单接入

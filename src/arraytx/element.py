@@ -16,7 +16,17 @@ What this module adds on top of polar_tx:
 * per-element gain / phase / delay errors and a PA deviation are drawn from
   the element's own seed streams (invariant 5).  When ``errors.enabled`` is
   false they are still drawn, then zeroed — the draw order never changes;
-* the LO is shared across elements through ``DTCPMConfig.lo_pn_seed``.
+* the LO is shared across elements through ``DTCPMConfig.lo_pn_seed``;
+* the clock profile's discrete spurs are applied as a phase rotation of the
+  chain OUTPUT, exp(j phi_spur(t)).  polar_tx adds the LO phase to the phase
+  that drives the DPA, and the DPA's AM-AM / AM-PM depend on the amplitude
+  code alone, so a phase added at the LO and the same rotation of the output
+  are the same signal (the test compares against rotating the DRIVE instead,
+  which differs by the DTC's re-quantisation of a different phase sequence
+  only).  The outphasing combiner and the RF-DAC mixer multiply by the LO the
+  same way.  Start phases come from the ``lo_spurs`` stream (one draw for
+  all elements when the LO is shared, per element otherwise), drawn even when
+  ``element.lo.spurs`` is off.
 """
 from __future__ import annotations
 
@@ -27,7 +37,7 @@ from typing import Any
 import numpy as np
 
 from .config import ArrayConfig
-from .lo import ClockProfileLO
+from .lo import ClockProfileLO, spur_phase_rad
 from .seeds import SeedTree
 from .standards import Standard
 from .vendor.polartx import DPAConfig
@@ -127,6 +137,15 @@ class ElementChain:
         self.run_seed = tree.int_seed("run", k)
         self.lo_pn_seed = lo_pn_seed
         self.fs_scale = fs_scale
+        # clock-profile spurs: (offset_hz, peak_rad, start_phase_rad); the
+        # start phases are drawn whether or not the switch is on
+        self.spurs: list[tuple[float, float, float]] = []
+        if lo_obj is not None:
+            tab = lo_obj.spurs_at_carrier()
+            rng = tree.rng("lo_spurs") if cfg.element.lo.shared else tree.rng("lo_spurs", k)
+            psi = rng.uniform(0.0, 2.0 * np.pi, len(tab))
+            if cfg.element.lo.spurs:
+                self.spurs = [(f, a, float(p)) for (f, a), p in zip(tab, psi)]
 
         kw: dict[str, Any] = dict(cfr_papr_db=None, dpa=self.dpa_cfg,
                                   lo_loop_bw=cfg.element.lo.loop_bw_hz)
@@ -200,6 +219,9 @@ class ElementChain:
         wf_k = wf if x_drive is wf.x else replace(wf, x=x_drive)
         r = self.tx.run(wf_k, noise=noise, seed=self.run_seed)
         y = r.y
+        if self.spurs and noise:          # LO spurs: gated with the LO phase noise (polar_tx: noise=)
+            t = np.arange(y.size) / wf.fs
+            y = y * np.exp(1j * spur_phase_rad(t, [(f, a) for f, a, _ in self.spurs], [p for _, _, p in self.spurs]))
         e = self.errors
         if e.gain_db != 0.0 or e.phase_deg != 0.0:
             y = y * (10.0 ** (e.gain_db / 20.0) * np.exp(1j * np.deg2rad(e.phase_deg)))
@@ -208,7 +230,7 @@ class ElementChain:
         info = dict(r.info)
         info["element"] = {"k": self.k, "errors": e, "run_seed": self.run_seed,
                            "lo_pn_seed": self.lo_pn_seed, "fs_scale": self.fs_scale,
-                           "dpa_mismatch_seed": self.dpa_cfg.seed,
+                           "dpa_mismatch_seed": self.dpa_cfg.seed, "lo_spurs": len(self.spurs),
                            "pa_deviation_effective": self.pa_deviation_effective,
                            "shared_lo_effective": self.shared_lo_effective}
         return ElementResult(y=y, info=info, raw=r)

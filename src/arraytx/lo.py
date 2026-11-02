@@ -8,8 +8,13 @@ pll_simulator clock profile (``export/clock_profile.py``: single-sideband
 L(f) in dBc/Hz on a log grid), so a measured or exported PLL profile can
 drive every element without touching polar_tx.
 
-Only the L(f) curve is used; the profile's discrete ``spurs`` entries are
-read but not injected (ROADMAP B6).
+The L(f) curve goes in through ``psd``.  The profile's discrete ``spurs``
+(reference and fractional spurs, ``(offset_hz, dbc)``) cannot go that way:
+polar_tx synthesises the LO sample from the PSD with a random amplitude per
+bin, and a spur is a sinusoid of KNOWN amplitude.  :meth:`ClockProfileLO.
+spurs_at_carrier` converts the table to peak phase deviations at the carrier
+and ``element.py`` applies them as a phase rotation of the element output,
+start phase per spur from its own seed stream (invariant 5).
 
 Sharing itself is polar_tx's ``lo_pn_seed`` mechanism: every element's
 modulator gets the SAME integer, so they draw the identical LO sample while
@@ -108,6 +113,38 @@ class ClockProfileLO:
         trap = getattr(np, "trapezoid", None) or np.trapz    # numpy 1.x has only trapz
         return float(np.sqrt(trap(self.psd(fe), f)))
 
+    # spurs ----------------------------------------------------------------
+    def spurs_at_carrier(self) -> list[tuple[float, float]]:
+        """``(offset_hz, peak_phase_rad)`` per spur at the OUTPUT carrier.
+
+        The profile's ``dbc`` is the single-sideband spur level at its own
+        f0 (pll_simulator's ``20 log10(dphi * mag / 2)``, the same reading
+        Halo's ``tx/clock.py`` takes): a sinusoidal phase modulation of peak
+        ``a`` rad puts first-order sidebands at 20 log10(a / 2) dBc for small
+        ``a``, so a = 2 * 10^(dbc / 20).  Behind an ideal multiplier the
+        phase scales by fout / f0 (sqrt of the PSD scale); the offset does
+        not.  Entries are returned in the profile's order."""
+        out = []
+        for row in self.spurs:
+            f, dbc = (row["f_hz"], row["dbc"]) if isinstance(row, dict) else row
+            out.append((float(f), 2.0 * 10.0 ** (float(dbc) / 20.0) * float(np.sqrt(self.scale))))
+        return out
+
+    def spur_rms_rad(self, f_lo: float = 0.0, f_hi: float = np.inf) -> float:
+        """rms phase of the spurs with offsets in [f_lo, f_hi] at the carrier:
+        sqrt(sum a^2 / 2) -- the number a small-angle EVM estimate uses."""
+        return float(np.sqrt(sum(a * a / 2.0 for f, a in self.spurs_at_carrier() if f_lo <= f <= f_hi)))
+
     def integrated_jitter_s(self, f_lo: float, f_hi: float, n: int = 4000) -> float:
         """rms jitter of the PROFILE (at its own f0) between two offsets."""
         return self.rms_phase_rad(f_lo, f_hi, n) / np.sqrt(self.scale) / (2 * np.pi * self.f0_hz)
+
+
+def spur_phase_rad(t_s: np.ndarray, spurs: list[tuple[float, float]], start_phases_rad) -> np.ndarray:
+    """phi(t) = sum_i a_i sin(2 pi f_i t + psi_i): the LO phase the spur table
+    adds, for ``spurs`` as ``spurs_at_carrier`` gives them."""
+    t = np.asarray(t_s, dtype=float)
+    phi = np.zeros(t.shape)
+    for (f, a), psi in zip(spurs, start_phases_rad):
+        phi += a * np.sin(2.0 * np.pi * f * t + float(psi))
+    return phi
