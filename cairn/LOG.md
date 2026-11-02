@@ -2,6 +2,18 @@
 
 本文件按时间倒序记录实质进展——新条目在顶。每条只写摘要与指针（数字写原值）；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-11-02 · 体检：两库全绿，ROADMAP 丢了 B6（补回），上游走了 14 个提交但 vendored 物理零变化，pin 不动
+
+- array_tx `ccr-411c6423-uxcjms` @ 917f25d：ruff 过、88 项测试 60 s 全过（本地 Python 3.13 / numpy 2.5.3，CI 矩阵 3.10–3.12）、
+  ex00–ex05 冒烟各 2–8 s 退出 0、`vendor_check --strict` 49 文件无漂移、指纹对 10-13 换 pin 后的记录 168 项 0 差异。
+- 记录缺陷：换 pin 提交 e8a622a 删 B1 时把 B6（时钟剖面杂散未注入）一并删了，LOG / CHANGELOG 仍引用它，工作没做——已补回并注明。
+- 上游核对：polar_tx main 5d84ed0 → 9a7ab05（7 提交，GUI P0–P4b，Streamlit / Qt 前端退役，换单页 web GUI；vendored 范围内只有
+  `outphasing.py` 在 `env_skew_s ≠ 0` 时加一条 UserWarning，本库不设该字段）；PA_DPD 08b9725 → 6241112（7 提交全是 GUI，`src/` 零改动）；
+  pll_simulator 仍在 00e48a2。三个 pin 都不动：数字不会变，换 pin 只换头部。上次为 polar_tx 钉的 PySide6 < 6.12 随 Qt 退役失效，不再相关。
+- polar_tx 本地：PR #9 已合并（5d84ed0），开发分支 `claude/digital-polar-tx-dev-r0c338` 落后 main 7 个提交；再回馈上游前先重置到 main。
+- 宽规则 ruff（E,W,F,B,UP）284 条：264 条行长、6 条 `zip` 无 `strict`，无功能问题，不动。
+- 下一步（已选）：ex06 单元数扩展（斜视何时进 EVM）、B6 杂散注入。
+
 ## 2026-10-13 · 四处修正回馈 polar_tx 并换 pin 到 008cc90：指纹 168 项逐位相同，B1 了结、B3 更新
 
 - 上游（polar_tx `claude/digital-polar-tx-dev-r0c338`，4 个提交 3bdb092…008cc90，其测试 307 项全绿）：
