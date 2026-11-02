@@ -4,6 +4,19 @@
 
 ## 未发布 / Unreleased
 
+### 工作台 GUI：一份单页（桌面应用窗口 / 浏览器 / 手机宽度），标准库宿主，子进程队列（2026-11-02）
+
+- `guispec.py`：控件 = `form_fields()` 的每个叶子（分组、单位、取值、显隐规则、出处），指标按域（ota / info / diagnostic）声明，
+  图按种类声明；`values_to_config` 走 `config_from_dict`，GUI 改过的 survey 数字降为 assumed 并注明；`to_yaml` 写回 `{value, source, ref}`，载回同值同出处。
+- `guiutil.py`：`run_report` / `scan_report`（一个 ArraySim 跑 scan_deg × 方案，逐行回传）：OTA 波束 + 旁瓣、per-tone EVM、导通诊断、
+  三张图的数据、引擎行、可复现卡（seed、配置 sha256、vendored pin、等价调用）。`direction_scan` 用单元信号的 Welch 分段按方向合成，
+  与逐方向合成远场的精确路径 ACLR 差 < 1e-4 dB、方向图差 < 0.01 dB，每份报告的绘图数据 10.9 s → 0.8 s（全尺寸）。
+- `webhost.py`：`GET /api/spec|config|jobs`，`POST /api/validate|save|run|scan|jobs/<id>/cancel`；每个任务一个 spawn 子进程，取消即终止；
+  POST 要 `X-ArrayTX` 头；绑 127.0.0.1；`arraytx-gui` 开 Chromium 系应用窗口，关窗口即停（照 polar_tx `webhost`）。
+- `webui/www/`：无外部库的 HTML / CSS / JS + 内联 SVG 图；≤ 760 px 底部导航。设计取自本会话的两组效果图（Fable web 为主，
+  Opus 的扫描表驱动图、可复现卡、全宽引擎横条、模板"非一致性条款"标注）。
+- CI 加 `test-gui`（Playwright + Chromium，`ARRAYTX_REQUIRE_BROWSER=1`）。测试 97 → 119 项。ROADMAP C1 改写为剩余宿主。
+
 ### B6 了结：时钟剖面的离散杂散注入共用 LO（2026-11-02）
 
 - `lo.py`：`ClockProfileLO.spurs_at_carrier()`（dbc 是单边带杂散电平 → 峰值相位 2·10^(dbc/20)，乘 f_c/f0；频偏不变）、`spur_rms_rad`、

@@ -20,7 +20,7 @@
 2. 读根目录 `ROADMAP.md`（只写没做的）和 `CHANGELOG.md`（按里程碑）。
 3. 读 `cairn/LOG.md` 最新几条（新条目在顶）：数字原值、被推翻的判断、下一步。
 4. 读 `cairn/architecture-invariants.md`：六条铁律 ↔ 实现位置 ↔ 守护测试。
-5. 代码入口：`src/arraytx/sim.py`（ArraySim）、`config.py`、`coupling.py`、`beam.py`、`dpd.py`。
+5. 代码入口：`src/arraytx/sim.py`（ArraySim）、`config.py`、`coupling.py`、`beam.py`、`dpd.py`；GUI：`guispec.py`、`guiutil.py`、`webhost.py`、`webui/www/`。
 
 ## 文档职责
 
@@ -50,6 +50,7 @@
 - `src/arraytx/vendor/` 是可校验的改编副本，不是 fork：pin 到上游完整 SHA，`tools/vendor_check.py --strict` 必须绿。
 - response / dtc_openloop 引擎出的杂散、互调结论一律标"线性化引擎，不能背书"；每个示例打印用的引擎。
 - 互耦在里程碑 1 只是线性泄漏；负载调制等 PA_DPD 的 load-pull，不在这里编。
+- GUI 只画不算：控件表只从 `config.form_fields()` 生成（`guispec.py`），数字只从 `guiutil.py` → `ArraySim` 来，页面不许有第二套默认值或自己算的指标。
 - 只提交到 `ccr-411c6423-uxcjms`；不开 PR、不推 main；提交信息写为什么并带实测数字。
 
 ## 冲突仲裁与知识蒸馏

@@ -13,11 +13,26 @@ polar_tx 的姊妹库（polar_tx ROADMAP D：GUI 里不再加架构、不做接�
 pip install -e ".[test,dev]"
 python examples/ex00_single_element_equals_polartx.py   # sub-6、S=0、1 单元：与 polar_tx 逐位相同
 python examples/ex03_scan_angle_x_dpd.py                # 扫描角 × DPD 方案的 OTA EVM / ACLR 表
-pytest -q                                               # 97 项
+pytest -q                                               # 119 项（页面测试无 Chromium 时跳过）
 ARRAYTX_SMOKE=1 python examples/ex04_aclr_vs_direction.py   # 短突发（CI 用的尺寸）
 ```
 
 每个示例先打印它用的相位调制引擎；response / dtc_openloop 引擎出的杂散与互调结论一律标"线性化引擎，不能背书"。
+
+## 工作台（GUI）
+
+```bash
+pip install -e ".[gui-test]"            # 页面测试要 playwright；只用 GUI 不需要
+arraytx-gui --config configs/fr2_4el_survey.yaml   # 本地服务 + 浏览器应用窗口（关窗口即停）；--tab 开普通标签页；--no-browser 只服务
+```
+
+一份页面（`src/arraytx/webui/www`，HTML / CSS / JS，无外部库）由标准库 HTTP 宿主（`webhost.py`）提供，桌面开成应用窗口，
+手机宽度（≤ 760 px）切成底部导航，和 polar_tx 2026-10 起的做法一样。页面只画：控件表由 `form_fields()` 生成（`guispec.py`，
+一个控件 = 一个 YAML 键，出处标签可点开），计算全在 `guiutil.py` → `ArraySim`，每次运行是宿主起的一个子进程（队列、进度、取消）。
+主视图是扫描角 × DPD 的 OTA 结果表，点一行驱动四张图（ACLR 随方向 + 方向图、波束频谱 + stylized 模板、扫描矩阵、星座）；
+指标卡带 OTA 标签与对基线的差；导通口指标折叠在"诊断"条里，名字带 `conducted_`（铁律 2）；引擎行与免责声明常驻顶部；
+"可复现"卡给 seed、配置 sha256、vendored pin 和等价的两行 Python。保存 YAML 时带引文的数字写成 `{value, source, ref}`，
+GUI 里改过的 survey 数字自动降为 `assumed` 并注明。
 
 ## 一次仿真的数据流
 
@@ -75,6 +90,8 @@ print(r.info["engine_line"]); print(r.beam.row()); print(r.sidelobe.row())
 | `metrics.py` | `ota_metrics`（验收）与 `conducted_metrics`（诊断） | 2 |
 | `dpd.py` | none / per_element（导通口 ILA-GMP）/ array（远场 ILA-GMP） | — |
 | `sim.py` / `report.py` | `ArraySim` 串联；引擎行与免责声明 | — |
+| `guispec.py` / `guiutil.py` | GUI 契约（控件 = YAML 键、指标域、图）/ 报告（run / scan、绘图数据、可复现卡、YAML 往返） | 1, 2 |
+| `webhost.py` / `webui/www/` | 本地宿主（JSON API、子进程队列、应用窗口）/ 一份页面 | — |
 | `tools/fingerprint.py` | 重构前后逐位比对 | 6 |
 | `tools/vendor_check.py` | vendor 树对上游 pin 的漂移检查（`--strict`） | — |
 

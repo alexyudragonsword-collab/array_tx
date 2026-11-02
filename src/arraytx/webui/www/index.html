@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>array_tx 工作台</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:,">
+</head>
+<body>
+<!-- One page, served by arraytx.webhost (desktop / browser) or a WebView.
+     Everything it shows comes from the JSON API; nothing here computes.
+     Controls are generated from /api/spec (guispec), so a control is a YAML
+     key and nothing else. -->
+<header id="top">
+  <span class="brand">array_tx</span>
+  <span id="cfg-chip" class="chip" title="当前配置文件">…</span>
+  <button id="btn-open" class="btn" title="载入 YAML（桌面：输入路径；也可拖入 / 粘贴文本）">打开</button>
+  <button id="btn-save" class="btn" title="下载 YAML；桌面可写回文件">保存 YAML</button>
+  <label class="inline">seed <input id="seed" type="number" min="0" step="1"></label>
+  <label class="inline chk" title="2 个 OFDM 符号的短突发（CI 尺寸），快但指标偏乐观"><input id="smoke" type="checkbox"> 冒烟</label>
+  <span class="sp"></span>
+  <label class="inline">θ0 <select id="run-theta"></select></label>
+  <label class="inline">DPD <select id="run-scheme"></select></label>
+  <button id="btn-run" class="btn p">▶ 运行</button>
+  <button id="btn-scan" class="btn" title="scan_deg × 三方案，一次 ArraySim">⇄ 扫描</button>
+</header>
+<div id="engine" class="engine">engine: — 尚未运行</div>
+<div id="error" class="error" hidden></div>
+
+<main id="main">
+  <aside id="config" class="pane">
+    <div class="pane-h">配置 <span class="muted">= 唯一真值 · 每个控件一个 YAML 键</span>
+      <input id="filter" placeholder="筛选字段 / 说明 / 出处" aria-label="filter"></div>
+    <div id="form"></div>
+    <div class="pane-f"><button id="btn-revert" class="btn small">还原到文件</button>
+      <button id="btn-defaults" class="btn small">全部默认</button>
+      <span id="validate" class="muted small"></span></div>
+  </aside>
+
+  <section id="results" class="pane">
+    <div id="res-head" class="res-head">
+      <b id="res-title">结果</b> <span id="res-sub" class="muted"></span>
+      <span class="sp"></span>
+      <span id="baseline-chip" class="chip" hidden></span>
+      <button id="btn-pin" class="btn small" hidden>固定为基线</button>
+      <button id="btn-unpin" class="btn small" hidden>清除基线</button>
+    </div>
+    <div id="cards" class="cards"></div>
+    <div id="sidelobe" class="sl muted"></div>
+    <div class="plots">
+      <div class="plot"><div class="pt" id="pt-direction">ACLR1 随方向 · 失真往哪辐射 <span class="muted">零点涂灰、不报</span></div>
+        <div id="plot-direction" class="svgbox"></div></div>
+      <div class="plot"><div class="pt" id="pt-spectrum">波束方向远场频谱 + 模板 <span id="mask-note" class="muted"></span></div>
+        <div id="plot-spectrum" class="svgbox"></div></div>
+      <div class="plot"><div class="pt">扫描角 × DPD · OTA ACLR1 @ 波束 [dBc] <span class="muted">点击一格切换</span></div>
+        <div id="plot-grid" class="svgbox"></div></div>
+      <div class="plot"><div class="pt">星座 @ 波束 <span class="muted" id="const-note"></span></div>
+        <div id="plot-constellation" class="svgbox"></div></div>
+    </div>
+    <div class="tbl-h">结果表 <span class="muted">OTA · 波束方向与最高旁瓣 · 点击行切换上图</span></div>
+    <div class="tbl-wrap"><table id="table"><thead><tr>
+      <th>#</th><th>θ0</th><th>DPD</th><th>导向</th><th>EVM dB</th><th>ACLR1</th><th>ACLR2</th><th>模板</th><th>旁瓣 θ</th><th>旁瓣 ACLR1</th><th>s</th>
+    </tr></thead><tbody></tbody></table></div>
+    <details class="diag"><summary>导通口诊断 — conducted_*，不是验收指标（铁律 2）</summary>
+      <div id="diag"></div></details>
+  </section>
+
+  <aside id="side" class="pane">
+    <div class="pane-h">运行队列 <span id="queue-sub" class="muted"></span></div>
+    <div id="queue" class="queue"></div>
+    <div class="pane-h">历史 <span class="muted">点击查看 · ◆ 基线</span></div>
+    <div id="history" class="history"></div>
+    <div class="pane-h">可复现</div>
+    <div id="repro" class="repro muted">—</div>
+    <div class="pane-h">出处 <span class="muted">点击控件旁的标签</span></div>
+    <div id="prov" class="prov muted">—</div>
+  </aside>
+</main>
+
+<nav id="bottom-nav">
+  <button data-pane="config">⚙ 配置</button>
+  <button data-pane="results" class="on">▦ 结果</button>
+  <button data-pane="side">≡ 队列 / 历史</button>
+</nav>
+<div id="tip" class="tip" hidden></div>
+<script src="charts.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

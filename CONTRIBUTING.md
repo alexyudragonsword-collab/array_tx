@@ -36,3 +36,12 @@ python tools/fingerprint.py compare before.json after.json
 ## 4. 提交
 
 只提交到 `ccr-411c6423-uxcjms`。提交信息写为什么，带实测数字。每个里程碑结束：CHANGELOG 一条、`cairn/LOG.md` 一条、ROADMAP 删做完的。
+
+## 5. GUI
+
+- 页面不算物理：`webui/www/app.js` 只调 `/api/*`；控件来自 `/api/spec`（`guispec.controls()` = `form_fields()`），数字来自报告（`guiutil`）。
+  要加一个控件，先在 `config.py` 加字段；要加一个指标或图，先在 `guiutil` 算出来、在 `guispec.METRICS / PLOTS` 声明，再画。
+- 页面与宿主对账：`tests/test_webui.py::test_the_page_speaks_only_routes_the_host_answers`——app.js 里每个 `api("...")` 都得是宿主答的路由。
+- 页面测试跑在真 Chromium 里（`pip install -e ".[gui-test]"`，`python -m playwright install chromium`）；本机没有就跳过，
+  CI 的 `test-gui` 任务 `ARRAYTX_REQUIRE_BROWSER=1` 把跳过算失败。`ARRAYTX_CHROMIUM=/path/chrome` 指定二进制。
+- 启动：`arraytx-gui [--config x.yaml] [--port 8766] [--workers 2] [--tab | --no-browser]`。

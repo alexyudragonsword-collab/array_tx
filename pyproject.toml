@@ -29,6 +29,8 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest"]
+# the page tests drive a real Chromium (CI test-gui); a laptop without it skips them
+gui-test = ["pytest", "playwright"]
 # Pinned so CI and a laptop agree on the version (polar_tx CONTRIBUTING 8.1).
 dev = ["ruff==0.16.8"]
 
@@ -40,8 +42,12 @@ Sister = "https://github.com/alexyudragonsword-collab/polar_tx"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[project.scripts]
+# the one page (webui/www) on a local server, opened in a browser app window
+arraytx-gui = "arraytx.webhost:main"
+
 [tool.setuptools.package-data]
-arraytx = ["data/clock_profiles/*.yaml", "data/clock_profiles/README.md"]
+arraytx = ["data/clock_profiles/*.yaml", "data/clock_profiles/README.md", "webui/www/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

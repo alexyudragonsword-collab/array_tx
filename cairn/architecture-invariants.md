@@ -18,6 +18,8 @@ authoring_mode: ai_generated
 | 2 | 验收指标只在空间读 | `metrics.py`（`DirectionMetrics.domain`、`conducted_*` 只做诊断） | `tests/test_metrics.py`、`tests/test_sim_dpd.py::test_anchor_sim_equals_polartx_bitwise` |
 | 3 | 互耦进链路，三来源同一路径 | `coupling.py`（`apply_coupling` 唯一入口；S=0 短路） | `tests/test_coupling.py`、`tests/test_touchstone.py` |
 | 4 | 波束斜视按真实带宽算 | `beam.py`（`far_field` 频域逐频点） | `tests/test_beam.py` |
+| 1（GUI） | 控件 = YAML 键，默认值只读不写 | `guispec.py`（`controls()` 来自 `form_fields()`，`values_to_config` 走 `config_from_dict`） | `tests/test_guispec.py` |
+| 2（GUI） | 页面上的导通指标标 diagnostic | `guispec.METRICS` 的 `domain`、`guiutil.report_from_result` 的 `conducted_*` 键 | `tests/test_guiutil.py`、`tests/test_webui.py` |
 | 5 | 单元差异是种子可复现的随机实例 | `seeds.py`（`SeedSequence` 派生命名流）、`element.py`（抽了再置零） | `tests/test_seeds.py`、`tests/test_element.py`、`tests/test_sim_dpd.py::test_run_matrix_and_switch_independence` |
 | 6 | 数值指纹 | `tools/fingerprint.py` | `tests/test_fingerprint.py` |
 

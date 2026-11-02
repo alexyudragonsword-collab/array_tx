@@ -67,6 +67,28 @@ jobs:
   # Siblings are checked out at the pinned FULL SHA with full history, so a
   # pin is never "stale" relative to its own checkout and --strict is safe:
   # it turns any skipped (unverifiable) file red, which is the point.
+  # The page in a real Chromium against the real host (tests/test_webui.py).
+  # On a laptop without Playwright those tests skip; here the skip is a
+  # failure (ARRAYTX_REQUIRE_BROWSER=1) so a green run that tested nothing
+  # cannot pass for one that did.
+  test-gui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install with the page-test extra and a Chromium
+        run: |
+          pip install -e ".[gui-test]"
+          python -m playwright install --with-deps chromium
+      - name: Page tests (real browser, real host)
+        env:
+          ARRAYTX_REQUIRE_BROWSER: "1"
+          ARRAYTX_SMOKE: "1"
+        run: pytest -q tests/test_webui.py tests/test_webhost.py tests/test_guispec.py tests/test_guiutil.py
+
   vendor-drift:
     runs-on: ubuntu-latest
     steps:
