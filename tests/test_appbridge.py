@@ -65,14 +65,17 @@ def test_a_run_on_the_thread_backend_lands_the_same_report(tmp_path):
 def test_thread_backend_cancels_between_rows_and_reports_errors():
     q = JobQueue(workers=1, backend="thread")
     cfg = load_config("configs/fr2_4el_survey.yaml")
-    job = q.submit("scan", cfg, {"scan_deg": [0.0, 10.0, 20.0, 30.0, 40.0, 50.0], "schemes": ["none"], "n_symbols": SMOKE_SYMBOLS}, "x")
-    time.sleep(1.5)
+    angles = [float(a) for a in range(-80, 81, 8)]                        # 21 rows: no runner finishes them before the cancel
+    job = q.submit("scan", cfg, {"scan_deg": angles, "schemes": ["none"], "n_symbols": SMOKE_SYMBOLS}, "x")
+    t0 = time.time()
+    while q.get(job["id"])["n_rows"] < 1 and time.time() - t0 < 120:       # cancel as soon as the first row has landed
+        time.sleep(0.05)
     assert q.cancel(job["id"])
     t0 = time.time()
     while q.get(job["id"])["status"] == "running" and time.time() - t0 < 120:
         time.sleep(0.2)
     j = q.get(job["id"])
-    assert j["status"] == "cancelled" and 0 < len(j["rows"]) < 6          # stopped after the row that was running
+    assert j["status"] == "cancelled" and 0 < len(j["rows"]) < len(angles)    # stopped after the row that was running
     bad = q.submit("sweep", cfg, {"path": "array.n_elements", "points": [0], "n_symbols": SMOKE_SYMBOLS}, "y")
     t0 = time.time()
     while q.get(bad["id"])["status"] in ("queued", "running") and time.time() - t0 < 60:

@@ -78,7 +78,7 @@ def execute(kind: str, cfg_yaml: str, source_path: str | None, params: dict, emi
 
         def progress(i, n, row):
             emit("row", row)
-            if cancelled is not None and cancelled():
+            if i < n and cancelled is not None and cancelled():     # a cancel after the last row is a finished job
                 raise Cancelled()
         if kind == "run":
             rep = run_report(cfg, params.get("theta0_deg"), params.get("scheme"), n_symbols=n_symbols)
