@@ -117,6 +117,20 @@ def test_scan_job_streams_rows_and_can_be_cancelled(server):
     assert _get(server + "api/jobs/999")["ok"] is False
 
 
+def test_sweep_job_runs_one_leaf_over_points_and_validates_first(server):
+    cfg = load_config(ROOT / "configs" / "fr2_4el_survey.yaml")
+    vals = values_from_config(cfg)
+    bad = _post(server + "api/sweep", {"values": vals, "path": "dpd.scheme", "points": ["none", "magic"], "n_symbols": SMOKE_SYMBOLS})
+    assert bad["ok"] is False and "dpd.scheme" in bad["error"]          # every point is validated before anything runs
+    assert _post(server + "api/sweep", {"values": vals, "path": "nope.leaf", "points": [1]})["ok"] is False
+    j = _post(server + "api/sweep", {"values": vals, "path": "array.n_elements", "points": [2, 4], "theta0_deg": 60,
+                                     "scheme": "none", "n_symbols": SMOKE_SYMBOLS})["job"]
+    assert j["kind"] == "sweep" and j["progress"] == [0, 2] and "n_elements" in j["label"]
+    done = _wait(server, j["id"])
+    assert done["status"] == "done" and [r["sweep"]["value"] for r in done["rows"]] == [2, 4]
+    assert done["rows"][0]["info"]["n_elements"] == 2 and done["summary"]["path"] == "array.n_elements"
+
+
 def test_config_text_and_save_round_trip(server, tmp_path):
     cfg = load_config(ROOT / "configs" / "fr2_4el_analytic.yaml")
     c = _post(server + "api/config/text", {"yaml": (ROOT / "configs" / "fr2_4el_analytic.yaml").read_text(encoding="utf-8")})

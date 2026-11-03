@@ -25,6 +25,14 @@
   <button id="btn-run" class="btn p">▶ 运行</button>
   <button id="btn-scan" class="btn" title="scan_deg × 三方案，一次 ArraySim">⇄ 扫描</button>
 </header>
+<div id="sweepbar" class="sweepbar">
+  <span class="muted">扫描研究</span>
+  <select id="sweep-path" aria-label="swept control"></select>
+  <input id="sweep-points" placeholder="取值列表，如 4, 8, 16, 32, 64 或 true, false" aria-label="points">
+  <button id="btn-sweep" class="btn small" title="一个控件 × 取值列表，其余不变（seed、波形、既有单元的抽取都不动）；ex05 / ex06 / ex07 的通用形式">▶ 研究</button>
+  <span class="sp"></span>
+  <label class="inline">图上指标 <select id="sweep-metric"></select></label>
+</div>
 <div id="engine" class="engine">engine: — 尚未运行</div>
 <div id="error" class="error" hidden></div>
 
@@ -53,7 +61,7 @@
         <div id="plot-direction" class="svgbox"></div></div>
       <div class="plot"><div class="pt" id="pt-spectrum">波束方向远场频谱 + 模板 <span id="mask-note" class="muted"></span></div>
         <div id="plot-spectrum" class="svgbox"></div></div>
-      <div class="plot"><div class="pt">扫描角 × DPD · OTA ACLR1 @ 波束 [dBc] <span class="muted">点击一格切换</span></div>
+      <div class="plot"><div class="pt" id="pt-grid">扫描角 × DPD · OTA ACLR1 @ 波束 [dBc] <span class="muted">点击一格切换</span></div>
         <div id="plot-grid" class="svgbox"></div></div>
       <div class="plot"><div class="pt">星座 @ 波束 <span class="muted" id="const-note"></span></div>
         <div id="plot-constellation" class="svgbox"></div></div>

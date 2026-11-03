@@ -233,5 +233,34 @@ def scan_report(cfg: ArrayConfig | dict, scan_deg=None, schemes=None, *, n_symbo
             "engine_line": rows[0]["engine_line"] if rows else "", "repro": rows[0]["repro"] if rows else {}}
 
 
+def sweep_report(cfg: ArrayConfig | dict, path: str, points, theta0_deg: float | None = None,
+                 scheme: str | None = None, *, n_symbols: int | None = None, with_plots: bool = True,
+                 progress=None) -> dict[str, Any]:
+    """One control, many values: the page's form of ex05 (clock profile),
+    ex06 (element count) and ex07 (spurs on / off).  Every point is a fresh
+    ArraySim built from the config with that one leaf changed through
+    ``values_to_config`` (so the YAML the point would save is what ran),
+    everything else -- seed, waveform, draws of the elements that still
+    exist -- unchanged (invariant 5).  Rows carry ``sweep`` = {path, value}."""
+    from .guispec import values_to_config
+    base = _cfg(cfg)
+    flat0 = values_from_config(base)
+    rows = []
+    t0 = time.time()
+    pts = list(points)
+    for i, v in enumerate(pts):
+        flat = dict(flat0)
+        flat[path] = v
+        c = values_to_config(flat, base)
+        sim = ArraySim(c, n_symbols=n_symbols)
+        rep = report_from_result(sim, sim.run(theta0_deg, scheme), with_plots=with_plots)
+        rep["sweep"] = {"path": path, "value": _json(v), "index": i, "n": len(pts)}
+        rows.append(rep)
+        if progress is not None:
+            progress(i + 1, len(pts), rep)
+    return {"rows": rows, "path": path, "points": [_json(v) for v in pts], "seconds": time.time() - t0,
+            "engine_line": rows[0]["engine_line"] if rows else "", "repro": rows[0]["repro"] if rows else {}}
+
+
 def yaml_text(cfg: ArrayConfig | dict) -> str:
     return to_yaml(_cfg(cfg))

@@ -79,3 +79,18 @@ def test_direction_scan_equals_the_exact_far_field_path(fr2_sim):
     assert np.abs(a - a0).max() < 0.05
     assert np.abs((p - p.max()) - (p0 - p0.max())).max() < 0.05
     assert abs(a[np.argmin(np.abs(th - 30.0))] - r.beam.aclr1_db) < 0.05
+
+
+def test_sweep_report_changes_one_leaf_and_keeps_the_rest(fr2_sim):
+    """A sweep point is the config with one leaf changed through
+    values_to_config: the n=4 point of an element-count sweep equals the
+    plain run, and a spurs on/off sweep over a profile with no spurs is a
+    pair of identical rows (the switch is drawn-then-zeroed either way)."""
+    from arraytx.guiutil import sweep_report
+    rep = sweep_report(fr2_sim.cfg, "array.n_elements", [2, 4], 60.0, "none", with_plots=False)
+    assert [r["sweep"]["value"] for r in rep["rows"]] == [2, 4] and rep["path"] == "array.n_elements"
+    assert rep["rows"][1]["ota"]["beam"]["aclr1_dbc"] == fr2_sim.run(60.0, "none").beam.aclr1_db
+    assert rep["rows"][0]["info"]["n_elements"] == 2
+    off_on = sweep_report(fr2_sim.cfg, "element.lo.spurs", [False, True], 30.0, "none", with_plots=False)
+    a, b = (r["ota"]["beam"]["evm_db"] for r in off_on["rows"])
+    assert a == b                                      # the preset LO has no spur table: nothing to inject

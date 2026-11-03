@@ -20,6 +20,7 @@ another origin cannot add without a preflight this host does not answer):
     POST /api/save          {values, path}   write YAML (desktop)
     POST /api/run           {values, theta0_deg, scheme, n_symbols}   -> job
     POST /api/scan          {values, scan_deg, schemes, n_symbols}    -> job
+    POST /api/sweep         {values, path, points, theta0_deg, scheme, n_symbols}  -> job (one leaf, many values)
     GET  /api/jobs                    the queue (no rows)
     GET  /api/jobs/<id>               one job, rows included
     POST /api/jobs/<id>/cancel
@@ -63,7 +64,7 @@ def _worker(conn, kind: str, cfg_yaml: str, source_path: str | None, params: dic
     """Runs in a child process.  Sends ("row", report) per scan row, then
     ("done", summary); or ("error", text)."""
     try:
-        from .guiutil import run_report, scan_report
+        from .guiutil import run_report, scan_report, sweep_report
         cfg = config_from_dict(yaml.safe_load(cfg_yaml), source_path)
         n_symbols = params.get("n_symbols")
         if kind == "run":
@@ -75,6 +76,12 @@ def _worker(conn, kind: str, cfg_yaml: str, source_path: str | None, params: dic
                 conn.send(("row", row))
             rep = scan_report(cfg, params.get("scan_deg"), params.get("schemes"), n_symbols=n_symbols,
                               progress=progress)
+            conn.send(("done", {k: v for k, v in rep.items() if k != "rows"}))
+        elif kind == "sweep":
+            def progress(i, n, row):
+                conn.send(("row", row))
+            rep = sweep_report(cfg, params["path"], params["points"], params.get("theta0_deg"), params.get("scheme"),
+                               n_symbols=n_symbols, progress=progress)
             conn.send(("done", {k: v for k, v in rep.items() if k != "rows"}))
         else:
             conn.send(("error", f"unknown job kind {kind!r}"))
@@ -100,7 +107,8 @@ class JobQueue:
 
     def submit(self, kind: str, cfg: ArrayConfig, params: dict, label: str) -> dict:
         jid = str(next(self._ids))
-        n = 1 if kind == "run" else len(params["scan_deg"]) * len(params["schemes"])
+        n = {"run": 1, "scan": len(params.get("scan_deg", [])) * len(params.get("schemes", [])),
+             "sweep": len(params.get("points", []))}[kind]
         job = {"id": jid, "kind": kind, "label": label, "status": "queued", "progress": [0, n],
                "rows": [], "summary": None, "error": None, "created": time.time(), "started": None,
                "finished": None, "params": params, "config_sha256": config_sha(cfg),
@@ -347,6 +355,24 @@ class _Handler(BaseHTTPRequestHandler):
             params = {"scan_deg": scan, "schemes": schemes,
                       "n_symbols": None if req.get("n_symbols") in (None, "") else int(req["n_symbols"])}
             job = st.jobs.submit("scan", cfg, params, f"扫描 {len(scan)}×{len(schemes)} · {cfg.beam.steering}")
+            self._json({"ok": True, "job": job})
+        elif route == "sweep":
+            cfg = st.build(req.get("values") or {})
+            path = str(req["path"])
+            if path not in values_from_config(cfg):
+                raise ValueError(f"sweep: {path!r} is not a config leaf")
+            points = list(req.get("points") or [])
+            if not points:
+                raise ValueError("sweep: points is empty")
+            for v in points:                       # every point must build a valid config before anything runs
+                flat = values_from_config(cfg)
+                flat[path] = v
+                values_to_config(_from_json(flat), cfg)
+            params = {"path": path, "points": points,
+                      "theta0_deg": None if req.get("theta0_deg") is None else float(req["theta0_deg"]),
+                      "scheme": req.get("scheme") or cfg.dpd.scheme,
+                      "n_symbols": None if req.get("n_symbols") in (None, "") else int(req["n_symbols"])}
+            job = st.jobs.submit("sweep", cfg, params, f"研究 {path.split('.')[-1]} × {len(points)} · {params['scheme']}")
             self._json({"ok": True, "job": job})
         elif route.startswith("jobs/") and route.endswith("/cancel"):
             ok = st.jobs.cancel(route[5:-7])

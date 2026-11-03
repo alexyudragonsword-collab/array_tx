@@ -109,7 +109,7 @@ function refreshForm() {
   const n = Object.keys(S.values).filter(isModified).length;
   const chip = $("cfg-chip"); const name = S.loaded && S.loaded.source_path ? S.loaded.source_path.split(/[\\/]/).pop() : "（默认配置，未保存）";
   chip.textContent = name + (n ? ` ● ${n} 处未保存` : ""); chip.classList.toggle("mod", n > 0); chip.title = S.loaded && S.loaded.source_path || "";
-  fillRunSelectors();
+  fillRunSelectors(); fillSweepSelectors();
 }
 let validateTimer = null;
 function onChange(path) {
@@ -139,6 +139,28 @@ function showProvenance(path) {
     `<div class="muted">${c ? c.help : ""}</div>`;
   if (window.innerWidth <= 760) showPane("side");
 }
+function fillSweepSelectors() {
+  const sp = $("sweep-path"); if (sp.options.length) return;
+  S.spec.controls.filter(c => ["int", "float", "bool", "choice", "optional_float"].includes(c.kind)).forEach(c => {
+    const o = document.createElement("option"); o.value = c.path; o.textContent = c.path; sp.appendChild(o); });
+  sp.value = "array.n_elements";
+  const sm = $("sweep-metric");
+  ["evm_db", "aclr1_dbc", "aclr2_dbc", "sem_margin_db", "evm_per_tone_db"].forEach(id => { const o = document.createElement("option"); o.value = id; o.textContent = M()[id].zh + " [" + M()[id].unit + "]"; sm.appendChild(o); });
+  sm.addEventListener("change", renderGrid);
+  const hint = { "array.n_elements": "4, 8, 16, 32, 64, 128", "element.lo.spurs": "false, true", "coupling.scale_db": "-inf, -20, -10, -6, 0, 6",
+                 "element.lo.clock_profile": S.spec.bundled_profiles.slice(0, 3).map(n => "bundled:" + n).join(", "), "beam.steering": "phase, ttd" };
+  const setHint = () => { $("sweep-points").placeholder = hint[sp.value] || "取值列表，逗号分隔"; };
+  sp.addEventListener("change", setHint); setHint();
+}
+function parsePoints(path, text) {
+  const c = S.spec.controls.find(x => x.path === path);
+  return String(text).split(/[,\n]+/).map(t => t.trim()).filter(Boolean).map(t => {
+    const l = t.toLowerCase();
+    if (c.kind === "bool") return l === "true" || l === "1" || l === "on";
+    if (c.kind === "choice") return l === "null" || l === "none" ? null : t;
+    if (l === "-inf") return "-inf"; if (l === "null" || l === "none") return null;
+    return c.kind === "int" ? parseInt(t, 10) : parseFloat(t); });
+}
 function fillRunSelectors() {
   const th = $("run-theta"); const cur = th.value; th.innerHTML = "";
   (S.values["beam.scan_deg"] || []).forEach(t => { const o = document.createElement("option"); o.value = t; o.textContent = `${t > 0 ? "+" : ""}${t}°`; th.appendChild(o); });
@@ -150,7 +172,8 @@ function fillRunSelectors() {
 /* ---------------------------------------------------------------- jobs */
 async function submit(route, body) {
   showError(null);
-  try { const j = await api(route, { values: S.values, n_symbols: $("smoke").checked ? 2 : null, ...body }); S.jobs[j.job.id] = j.job; renderQueue(); startPolling(); }
+  try { const j = await api(route, { values: S.values, n_symbols: $("smoke").checked ? 2 : null, ...body }); S.jobs[j.job.id] = j.job; renderQueue();
+    S.pollAgain = true; startPolling(); }          // a poll already in flight may have listed the jobs before this one existed
   catch (e) { showError(e); }
 }
 function startPolling() { if (S.polling) return; S.polling = true; poll(); }
@@ -160,6 +183,9 @@ async function poll() {
     let active = false;
     for (const j of jobs) {
       const old = S.jobs[j.id]; S.jobs[j.id] = j;
+      // a restored copy of a job this host still holds: the live rows replace it
+      const dup = S.reports.filter(r => r.restored && String(r.jobId) === String(j.id) && r.sha === j.config_sha256);
+      if (dup.length) { S.reports = S.reports.filter(r => !dup.includes(r)); if (dup.some(r => r.key === S.selected)) S.selected = null; delete S.jobs["prev." + j.id]; renderAll(); }
       if (["queued", "running"].includes(j.status)) active = true;
       const seen = S.seenRows[j.id] || 0;
       if (j.n_rows > seen) {                           // new rows landed: fetch them
@@ -170,14 +196,25 @@ async function poll() {
       if (old && old.status !== j.status && j.status === "error") showError(new Error("运行失败 #" + j.id + "\n" + (j.error || "")));
     }
     renderQueue();
-    if (active) setTimeout(poll, 700); else S.polling = false;
+    if (active || S.pollAgain) { S.pollAgain = false; setTimeout(poll, 700); } else S.polling = false;
   } catch (e) { showError(e); S.polling = false; }
 }
 function addReport(job, i, rep) {
   const key = `${job.id}.${i}`;
-  S.reports.push({ key, jobId: job.id, i, rep, ts: new Date(), sha: job.config_sha256, label: job.label });
+  if (S.reports.some(r => r.key === key)) return;
+  S.reports.push({ key, jobId: job.id, i, rep, ts: new Date(), sha: job.config_sha256, label: job.label, kind: job.kind });
   if (!S.selected || S.autoFollow !== false) select(key, false);
-  renderTable(); renderHistory(); renderGrid();
+  renderTable(); renderHistory(); renderGrid(); persist();
+}
+/* the last reports survive a reload (localStorage, per host port); anything stored is what this page wrote */
+const STORE = "arraytx.reports." + location.port;
+function persist() {
+  try { localStorage.setItem(STORE, JSON.stringify(S.reports.slice(-12))); } catch (e) { /* quota or no storage: the page still works */ }
+}
+function restore() {
+  try { const prev = JSON.parse(localStorage.getItem(STORE) || "[]");
+    prev.forEach(r => { r.key = "prev." + r.key; r.restored = true; r.ts = new Date(r.ts); S.reports.push(r); S.jobs["prev." + r.jobId] = S.jobs["prev." + r.jobId] || { id: "prev." + r.jobId, kind: r.kind, label: r.label, status: "done", progress: [0, 0], created: 0 }; });
+  } catch (e) { /* ignore a broken store */ }
 }
 function renderQueue() {
   const q = $("queue"); q.innerHTML = "";
@@ -221,7 +258,7 @@ function renderCards() {
     box.appendChild(c); });
   const sl = rep.ota.sidelobe;
   $("sidelobe").innerHTML = sl ? `最高旁瓣 <b>${f(sl.theta_deg, 1)}°</b> <span class="dom">OTA</span> · EVM ${f(sl.evm_db, 2)} dB · ACLR1 ${f(sl.aclr1_dbc, 1)} dBc · ACLR2 ${f(sl.aclr2_dbc, 1)} dBc` : "单元数 1：无旁瓣";
-  $("res-title").textContent = `#${r.jobId}.${r.i + 1} · 波束 ${beam.theta_deg > 0 ? "+" : ""}${f(beam.theta_deg, 1)}° · ${LABELS[rep.scheme]}`;
+  $("res-title").textContent = `${r.restored ? "↺ 上次会话 " : "#"}${String(r.jobId).replace("prev.", "")}.${r.i + 1}${rep.sweep ? ` · ${rep.sweep.path}=${rep.sweep.value}` : ""} · 波束 ${beam.theta_deg > 0 ? "+" : ""}${f(beam.theta_deg, 1)}° · ${LABELS[rep.scheme]}`;
   $("res-sub").textContent = `${rep.info.n_elements} 单元 λ/2 · ${rep.info.f0_ghz} GHz / ${rep.info.bw_mhz} MHz · ${rep.info.coupling_source} ${f(rep.info.coupling_max_offdiag_db, 1)} dB · seed ${rep.repro.seed} · ${rep.info.n_symbols} 符号 · ${rep.info.evm_equalize} 均衡 · ${f(rep.seconds, 1)} s`;
   $("engine").textContent = rep.engine_line;
   $("btn-pin").hidden = false; $("btn-unpin").hidden = !S.baseline;
@@ -257,8 +294,33 @@ function renderPlots() {
   Charts.scatter($("plot-constellation"), { x: c.i, y: c.q, color: col, lim: 1.6, note: `${c.qam}-QAM · ${c.equalize} 均衡 · ${c.i.length} 点` });
   $("const-note").textContent = `EVM ${f(r.rep.ota.beam.evm_db, 2)} dB`;
 }
+function renderSweep(r, box) {
+  const same = S.reports.filter(x => x.jobId === r.jobId && x.rep.sweep).sort((a, b) => a.rep.sweep.index - b.rep.sweep.index);
+  const path = r.rep.sweep.path, mid = $("sweep-metric").value || "evm_db", m = M()[mid];
+  $("pt-grid").innerHTML = `研究 · ${path} → ${m.zh} [${m.unit}] @ 波束 ${r.rep.theta0_deg}° · ${LABELS[r.rep.scheme]} <span class="muted">${same.length}/${r.rep.sweep.n} 点，边跑边画</span>`;
+  const vals = same.map(x => x.rep.sweep.value), ys = same.map(x => x.rep.ota.beam[mid]);
+  const numeric = vals.every(v => typeof v === "number" && isFinite(v));
+  const b = get(S.baseline), bv = b && b.rep.ota.beam[mid];
+  if (numeric && vals.length > 1) {
+    const span = Math.max(...vals) / Math.max(1e-9, Math.min(...vals.filter(v => v > 0)));
+    const useLog = Math.min(...vals) > 0 && span >= 8;
+    const xs = useLog ? vals.map(v => Math.log2(v)) : vals;
+    const series = [{ x: xs, y: ys, color: COLORS[r.rep.scheme], marker: true, label: LABELS[r.rep.scheme] }];
+    if (bv !== undefined && bv !== null) series.push({ x: [xs[0], xs[xs.length - 1]], y: [bv, bv], color: "#8a8a85", dash: "5 3", label: "基线" });
+    Charts.lines(box, { series, xlab: useLog ? `${path} (log2)` : path, ylab: `${m.zh} [${m.unit}] · ${m.better === "lower" ? "低" : "高"} = 好`, legend: true,
+      tooltip: i => `${path} = ${vals[i]}\n${m.zh} ${Charts.fmt(ys[i])} ${m.unit}` });
+    box.querySelector("svg").addEventListener("click", ev => { const rc = box.querySelector("svg").getBoundingClientRect(); const fx = (ev.clientX - rc.left) / rc.width;
+      let best = 0, bd = 2; xs.forEach((x, i) => { const px = 42 / 560 + (x - Math.min(...xs)) / (Math.max(...xs) - Math.min(...xs) || 1) * (1 - 52 / 560); const d = Math.abs(px - fx); if (d < bd) { bd = d; best = i; } });
+      S.autoFollow = false; select(same[best].key, false); });
+  } else {
+    Charts.grid(box, { rows: [m.zh], cols: vals.map(v => String(v)), cells: [same.map(x => ({ v: x.rep.ota.beam[mid], text: Charts.fmt(x.rep.ota.beam[mid]), sub: `EVM ${x.rep.ota.beam.evm_db.toFixed(1)}`, sel: x.key === S.selected, base: x.key === S.baseline, key: x.key }))],
+      lo: Math.min(...ys), hi: Math.max(...ys), onclick: (i, j) => { S.autoFollow = false; select(same[j].key, false); } });
+  }
+}
 function renderGrid() {
   const box = $("plot-grid"); const r = get(S.selected); if (!r) { box.innerHTML = ""; return; }
+  if (r.rep.sweep) { renderSweep(r, box); return; }
+  $("pt-grid").innerHTML = `扫描角 × DPD · OTA ACLR1 @ 波束 [dBc] <span class="muted">点击一格切换</span>`;
   const same = S.reports.filter(x => x.jobId === r.jobId); const thetas = [...new Set(same.map(x => x.rep.theta0_deg))].sort((a, b) => a - b);
   const schemes = S.spec.schemes.filter(s => same.some(x => x.rep.scheme === s));
   const all = same.map(x => x.rep.ota.beam.aclr1_dbc);
@@ -271,7 +333,7 @@ function renderTable() {
   const tb = $("table").querySelector("tbody"); tb.innerHTML = "";
   S.reports.slice().reverse().forEach(r => { const rep = r.rep, b = rep.ota.beam, sl = rep.ota.sidelobe;
     const tr = document.createElement("tr"); tr.className = (r.key === S.selected ? "sel " : "") + (r.key === S.baseline ? "base" : "");
-    tr.innerHTML = `<td>${r.jobId}.${r.i + 1}</td><td>${b.theta_deg > 0 ? "+" : ""}${f(b.theta_deg, 0)}°</td><td>${LABELS[rep.scheme]}</td><td>${rep.steering}</td>` +
+    tr.innerHTML = `<td>${r.restored ? "↺ " : ""}${String(r.jobId).replace("prev.", "")}.${r.i + 1}${rep.sweep ? ` <span class="muted">${rep.sweep.path.split(".").pop()}=${rep.sweep.value}</span>` : ""}</td><td>${b.theta_deg > 0 ? "+" : ""}${f(b.theta_deg, 0)}°</td><td>${LABELS[rep.scheme]}</td><td>${rep.steering}</td>` +
       `<td>${f(b.evm_db, 2)}</td><td>${f(b.aclr1_dbc, 2)}</td><td>${f(b.aclr2_dbc, 2)}</td><td class="${b.sem_passes ? "ok" : "fail"}">${b.sem_passes ? "✓" : "✗"} ${f(b.sem_margin_db, 2)}</td>` +
       `<td>${sl ? f(sl.theta_deg, 1) + "°" : "—"}</td><td>${sl ? f(sl.aclr1_dbc, 2) : "—"}</td><td>${f(rep.seconds, 1)}</td>`;
     tr.addEventListener("click", () => { S.autoFollow = false; select(r.key, true); });
@@ -280,7 +342,7 @@ function renderTable() {
 function renderHistory() {
   const h = $("history"); h.innerHTML = "";
   S.reports.slice().reverse().slice(0, 30).forEach(r => { const b = r.rep.ota.beam; const d = document.createElement("div"); d.className = "hist" + (r.key === S.selected ? " sel" : "");
-    d.innerHTML = `<input type="radio" name="base" title="固定为基线" ${r.key === S.baseline ? "checked" : ""}><span>#${r.jobId}.${r.i + 1} ${b.theta_deg > 0 ? "+" : ""}${f(b.theta_deg, 0)}° ${LABELS[r.rep.scheme]}</span><span class="m">${f(b.evm_db, 2)} / ${f(b.aclr1_dbc, 1)}</span>`;
+    d.innerHTML = `<input type="radio" name="base" title="固定为基线" ${r.key === S.baseline ? "checked" : ""}><span>${r.restored ? "↺" : "#"}${String(r.jobId).replace("prev.", "")}.${r.i + 1} ${b.theta_deg > 0 ? "+" : ""}${f(b.theta_deg, 0)}° ${LABELS[r.rep.scheme]}${r.rep.sweep ? " · " + r.rep.sweep.path.split(".").pop() + "=" + r.rep.sweep.value : ""}</span><span class="m">${f(b.evm_db, 2)} / ${f(b.aclr1_dbc, 1)}</span>`;
     d.querySelector("input").addEventListener("click", ev => { ev.stopPropagation(); S.baseline = r.key; renderAll(); });
     d.addEventListener("click", () => { S.autoFollow = false; select(r.key, true); });
     h.appendChild(d); });
@@ -317,6 +379,9 @@ function showPane(name) { document.querySelectorAll(".pane").forEach(p => p.clas
     $("seed").addEventListener("change", () => { S.values.seed = parseInt($("seed").value, 10) || 0; onChange("seed"); });
     $("btn-run").addEventListener("click", () => submit("run", { theta0_deg: parseFloat($("run-theta").value), scheme: $("run-scheme").value }));
     $("btn-scan").addEventListener("click", () => submit("scan", {}));
+    $("btn-sweep").addEventListener("click", () => { const path = $("sweep-path").value; const pts = parsePoints(path, $("sweep-points").value || $("sweep-points").placeholder);
+      submit("sweep", { path, points: pts, theta0_deg: parseFloat($("run-theta").value), scheme: $("run-scheme").value }); });
+    restore();
     $("run-scheme").addEventListener("change", () => { $("run-scheme").dataset.touched = "1"; });
     $("btn-open").addEventListener("click", openConfig); $("btn-save").addEventListener("click", saveConfig);
     $("btn-revert").addEventListener("click", () => applyLoaded(S.loaded));
@@ -332,7 +397,11 @@ function showPane(name) { document.querySelectorAll(".pane").forEach(p => p.clas
     // deep links (and the browser tests): ?smoke=1  ?run=30,none  ?scan=1
     const q = new URLSearchParams(location.search);
     if (q.get("smoke") === "1") $("smoke").checked = true;
+    if (q.get("theta")) $("run-theta").value = q.get("theta");
+    if (q.get("scheme")) { $("run-scheme").value = q.get("scheme"); $("run-scheme").dataset.touched = "1"; }
     if (q.get("run")) { const [t, s] = q.get("run").split(","); await validate(); submit("run", { theta0_deg: parseFloat(t), scheme: s || $("run-scheme").value }); }
     if (q.get("scan") === "1") { await validate(); submit("scan", {}); }
+    if (q.get("sweep")) { const [path, ...pts] = q.get("sweep").split(","); await validate();
+      submit("sweep", { path, points: parsePoints(path, pts.join(",")), theta0_deg: parseFloat($("run-theta").value), scheme: $("run-scheme").value }); }
   } catch (e) { showError(e); }
 })();

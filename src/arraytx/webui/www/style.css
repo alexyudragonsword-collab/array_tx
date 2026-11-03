@@ -24,6 +24,10 @@ header#top { display: flex; align-items: center; gap: 8px; padding: 6px 12px; ba
 .sp { flex: 1; }
 .muted { color: var(--mute); font-weight: 400; }
 .small { font-size: 12px; }
+.sweepbar { display: flex; align-items: center; gap: 8px; padding: 5px 12px; background: #fff; border-bottom: 1px solid var(--line); font-size: 12px; flex-wrap: wrap; }
+.sweepbar select, .sweepbar input { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; background: #fff; font-size: 12px; }
+.sweepbar input { width: 300px; }
+@media (max-width: 760px) { .sweepbar { display: none; } }
 .engine { background: var(--amber); color: var(--amber-ink); border-bottom: 1px solid #f1dfb3; padding: 5px 12px; font-size: 12px; }
 .error { background: #fdecec; color: #a12d2d; padding: 6px 12px; font-size: 12px; white-space: pre-wrap; }
 

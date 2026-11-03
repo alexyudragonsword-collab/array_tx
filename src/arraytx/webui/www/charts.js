@@ -59,7 +59,9 @@ const Charts = (() => {
     o.series.forEach(s => { let d = "", pen = false;
       s.x.forEach((x, i) => { const y = s.y[i]; if (y === null || y === undefined || !isFinite(y)) { pen = false; return; }
         d += (pen ? " L" : " M") + X(x).toFixed(1) + "," + Y(Math.max(y0, Math.min(y1, y))).toFixed(1); pen = true; });
-      svg.appendChild(el("path", { d, fill: "none", stroke: s.color, "stroke-width": s.width || 1.6, "stroke-dasharray": s.dash || null })); });
+      svg.appendChild(el("path", { d, fill: "none", stroke: s.color, "stroke-width": s.width || 1.6, "stroke-dasharray": s.dash || null }));
+      if (s.marker) s.x.forEach((x, i) => { const y = s.y[i]; if (y === null || y === undefined || !isFinite(y)) return;
+        svg.appendChild(el("circle", { cx: X(x).toFixed(1), cy: Y(Math.max(y0, Math.min(y1, y))).toFixed(1), r: s.marker === true ? 3.5 : s.marker, fill: s.color })); }); });
     if (o.legend !== false) { let lx = L + 6; o.series.forEach(s => { if (!s.label) return;
       svg.appendChild(el("line", { x1: lx, y1: T + 8, x2: lx + 14, y2: T + 8, stroke: s.color, "stroke-width": 2, "stroke-dasharray": s.dash || null }));
       const t = el("text", { x: lx + 17, y: T + 11, class: "lg", fill: s.color }, s.label); svg.appendChild(t); lx += 24 + s.label.length * 6.2; }); }

@@ -13,7 +13,7 @@ polar_tx 的姊妹库（polar_tx ROADMAP D：GUI 里不再加架构、不做接�
 pip install -e ".[test,dev]"
 python examples/ex00_single_element_equals_polartx.py   # sub-6、S=0、1 单元：与 polar_tx 逐位相同
 python examples/ex03_scan_angle_x_dpd.py                # 扫描角 × DPD 方案的 OTA EVM / ACLR 表
-pytest -q                                               # 119 项（页面测试无 Chromium 时跳过）
+pytest -q                                               # 122 项（页面测试无 Chromium 时跳过）
 ARRAYTX_SMOKE=1 python examples/ex04_aclr_vs_direction.py   # 短突发（CI 用的尺寸）
 ```
 
@@ -33,6 +33,9 @@ arraytx-gui --config configs/fr2_4el_survey.yaml   # 本地服务 + 浏览器应
 指标卡带 OTA 标签与对基线的差；导通口指标折叠在"诊断"条里，名字带 `conducted_`（铁律 2）；引擎行与免责声明常驻顶部；
 "可复现"卡给 seed、配置 sha256、vendored pin 和等价的两行 Python。保存 YAML 时带引文的数字写成 `{value, source, ref}`，
 GUI 里改过的 survey 数字自动降为 `assumed` 并注明。
+"扫描研究"栏是 ex05 / ex06 / ex07 的通用形式：任选一个控件和一个取值列表（如 `array.n_elements` × `4, 8, 16, 32, 64, 128`、
+`element.lo.clock_profile` × 几个 `bundled:` 剖面、`element.lo.spurs` × `false, true`），其余不变，指标随取值的曲线边跑边画。
+最近 12 条结果存在浏览器 localStorage 里，刷新不丢（标 ↺）。
 
 ## 一次仿真的数据流
 

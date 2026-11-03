@@ -129,3 +129,29 @@ def test_phone_layout_switches_panes(server, browser):
     assert page.evaluate("getComputedStyle(document.getElementById('config')).display") == "block"
     assert page.evaluate("getComputedStyle(document.getElementById('results')).display") == "none"
     page.close()
+
+
+def test_a_sweep_draws_as_it_lands_and_history_survives_a_reload(server, browser):
+    ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = ctx.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(server + "?smoke=1&sweep=array.n_elements,2,4")
+    # the host still holds the earlier tests' jobs, so wait for THIS sweep's last row, not a row count
+    page.wait_for_function("[...document.querySelectorAll('#table tbody tr')].some(tr => tr.textContent.includes('n_elements=4'))", timeout=240000)
+    assert not errors, errors
+    assert "n_elements" in page.text_content("#pt-grid") and page.evaluate("document.querySelector('#plot-grid svg circle') !== null")
+    assert "array.n_elements=4" in page.text_content("#res-title")
+    # a reload restores the stored reports; ones the host still holds are replaced by the live rows (no duplicates)
+    page.goto(server)
+    page.wait_for_selector("#form .row", timeout=30000)
+    page.wait_for_function("[...document.querySelectorAll('#table tbody tr')].some(tr => tr.textContent.includes('n_elements=4'))", timeout=15000)
+    page.wait_for_timeout(800)
+    assert "↺" not in page.text_content("#table tbody")
+    assert page.evaluate("[...document.querySelectorAll('#table tbody tr')].filter(tr => tr.textContent.includes('n_elements=4')).length") == 1
+    # a report from a host that is gone (another job id) comes back marked restored
+    page.evaluate("""() => { const k = 'arraytx.reports.' + location.port; const a = JSON.parse(localStorage.getItem(k));
+                          a.forEach(r => { r.jobId = '999'; r.key = '999.' + r.i; }); localStorage.setItem(k, JSON.stringify(a)); }""")
+    page.goto(server)
+    page.wait_for_function("[...document.querySelectorAll('#table tbody tr td')].some(td => td.textContent.includes('↺'))", timeout=15000)
+    ctx.close()
