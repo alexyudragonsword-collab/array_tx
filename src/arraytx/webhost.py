@@ -519,6 +519,13 @@ class _Server(ThreadingHTTPServer):
     state: State
     api: Api
 
+    def handle_error(self, request, client_address):
+        """A client that hangs up mid-request (the app window closing while a
+        poll is in flight) is not a server error; everything else prints."""
+        if isinstance(sys.exc_info()[1], ConnectionError):
+            return
+        super().handle_error(request, client_address)
+
 
 def make_server(port: int = 0, host: str = "127.0.0.1", cfg: ArrayConfig | None = None,
                 workers: int = 2) -> ThreadingHTTPServer:

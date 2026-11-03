@@ -184,12 +184,19 @@ class ArraySim:
             cond = [conducted_metrics(ys[k], self.wf, k, offsets=offsets, equalize=cfg.metrics.evm_equalize)
                     for k in range(self.geom.n)]
         modes = [r.phasemod_mode for r in res]
+        etas = [r.info["element"]["efficiency"]["eta_avg"] for r in res if "efficiency" in r.info["element"]]
+        efficiency = None
+        if etas:
+            law = res[0].info["element"]["efficiency"]["law"]
+            efficiency = {"eta_avg_mean": float(np.mean(etas)), "eta_avg_min": float(min(etas)), "eta_avg_max": float(max(etas)),
+                          "law": law, "note": "polar_tx DPA law on the matched-load amplitude table; Gamma does not enter"}
         return ArrayResult(theta0, scheme, sl, drives, res, ys, rs, far, ota, cond, bank, modes,
                            time.time() - t0,
                            info={"coupling_source": self.coupling.source,
                                  "coupling_max_offdiag_db": self.coupling.max_offdiag_db(),
                                  "n_symbols": self.n_symbols, "fs": self.fs,
                                  "load_pull": self.last_load_pull,
+                                 "efficiency": efficiency,
                                  "engine_line": engine_line(modes, cfg.element.topology)})
 
     def run_matrix(self, scan_deg=None, schemes=None) -> dict[tuple[float, str], ArrayResult]:

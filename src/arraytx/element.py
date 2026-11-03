@@ -259,6 +259,14 @@ class ElementChain:
             ga = np.abs(1.0 + self.cfg.element.pa.load_pull.kappa_amam * g)
             info["element"]["load"] = {"abs_1pg_mean": float(ga.mean()), "abs_1pg_std": float(ga.std()),
                                        "abs_gamma_max": float(np.abs(g).max())}
+        dpa = getattr(self.tx, "dpa", None)
+        if self.topology == "polar" and hasattr(r, "avg_efficiency") and getattr(getattr(dpa, "cfg", None), "eff", None):
+            # polar_tx's modulated average drain efficiency over this run's
+            # code stream, on the DPA's own (matched-load) law: Gamma does not
+            # enter it (the proposal keeps efficiency out of the load model)
+            eff = r.avg_efficiency(dpa)
+            info["element"]["efficiency"] = {"eta_avg": eff["eta_avg"], "backoff_db": eff["backoff_db"],
+                                             "law": list(dpa.cfg.eff), "load": "matched"}
         return ElementResult(y=y, info=info, raw=r)
 
 
@@ -289,5 +297,9 @@ def build_elements(cfg: ArrayConfig, standard: Standard, tree: SeedTree,
     fs_scale = reference_full_scale(probe.tx, cfg.element.topology, x_ref, wf)
     if np.isnan(fs_scale):
         fs_scale = None
+    elif cfg.element.pa.backoff_db != 0.0:
+        # output power backoff: the pinned full scale sits backoff_db above the
+        # undistorted peak, every topology alike (the chains read fs_scale_fixed)
+        fs_scale = fs_scale * 10.0 ** (float(cfg.element.pa.backoff_db) / 20.0)
     return [ElementChain(cfg, standard, tree, k, fs_scale=fs_scale, lo_pn_seed=lo_seed, lo_obj=lo_obj)
             for k in range(cfg.array.n_elements * cfg.array.n_rows)]

@@ -95,6 +95,7 @@ class ElementPACfg:
     amam: str = _f("rapp", "", "AM-AM law (ideal = polar_tx nr_dtc default)", ("ideal", "rapp"))
     rapp_p: float = _f(2.0, "", "Rapp smoothness (CMOS PA ~1-3); used when amam=rapp")
     rapp_drive: float = _f(1.0, "", "Rapp drive at full scale (compression depth); used when amam=rapp")
+    backoff_db: float = _f(0.0, "dB", "envelope full-scale headroom above the undistorted peak: the chain's full scale is raised by this, so the signal uses 10^(-backoff/20) of the code range (output power backoff; 0 = peak at full scale, polar_tx's pin)")
     ampm_deg_at_fs: float = _f(8.0, "deg", "AM-PM at full scale, quadratic in amplitude (0 = none)")
     load_pull: LoadPullCfg = field(default_factory=LoadPullCfg)
 
@@ -245,6 +246,8 @@ class ArrayConfig:
             raise ValueError("coupling.source=touchstone needs coupling.touchstone.path")
         if self.dpd.n_iterations < 1:
             raise ValueError("dpd.n_iterations must be >= 1")
+        if self.element.pa.backoff_db < 0.0:
+            raise ValueError("element.pa.backoff_db must be >= 0 (a negative value would clip the undistorted peak)")
         lp = self.element.pa.load_pull
         if lp.iterations < 1 or not 0.0 < lp.gamma_max <= 1.0 or not 0.0 <= lp.floor < 1.0:
             raise ValueError("element.pa.load_pull: iterations >= 1, 0 < gamma_max <= 1, 0 <= floor < 1")

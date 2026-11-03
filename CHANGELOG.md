@@ -4,6 +4,13 @@
 
 ## 未发布 / Unreleased
 
+### 8 × 8 负载调制 DPD 对比 + 60° 回退研究（ex10）（2026-11-03）
+
+- `element.pa.backoff_db`：钉住的满刻度抬高这么多 dB（输出功率回退），所有拓扑一样；0 逐位不变（指纹 168 项相同），负值报错。
+- `info["efficiency"]` / 报告的 `eta_avg_pct`：polar_tx 的平均漏极效率，按单元平均，标明是匹配负载律（Γ 不进效率）；页面多一张 info 卡。
+- ex10：8 × 8 上三方案有 / 无牵引、0° 训练用到 60°；60° 的回退 × CFR 深度扫描带效率代价。结论见 `cairn/load-pull-proposal.md` 末节与 LOG。
+- 页面服务器不再为客户端中途挂断打印 traceback（只吞 `ConnectionError`）。测试 147 → 150。
+
 ### 代码评审一轮：页面轮询在 −∞ 上停摆的修复、负载牵引少跑一遍、管道竞态（2026-11-03）
 
 - `webhost.dumps`：HTTP 与 Android 桥共用的 JSON 编码器，非有限浮点写成 `"-inf" / "inf" / "nan"`（此前 `scale_db = -inf` 的报告让 `GET /api/jobs/<id>`

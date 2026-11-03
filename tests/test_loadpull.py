@@ -99,3 +99,24 @@ def test_controls_for_load_pull_follow_the_switch():
     assert by["element.pa.load_pull.kappa_amam"].source == "assumed" and "voltage" in by["element.pa.load_pull.kappa_amam"].ref
     with pytest.raises(ValueError):
         config_from_dict({"element": {"pa": {"load_pull": {"gamma_max": 0.0}}}})
+
+
+def test_backoff_raises_the_pinned_full_scale_and_costs_efficiency():
+    """element.pa.backoff_db: 0 is polar_tx's pin (bit for bit, fingerprint);
+    3 dB puts the undistorted peak at 10^(-3/20) of the code range, which the
+    polar_tx DPA law prices as lower average drain efficiency; the report
+    carries that number labelled as the matched-load law."""
+    base = ArraySim(load_config("configs/fr2_4el_survey.yaml"))
+    bo = ArraySim(config_from_dict({"element": {"pa": {"backoff_db": 3.0}}}))
+    assert bo.elements[0].fs_scale == pytest.approx(base.elements[0].fs_scale * 10 ** (3 / 20))
+    r0, r3 = base.run(60.0, "none"), bo.run(60.0, "none")
+    e0, e3 = r0.info["efficiency"], r3.info["efficiency"]
+    assert e0["law"][0] == "scpa" and e3["eta_avg_mean"] < e0["eta_avg_mean"] - 0.05
+    assert r3.beam.aclr1_db < r0.beam.aclr1_db - 2.0                     # the PA is driven less deep
+    assert r0.element_results[0].info["element"]["efficiency"]["load"] == "matched"
+    b0 = r0.element_results[0].info["element"]["efficiency"]["backoff_db"]
+    b3 = r3.element_results[0].info["element"]["efficiency"]["backoff_db"]
+    assert b3 - b0 == pytest.approx(3.0, abs=0.3)                       # polar_tx's own backoff reading moves by the 3 dB
+    assert np.abs(r3.ys).max() > np.abs(r0.ys).max()                    # output gain stays 1: the less compressed PA keeps its peaks
+    with pytest.raises(ValueError):
+        config_from_dict({"element": {"pa": {"backoff_db": -1.0}}})

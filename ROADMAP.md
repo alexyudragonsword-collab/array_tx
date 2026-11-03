@@ -11,6 +11,7 @@
 ### A2. 负载调制：只有一阶电压模，没有实测 load-pull 表
 `element.pa.load_pull` 已实现（`cairn/load-pull-proposal.md`），κ = 1 是 assumed。真实 PA 的压缩等高线在 Smith 圆图上不是圆（Γ 相位相关），
 要更真得换 source: measured 的 load-pull 表替换 `loadpull.amam_loaded` 的映射。outphasing 的合路器负载是另一个模型，没做。
+效率（`info["efficiency"]`）仍按匹配负载的 DPA 律算，有源阻抗对效率的影响没建模，所以 ex10 的效率代价只含回退本身。
 
 ## B. 已知模型缺口
 

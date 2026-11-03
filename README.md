@@ -15,7 +15,7 @@ polar_tx 的姊妹库（polar_tx ROADMAP D：GUI 里不再加架构、不做接�
 pip install -e ".[test,dev]"
 python examples/ex00_single_element_equals_polartx.py   # sub-6、S=0、1 单元：与 polar_tx 逐位相同
 python examples/ex03_scan_angle_x_dpd.py                # 扫描角 × DPD 方案的 OTA EVM / ACLR 表
-pytest -q                                               # 147 项（页面测试无 Chromium 时跳过）
+pytest -q                                               # 150 项（页面测试无 Chromium 时跳过）
 ARRAYTX_SMOKE=1 python examples/ex04_aclr_vs_direction.py   # 短突发（CI 用的尺寸）
 ```
 
@@ -86,6 +86,7 @@ print(r.info["engine_line"]); print(r.beam.row()); print(r.sidelobe.row())
 | `ex03_scan_angle_x_dpd` | 0 / 30 / 60° × 三方案，波束与旁瓣方向；带边斜视 vs 解析；导通诊断 |
 | `ex04_aclr_vs_direction` | ACLR 随方向：非线性互调往哪辐射（方向图零点已标出） |
 | `ex05_lo_profiles` | 共用 LO 换成 pll_simulator 导出的 18 个时钟剖面之一（随包提供，`bundled:<preset>`），EVM / ACLR 随 LO |
+| `ex10_grid_load_pull_backoff` | 8 × 8 上负载调制下的三方案与扫描角失配；60° 用输出回退 / CFR 深度追回 ACLR，按 polar_tx 平均漏极效率标代价 |
 | `ex09_load_pull` | 负载调制：|1+Γ_k| 随扫描角与位置，三方案在训练角度上的差，0° 训练的 DPD 用到 60° 的损失，单元偏差带来的残余 |
 | `ex08_planar_array` | 8 × 8 面阵 vs 同单元数的 64 × 1 行阵：两个主平面与对角切面的波束宽、斜视代价、旁瓣，阵列 DPD 后失真往哪辐射，二维互耦矩阵 |
 | `ex07_lo_spurs` | 时钟剖面的离散杂散（参考 / 小数杂散）按载频换算后注入共用 LO：9 个带杂散剖面的 EVM / ACLR 关 / 开，小角度估计 vs 实测 |
