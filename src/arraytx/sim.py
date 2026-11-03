@@ -83,6 +83,9 @@ class ArraySim:
         self.elements: list[ElementChain] = build_elements(cfg, self.standard, self.tree, self.x, self.wf)
         #: the last ``radiate`` with load modulation: iterations, deltas, |1+Gamma| stats (None otherwise)
         self.last_load_pull: dict[str, Any] | None = None
+        #: banks trained jointly over dpd.train_angles_deg do not depend on the
+        #: beam angle: one per scheme for the life of this ArraySim
+        self._joint_banks: dict[str, DPDBank] = {}
 
     # ------------------------------------------------------------- pieces
     @property
@@ -157,7 +160,8 @@ class ArraySim:
         theta0 = float(cfg.beam.scan_deg[0] if theta0_deg is None else theta0_deg)
         scheme = scheme or cfg.dpd.scheme
         self.last_load_pull = None
-        if self.load_pull_active and scheme == "per_element" and cfg.dpd.per_element_observe == "pa_output":
+        joint = bool(cfg.dpd.train_angles_deg) and scheme != "none"
+        if self.load_pull_active and scheme == "per_element" and cfg.dpd.per_element_observe == "pa_output" and not joint:
             # the operating point: every PA under the load the undistorted,
             # steered drives put on it, before the per-element DPDs train
             # against their own PA.  The other schemes radiate these drives
@@ -165,8 +169,13 @@ class ArraySim:
             # none right below), and radiate() starts from the matched load
             # each time, so for them this pass would only repeat work.
             self.radiate(steer(self.x, self.geom, theta0, self.fs, cfg.beam.steering))
-        bank = train(cfg, scheme, elements=self.elements, x=self.x, wf=self.wf, geom=self.geom,
-                     coupling=self.coupling, theta0_deg=theta0, radiate=self.radiate)
+        if joint and scheme in self._joint_banks:
+            bank = self._joint_banks[scheme]
+        else:
+            bank = train(cfg, scheme, elements=self.elements, x=self.x, wf=self.wf, geom=self.geom,
+                         coupling=self.coupling, theta0_deg=theta0, radiate=self.radiate)
+            if joint:
+                self._joint_banks[scheme] = bank
         drives = predistort_drives(bank, self.x, self.geom, theta0, self.fs, cfg.beam.steering)
         res, ys, rs = self.radiate(drives)
         sl = self.sidelobe_direction(theta0)

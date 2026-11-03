@@ -120,3 +120,26 @@ def test_backoff_raises_the_pinned_full_scale_and_costs_efficiency():
     assert np.abs(r3.ys).max() > np.abs(r0.ys).max()                    # output gain stays 1: the less compressed PA keeps its peaks
     with pytest.raises(ValueError):
         config_from_dict({"element": {"pa": {"backoff_db": -1.0}}})
+
+
+@pytest.mark.parametrize("scheme,observe", [("per_element", "pa_output"), ("per_element", "antenna_port"), ("array", "pa_output")])
+def test_joint_training_over_one_angle_is_training_at_the_beam(scheme, observe):
+    """dpd.train_angles_deg = [theta] runs the joint ILA (stacked bases) over
+    a single pair: the same least-squares problem as training at theta, so
+    the drives come out bit for bit -- with load modulation on, where the
+    per-angle operating point has to be captured and restored."""
+    on = {"element": {"pa": {"load_pull": {"enabled": True}}}, "dpd": {"per_element_observe": observe}}
+    plain = ArraySim(config_from_dict(on))
+    joint = ArraySim(config_from_dict({**on, "dpd": {"per_element_observe": observe, "train_angles_deg": [30.0]}}))
+    a, b = plain.run(30.0, scheme, conducted_diagnostics=False), joint.run(30.0, scheme, conducted_diagnostics=False)
+    assert all(np.array_equal(p, q) for p, q in zip(a.drives, b.drives)) and np.array_equal(a.ys, b.ys)
+    assert b.dpd.info["train_angles_deg"] == [30.0]
+
+
+def test_joint_bank_is_trained_once_and_reused_at_every_angle():
+    sim = ArraySim(config_from_dict({"dpd": {"train_angles_deg": [0.0, 60.0]}}))
+    r0, r60 = sim.run(0.0, "array", conducted_diagnostics=False), sim.run(60.0, "array", conducted_diagnostics=False)
+    assert r0.dpd is r60.dpd and r60.dpd.info["train_angles_deg"] == [0.0, 60.0]
+    assert r60.seconds < r0.seconds                      # no ILA on the second call
+    with pytest.raises(ValueError):
+        config_from_dict({"dpd": {"train_angles_deg": [95.0]}})

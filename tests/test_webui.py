@@ -181,6 +181,26 @@ def test_grouped_study_and_the_language_toggle(server, browser):
     ctx.close()
 
 
+def test_a_backoff_study_draws_against_drain_efficiency(server, browser):
+    """ex10's trade on the page: element.pa.backoff_db x load pull on / off,
+    drawn with the average drain efficiency (a number the report carries,
+    not one the page computes) on the x axis."""
+    ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = ctx.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(server + "?smoke=1&theta=60&sweepx=eta&sweep=element.pa.backoff_db,0,3&group=element.pa.load_pull.enabled,false,true")
+    page.wait_for_function("[...document.querySelectorAll('#table tbody tr')].filter(tr => tr.textContent.includes('backoff_db=3') && tr.textContent.includes('enabled=true')).length >= 1", timeout=300000)
+    page.wait_for_function("document.querySelector('#pt-grid').textContent.includes('4/4')", timeout=60000)
+    assert not errors, errors
+    assert page.input_value("#sweep-x") == "eta"
+    assert "平均漏极效率" in page.text_content("#plot-grid") and page.evaluate("document.querySelectorAll('#plot-grid svg circle').length") >= 4
+    assert "平均漏极效率" in page.text_content("#cards")
+    page.select_option("#sweep-x", "value")
+    assert "element.pa.backoff_db" in page.text_content("#plot-grid")
+    ctx.close()
+
+
 def test_the_page_works_through_an_injected_host_bridge(server, browser):
     """The Android path without Android: inject a window.host whose call()
     answers through the real Api (via the server) and replies by

@@ -4,6 +4,14 @@
 
 ## 未发布 / Unreleased
 
+### 多扫描角 DPD（ex11）+ 页面按效率画研究 + 两份模型提案（2026-11-03）
+
+- `dpd.train_angles_deg`：两种 DPD 都可在若干扫描角上联合拟合（GMP 基矩阵拼接成一个最小二乘），每角度保留自己的负载工作点；联合 bank 每个 ArraySim 训一次复用。
+  默认空列表 = 原行为，指纹 168 项逐位相同；单角度与原路径逐位相等。
+- ex11：重训 / 0° 训练 / 联合 / 30° 网格查表（取大角、系数插值）在 0–60° 的比较。结论：联合训练最差，30° 网格不够（数字见 LOG）。
+- 页面：研究横轴可选"平均漏极效率"，回退与 CFR 的取值提示，CFR 可当分组控件；`?sweepx=eta` 深链接。
+- `cairn/loaded-efficiency-proposal.md`、`cairn/outphasing-load-proposal.md`：status proposed，未实现。测试 150 → 156。
+
 ### 8 × 8 负载调制 DPD 对比 + 60° 回退研究（ex10）（2026-11-03）
 
 - `element.pa.backoff_db`：钉住的满刻度抬高这么多 dB（输出功率回退），所有拓扑一样；0 逐位不变（指纹 168 项相同），负值报错。

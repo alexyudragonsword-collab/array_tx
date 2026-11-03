@@ -12,7 +12,7 @@ const T = {
         vs_base: "对基线", results_none: "还没有结果：改好配置后按 ▶ 运行，或 ⇄ 扫描。", symbols: "符号", eq: "均衡", elements: "单元",
         queued: "排队", running: "运行中", done: "完成", error: "失败", cancelled: "已取消", cancel: "取消", idle: "空闲", active: "个在跑 / 排队",
         info: "信息", limit: "64-QAM 限值 8 %", pass: "✓ 通过", fail: "✗ 越限", pertone_note: "逐子载波均衡能抹掉的线性部分",
-        bw3: "3 dB 波束宽", backoff: "回退", ttd: "真延时", phase: "相移器", no_sidelobe: "单元数 1：无旁瓣", highest_sl: "最高旁瓣",
+        bw3: "3 dB 波束宽", backoff: "回退", eta_x_note: "匹配负载律，每组按研究顺序连线", ttd: "真延时", phase: "相移器", no_sidelobe: "单元数 1：无旁瓣", highest_sl: "最高旁瓣",
         form_changed: "（当前表单已改）", study: "研究", points: "点，边跑边画", low_good: "低 = 好", high_good: "高 = 好",
         grid_title: "扫描角 × DPD · OTA ACLR1 @ 波束 [dBc]", grid_sub: "点击一格切换", mask_note: "stylized 工程模板，非一致性条款",
         element: "单元", errors_hdr: "误差抽取 gain / phase / delay / PA", prev: "上次会话", valid: "合法", differ: "处与文件不同",
@@ -23,7 +23,7 @@ const T = {
         vs_base: "vs baseline", results_none: "No results yet: set the config and press ▶ Run or ⇄ Scan.", symbols: "symbols", eq: "EQ", elements: "elements",
         queued: "queued", running: "running", done: "done", error: "failed", cancelled: "cancelled", cancel: "cancel", idle: "idle", active: "running / queued",
         info: "info", limit: "64-QAM limit 8 %", pass: "✓ pass", fail: "✗ fail", pertone_note: "the linear part a per-tone equaliser removes",
-        bw3: "3 dB beamwidth", backoff: "backoff", ttd: "true time delay", phase: "phase shifters", no_sidelobe: "one element: no sidelobe", highest_sl: "highest sidelobe",
+        bw3: "3 dB beamwidth", backoff: "backoff", eta_x_note: "matched-load law, each group joined in study order", ttd: "true time delay", phase: "phase shifters", no_sidelobe: "one element: no sidelobe", highest_sl: "highest sidelobe",
         form_changed: "(form edited since)", study: "study", points: "points, drawn as they land", low_good: "lower = better", high_good: "higher = better",
         grid_title: "scan angle × DPD · OTA ACLR1 @ beam [dBc]", grid_sub: "click a cell", mask_note: "stylized template, not a conformance clause",
         element: "element", errors_hdr: "drawn errors gain / phase / delay / PA", prev: "previous session", valid: "valid", differ: "differ from the file",
@@ -192,13 +192,16 @@ function fillSweepSelectors() {
     const o = document.createElement("option"); o.value = c.path; o.textContent = c.path; sp.appendChild(o); });
   sp.value = "array.n_elements";
   const sg = $("sweep-group"); const none = document.createElement("option"); none.value = ""; none.textContent = "—"; sg.appendChild(none);
-  S.spec.controls.filter(c => ["int", "float", "bool", "choice"].includes(c.kind)).forEach(c => { const o = document.createElement("option"); o.value = c.path; o.textContent = c.path.split(".").pop(); o.title = c.path; sg.appendChild(o); });
-  const ghint = { "beam.steering": "phase, ttd", "dpd.scheme": "none, per_element, array", "element.lo.spurs": "false, true", "metrics.evm_equalize": "scalar, per_tone" };
+  S.spec.controls.filter(c => ["int", "float", "bool", "choice", "optional_float"].includes(c.kind)).forEach(c => { const o = document.createElement("option"); o.value = c.path; o.textContent = c.path.split(".").pop(); o.title = c.path; sg.appendChild(o); });
+  const ghint = { "beam.steering": "phase, ttd", "dpd.scheme": "none, per_element, array", "element.lo.spurs": "false, true", "metrics.evm_equalize": "scalar, per_tone",
+                  "sim.cfr_papr_db": "8.5, 7.5, 6.5", "element.pa.load_pull.enabled": "false, true" };
   sg.addEventListener("change", () => { $("sweep-group-values").placeholder = ghint[sg.value] || "a, b"; });
   const sm = $("sweep-metric");
   ["evm_db", "aclr1_dbc", "aclr2_dbc", "sem_margin_db", "evm_per_tone_db"].forEach(id => { const o = document.createElement("option"); o.value = id; o.textContent = M()[id][LANG] + " [" + M()[id].unit + "]"; sm.appendChild(o); });
   sm.addEventListener("change", renderGrid);
+  $("sweep-x").addEventListener("change", renderGrid);
   const hint = { "array.n_elements": "4, 8, 16, 32, 64, 128", "element.lo.spurs": "false, true", "coupling.scale_db": "-inf, -20, -10, -6, 0, 6",
+                 "element.pa.backoff_db": "0, 1, 2, 3, 4, 6", "sim.cfr_papr_db": "8.5, 7.5, 6.5",
                  "element.lo.clock_profile": S.spec.bundled_profiles.slice(0, 3).map(n => "bundled:" + n).join(", "), "beam.steering": "phase, ttd" };
   const setHint = () => { $("sweep-points").placeholder = hint[sp.value] || "取值列表，逗号分隔"; };
   sp.addEventListener("change", setHint); setHint();
@@ -357,16 +360,19 @@ function renderSweep(r, box) {
   const allVals = same.map(x => x.rep.sweep.value), allY = same.map(x => x.rep.ota.beam[mid]);
   const numeric = allVals.every(v => typeof v === "number" && isFinite(v));
   const b = get(S.baseline), bv = b && b.rep.ota.beam[mid];
-  if (numeric && allVals.length > 1) {
-    const span = Math.max(...allVals) / Math.max(1e-9, Math.min(...allVals.filter(v => v > 0)));
-    const useLog = Math.min(...allVals) > 0 && span >= 8;
-    const X = v => (useLog ? Math.log2(v) : v);
-    const series = groups.map((g, gi) => { const rows = of(g); return { x: rows.map(x => X(x.rep.sweep.value)), y: rows.map(x => x.rep.ota.beam[mid]),
+  // x = the swept value, or (sweep-x = eta) each point's average drain efficiency, the points of a
+  // group joined in study order: the efficiency-vs-ACLR trade of a backoff / CFR study (ex10)
+  const byEta = $("sweep-x").value === "eta" && same.every(x => typeof x.rep.info.eta_avg_pct === "number" && isFinite(x.rep.info.eta_avg_pct));
+  if ((numeric || byEta) && allVals.length > 1) {
+    const span = numeric ? Math.max(...allVals) / Math.max(1e-9, Math.min(...allVals.filter(v => v > 0))) : 1;
+    const useLog = !byEta && Math.min(...allVals) > 0 && span >= 8;
+    const X = x => (byEta ? x.rep.info.eta_avg_pct : (useLog ? Math.log2(x.rep.sweep.value) : x.rep.sweep.value));
+    const series = groups.map((g, gi) => { const rows = of(g); return { x: rows.map(X), y: rows.map(x => x.rep.ota.beam[mid]),
       color: g === null ? COLORS[r.rep.scheme] : PALETTE[gi % PALETTE.length], marker: true, label: g === null ? LABELS[r.rep.scheme] : `${gpath.split(".").pop()}=${g}`, rows }; });
-    const xs = allVals.map(X);
+    const xs = series.flatMap(q => q.x);
     if (bv !== undefined && bv !== null) series.push({ x: [Math.min(...xs), Math.max(...xs)], y: [bv, bv], color: "#8a8a85", dash: "5 3", label: t("baseline") });
-    Charts.lines(box, { series, xlab: useLog ? `${path} (log2)` : path, ylab: `${m[LANG]} [${m.unit}] · ${m.better === "lower" ? t("low_good") : t("high_good")}`, legend: true,
-      tooltip: i => series.filter(q => q.rows).map(q => `${q.label}: ${q.y[i] === undefined ? "—" : Charts.fmt(q.y[i]) + " " + m.unit}`).join("\n") + `\n${path} = ${series[0].rows[i] ? series[0].rows[i].rep.sweep.value : ""}` });
+    Charts.lines(box, { series, xlab: byEta ? `${M().eta_avg_pct[LANG]} [%] · ${t("eta_x_note")}` : (useLog ? `${path} (log2)` : path), ylab: `${m[LANG]} [${m.unit}] · ${m.better === "lower" ? t("low_good") : t("high_good")}`, legend: true,
+      tooltip: i => series.filter(q => q.rows).map(q => `${q.label}: ${q.y[i] === undefined ? "—" : Charts.fmt(q.y[i]) + " " + m.unit}` + (byEta && q.rows[i] ? ` @ ${q.x[i].toFixed(1)} %` : "")).join("\n") + `\n${path} = ${series[0].rows[i] ? series[0].rows[i].rep.sweep.value : ""}` });
     box.querySelector("svg").addEventListener("click", ev => { const rc = box.querySelector("svg").getBoundingClientRect(); const fx = (ev.clientX - rc.left) / rc.width;
       const first = series[0]; let best = 0, bd = 2; first.x.forEach((x, i) => { const px = 42 / 560 + (x - Math.min(...xs)) / (Math.max(...xs) - Math.min(...xs) || 1) * (1 - 52 / 560); const d = Math.abs(px - fx); if (d < bd) { bd = d; best = i; } });
       S.autoFollow = false; select(first.rows[best].key, false); });
@@ -461,6 +467,7 @@ function showPane(name) { document.querySelectorAll(".pane").forEach(p => p.clas
     // deep links (and the browser tests): ?smoke=1  ?run=30,none  ?scan=1
     const q = new URLSearchParams(location.search);
     if (q.get("smoke") === "1") $("smoke").checked = true;
+    if (q.get("sweepx")) $("sweep-x").value = q.get("sweepx");
     if (q.get("theta")) $("run-theta").value = q.get("theta");
     if (q.get("scheme")) { $("run-scheme").value = q.get("scheme"); $("run-scheme").dataset.touched = "1"; }
     if (q.get("run")) { const [t, s] = q.get("run").split(","); await validate(); submit("run", { theta0_deg: parseFloat(t), scheme: s || $("run-scheme").value }); }

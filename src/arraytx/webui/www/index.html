@@ -36,6 +36,8 @@
   <button id="btn-sweep" class="btn small" title="一个控件 × 取值列表，其余不变（seed、波形、既有单元的抽取都不动）；ex05 / ex06 / ex07 的通用形式" data-zh="▶ 研究" data-en="▶ Study">▶ 研究</button>
   <span class="sp"></span>
   <label class="inline"><span data-zh="图上指标" data-en="metric">图上指标</span> <select id="sweep-metric"></select></label>
+  <label class="inline"><span data-zh="横轴" data-en="x axis">横轴</span> <select id="sweep-x" title="研究的横轴：控件取值，或该点的平均漏极效率（每组按研究顺序连线：回退 / CFR 的效率-ACLR 权衡）">
+    <option value="value" data-zh="取值" data-en="value">取值</option><option value="eta" data-zh="平均漏极效率" data-en="drain efficiency">平均漏极效率</option></select></label>
 </div>
 <div id="engine" class="engine">engine: — 尚未运行</div>
 <div id="error" class="error" hidden></div>

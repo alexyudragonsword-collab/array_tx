@@ -14,7 +14,10 @@
 The predistorter is PA_DPD's ``ILAPredistorter`` over its ``GMPModel``
 (vendored through polar_tx), untouched: the "PA" it sees is a callable that
 runs the element chain(s) and, for the array scheme, the far-field
-synthesis.  Nothing in the chain moves between training and use: the
+synthesis.  ``dpd.train_angles_deg`` fits either scheme jointly over several
+scan angles (one least-squares problem over all of them) instead of at the
+beam; the bank then does not depend on the angle it is used at.
+Nothing in the chain moves between training and use: the
 envelope full scale is pinned (element.py) and each element's run seed is
 fixed, so the ILA iterates against one deterministic device.
 """
@@ -31,6 +34,7 @@ from .coupling import CouplingMatrix, apply_coupling
 from .element import ElementChain
 from .geometry import ArrayGeometry
 from .vendor.polartx.vendor.padpd.dpd import ILAPredistorter
+from .vendor.polartx.vendor.padpd.pa.base import lstsq_fit
 from .vendor.polartx.vendor.padpd.pa.gmp import GMPModel
 from .vendor.polartx.waveforms.base import Waveform
 
@@ -88,6 +92,9 @@ def train(cfg: ArrayConfig, scheme: str, *, elements: list[ElementChain], x: np.
     bank = DPDBank(scheme)
     if scheme == "none":
         return bank
+    if cfg.dpd.train_angles_deg:
+        return _train_joint(cfg, scheme, elements=elements, x=x, wf=wf, geom=geom, coupling=coupling,
+                            angles=cfg.dpd.train_angles_deg, _radiate=_radiate)
     drives = steer(x, geom, theta0_deg, fs, cfg.beam.steering)
 
     if scheme == "per_element":
@@ -120,6 +127,75 @@ def train(cfg: ArrayConfig, scheme: str, *, elements: list[ElementChain], x: np.
     ila.fit(pa_array, x)
     bank.array = ila
     bank.info = {"observe": f"far field {theta0_deg:+.1f} deg", "target_gain": complex(ila.target_gain)}
+    return bank
+
+
+def _joint_ila(cfg: ArrayConfig, pas: list[Callable[[np.ndarray], np.ndarray]], xs: list[np.ndarray]) -> ILAPredistorter:
+    """ILA over several (PA, input) pairs at once: the same loop as
+    ``ILAPredistorter.fit`` (target gain from the first pass, post-inverse
+    fitted on y/G -> u, then u = DPD(x)), with the GMP basis matrices of
+    all pairs stacked into ONE least-squares problem.  Stacking the bases
+    instead of concatenating the signals keeps the memory taps from
+    reaching across from one angle's burst into the next.  Each pair keeps
+    its own target gain (the gain at 0 deg and at 60 deg need not agree);
+    the predistorter's ``target_gain`` is the first pair's."""
+    ila = make_ila(cfg)
+    us = list(xs)
+    gains: list[complex] = []
+    for it in range(ila.n_iterations):
+        ys = [pa(u) for pa, u in zip(pas, us)]
+        if it == 0:
+            gains = [complex(np.vdot(x, y) / np.vdot(x, x)) for x, y in zip(xs, ys)]
+        model = ila.model_factory()
+        phi = np.vstack([model.basis_matrix(y / g) for y, g in zip(ys, gains)])
+        model.coeffs = lstsq_fit(phi, np.concatenate(us), **ila.fit_kwargs)
+        ila.dpd_model = model
+        if it < ila.n_iterations - 1:
+            us = [model(x) for x in xs]
+    ila.target_gain = gains[0]
+    return ila
+
+
+def _train_joint(cfg: ArrayConfig, scheme: str, *, elements, x, wf, geom, coupling, angles, _radiate) -> DPDBank:
+    """One predistorter (per element, or for the array) fitted jointly over
+    ``angles``.  With load modulation each angle has its own operating point:
+    the loads the undistorted steered drives put on the PAs at that angle
+    are captured once and set again before every PA call made for it."""
+    noise = cfg.sim.noise
+    fs, f0 = wf.fs, geom.f0_hz
+    bank = DPDBank(scheme)
+    angles = [float(a) for a in angles]
+    drives = {th: steer(x, geom, th, fs, cfg.beam.steering) for th in angles}
+    loads, ys_fixed = {}, {}
+    for th in angles:
+        ys_fixed[th] = _radiate(drives[th])[1]
+        loads[th] = [el.load for el in elements]
+    if scheme == "per_element":
+        observe = cfg.dpd.per_element_observe
+        for k, el in enumerate(elements):
+            def make_pa(th, k=k, el=el):
+                def pa(u):
+                    el.set_load(loads[th][k])
+                    y = el.run(u, wf, noise=noise).y
+                    if observe == "pa_output":
+                        return y
+                    ys = ys_fixed[th].copy()
+                    ys[k] = y
+                    return apply_coupling(ys, coupling, fs, f0)[k]
+                return pa
+            bank.per_element.append(_joint_ila(cfg, [make_pa(th) for th in angles], [drives[th][k] for th in angles]))
+        bank.info = {"observe": observe, "train_angles_deg": angles,
+                     "target_gain": [complex(d.target_gain) for d in bank.per_element]}
+        return bank
+
+    def make_pa_array(th):
+        def pa(u):
+            rs = _radiate(steer(u, geom, th, fs, cfg.beam.steering))[2]
+            return far_field(rs, geom, th, fs)
+        return pa
+    bank.array = _joint_ila(cfg, [make_pa_array(th) for th in angles], [x for _ in angles])
+    bank.info = {"observe": "far field, jointly at " + ", ".join(f"{a:+.1f}" for a in angles) + " deg",
+                 "train_angles_deg": angles, "target_gain": complex(bank.array.target_gain)}
     return bank
 
 

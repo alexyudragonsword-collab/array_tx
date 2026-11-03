@@ -201,6 +201,7 @@ class DPDCfg:
     regularization: float = _f(1e-9, "", "relative ridge in the GMP least squares")
     gmp: GMPCfg = field(default_factory=GMPCfg)
     per_element_observe: str = _f("pa_output", "", "what the per-element DPD observes: its own PA forward output, or the antenna port including coupled leakage", ("pa_output", "antenna_port"))
+    train_angles_deg: list = _f([], "deg", "scan angles the DPD is trained on JOINTLY (one fit over all of them, then used at whatever angle the beam points); empty = train at the beam only")
 
 
 @dataclass
@@ -267,6 +268,9 @@ class ArrayConfig:
                 float(self.beam.sidelobe)
             except (TypeError, ValueError):
                 raise ValueError(f"beam.sidelobe must be 'auto' or a number, got {self.beam.sidelobe!r}") from None
+        for a in self.dpd.train_angles_deg:
+            if isinstance(a, bool) or not isinstance(a, (int, float)) or not -90.0 < float(a) < 90.0:
+                raise ValueError(f"dpd.train_angles_deg entries must be numbers in (-90, 90), got {a!r}")
         if not self.beam.scan_deg:
             raise ValueError("beam.scan_deg must list at least one angle")
         for a in self.beam.scan_deg:

@@ -20,7 +20,7 @@ authoring_mode: ai_generated
 
 | 层 | 文件 | 规则 |
 |---|---|---|
-| 描述 | `guispec.py` | 控件 = `form_fields()` 的叶子（53 可见 + 2 隐藏），默认值从 `default_config()` 读；指标按域 ota / info / diagnostic；`values_to_config` 走 `config_from_dict`，GUI 改过的 survey 数字降为 assumed |
+| 描述 | `guispec.py` | 控件 = `form_fields()` 的叶子（54 可见 + 2 隐藏），默认值从 `default_config()` 读；指标按域 ota / info / diagnostic；`values_to_config` 走 `config_from_dict`，GUI 改过的 survey 数字降为 assumed |
 | 计算 | `guiutil.py` | `run_report / scan_report / sweep_report`；报告 = OTA 波束 + 旁瓣、per-tone EVM、`conducted_*` 诊断、三张图数据、引擎行、可复现卡（seed、cfg sha256、vendored pin、等价调用） |
 | 分发 | `webhost.Api` | `get / post / call(route, req) -> (code, payload)`，HTTP 处理器与 `appbridge.call` 都只是传输 |
 | 队列 | `webhost.JobQueue` | `process` 后端（桌面：spawn 子进程，取消 = 终止）/ `thread` 后端（Android：取消在行与行之间）；`execute()` 共用 |
@@ -44,3 +44,4 @@ authoring_mode: ai_generated
 
 `android/` 照 polar_tx（AGP 8.1.4 / Kotlin 1.9.24 / Chaquopy 15.0.1 / Python 3.10），assets 直接指向 `src/arraytx/webui`，
 `MainActivity.kt` 约 80 行 + WebChromeClient 把 prompt 按默认值确认。APK 工作流手动触发；首次构建记录见 LOG。
+- 研究横轴可选"平均漏极效率"（`#sweep-x`，`?sweepx=eta`）：x 取报告里的 `info.eta_avg_pct`，每组按研究顺序连线，页面不算效率。效率是匹配负载律，卡片注明。
