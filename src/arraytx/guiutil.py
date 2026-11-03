@@ -26,7 +26,7 @@ import numpy as np
 from .beam import beamwidth_3db_deg, squint_analytic_deg
 from .config import ArrayConfig, config_from_dict
 from .guispec import to_yaml, values_from_config
-from .metrics import ota_metrics
+from .metrics import SEM_TX_POWER_DBM, ota_metrics
 from .sim import ArrayResult, ArraySim
 from .vendor.polartx.metrics.masks import default_mask_spec
 from .vendor.polartx.metrics.sem import check_sem
@@ -154,7 +154,7 @@ def _plots(sim: ArraySim, r: ArrayResult) -> dict[str, Any]:
     e_beam = r.far["beam"][1]
     f, p = psd(e_beam, sim.fs, nfft=PLOT_NFFT)
     spec = default_mask_spec(sim.wf)
-    sem = check_sem(f, p, spec, channel_bw_hz=sim.wf.bw, tx_power_dbm=23.0)
+    sem = check_sem(f, p, spec, channel_bw_hz=sim.wf.bw, tx_power_dbm=SEM_TX_POWER_DBM)
     spectrum = {"f_mhz": (f / 1e6).tolist(), "psd_db": p.tolist(), "mask_db": np.asarray(sem["limit_db"]).tolist(),
                 "mask_source": spec.source, "mask_is_conformance": bool(spec.is_conformance),
                 "bw_mhz": sim.wf.bw / 1e6, "rbw_hz": sem.get("rbw_hz")}

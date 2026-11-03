@@ -164,10 +164,11 @@ def _extra_phase_rad(geom, k: int, j: int, f0: float, phase_from_distance: bool)
     return 0.0 if extra == 0.0 else TWO_PI * f0 * extra / C0
 
 
-def _neighbour_shape(geom, c1: complex, c2_rel: float, c1y_rel: float = 1.0, c_diag_rel: float = 10 ** (-6 / 20),
-                     *, f0: float | None = None, phase_from_distance: bool = False) -> np.ndarray:
+def _neighbour_shape(geom, c1: complex, g: dict[str, float], *, f0: float | None = None,
+                     phase_from_distance: bool = False) -> np.ndarray:
+    """The frequency-flat matrix: c1 on the adjacent class, c1 x ``g[rel]``
+    (from ``_class_gains``) on the others."""
     m = np.zeros((geom.n, geom.n), dtype=complex)
-    g = {"x1": 1.0, "x2": c2_rel, "y1": c1y_rel, "y2": c1y_rel * c2_rel, "d1": c_diag_rel}
     for k, j, rel in _neighbour_classes(geom):
         v = c1 if rel == "x1" else c1 * g[rel]
         if rel != "x1" and phase_from_distance:
@@ -183,7 +184,7 @@ def analytic_matrix(geom, c1_db: float, c1_deg: float, c2_rel_db: float,
     geom = _geom(geom, f_lo, f_hi)
     c1 = 10.0 ** (c1_db / 20.0) * np.exp(1j * np.deg2rad(c1_deg))
     g = _class_gains(c2_rel_db, c1y_rel_db, c_diag_rel_db)
-    m = _neighbour_shape(geom, c1, g["x2"], g["y1"], g["d1"], f0=geom.f0_hz, phase_from_distance=phase_from_distance)
+    m = _neighbour_shape(geom, c1, g, f0=geom.f0_hz, phase_from_distance=phase_from_distance)
     return CouplingMatrix(np.array([f_lo, f_hi]), np.stack([m, m]), "analytic")
 
 

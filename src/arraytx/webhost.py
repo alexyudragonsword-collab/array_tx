@@ -24,6 +24,7 @@ another origin cannot add without a preflight this host does not answer):
                              group_path?, group_values?}  -> job (one leaf, many values; optionally per value of a second leaf)
     GET  /api/jobs                    the queue (no rows)
     GET  /api/jobs/<id>               one job, rows included
+    GET  /api/jobs/<id>/rows/<from>   the job with rows[from:] only (the page's poll)
     POST /api/jobs/<id>/cancel
 
 Run: ``arraytx-gui [--config configs/fr2_4el_survey.yaml]`` (or
@@ -34,6 +35,7 @@ from __future__ import annotations
 import argparse
 import itertools
 import json
+import math
 import mimetypes
 import multiprocessing as mp
 import os
@@ -169,10 +171,18 @@ class JobQueue:
         with self._lock:
             return [self.public(j) for j in self.jobs.values()]
 
-    def get(self, jid: str) -> dict | None:
+    def get(self, jid: str, rows_from: int = 0) -> dict | None:
+        """The job with its rows from index ``rows_from`` (``rows_from`` is
+        echoed so the page can place them); None when there is no such job."""
         with self._lock:
             j = self.jobs.get(jid)
-            return None if j is None else self.public(j, with_rows=True)
+            if j is None:
+                return None
+            d = self.public(j, with_rows=True)
+        if rows_from:
+            d["rows"] = d["rows"][rows_from:]
+        d["rows_from"] = int(rows_from)
+        return d
 
     def _next(self) -> dict | None:
         with self._cv:
@@ -202,29 +212,39 @@ class JobQueue:
         child.close()
         with self._lock:
             self._procs[job["id"]] = p
+        def take(timeout: float) -> str | None:
+            """One message into the job, or None when none arrived in time
+            (or the pipe is closed)."""
+            if not parent.poll(timeout):
+                return None
+            try:
+                msg, payload = parent.recv()
+            except EOFError:
+                return "eof"
+            with self._lock:
+                if msg == "row":
+                    job["rows"].append(payload)
+                    job["progress"][0] = len(job["rows"])
+                elif msg == "done":
+                    job["summary"] = payload
+                    job["status"] = "done"
+                elif msg == "error":
+                    job["error"] = payload
+                    job["status"] = "error"
+            return msg
         try:
             while True:
                 if job["cancel"]:
                     p.terminate()
                     break
-                if parent.poll(0.1):
-                    try:
-                        msg, payload = parent.recv()
-                    except EOFError:
-                        break
-                    with self._lock:
-                        if msg == "row":
-                            job["rows"].append(payload)
-                            job["progress"][0] = len(job["rows"])
-                        elif msg == "done":
-                            job["summary"] = payload
-                            job["status"] = "done"
-                        elif msg == "error":
-                            job["error"] = payload
-                            job["status"] = "error"
-                    if msg in ("done", "error"):
-                        break
-                elif not p.is_alive():
+                msg = take(0.1)
+                if msg in ("done", "error", "eof"):
+                    break
+                if msg is None and not p.is_alive():
+                    # the worker is gone: what it sent before exiting may still
+                    # be in the pipe (its 'done' lands a moment before exit)
+                    while take(0.0) not in (None, "eof", "done", "error"):
+                        pass
                     break
         finally:
             p.join(5)
@@ -286,8 +306,13 @@ class State:
 
 
 def _jsonable(v):
-    if isinstance(v, float) and v == float("-inf"):
-        return "-inf"
+    """JSON-safe copy: non-finite floats become the strings "-inf" / "inf" /
+    "nan" (json.dumps(allow_nan=False) would otherwise refuse the whole
+    payload -- a report with coupling.scale_db = -inf carries
+    coupling_max_offdiag_db = -inf; the page shows a dash for them, and
+    ``_from_json`` turns "-inf" back into the float for config leaves)."""
+    if isinstance(v, float) and not math.isfinite(v):
+        return "-inf" if v < 0 else ("inf" if v > 0 else "nan")
     if isinstance(v, dict):
         return {k: _jsonable(x) for k, x in v.items()}
     if isinstance(v, (list, tuple)):
@@ -326,7 +351,13 @@ class Api:
         elif route == "jobs":
             return 200, {"ok": True, "jobs": st.jobs.listing()}
         elif route.startswith("jobs/"):
-            j = st.jobs.get(route[5:])
+            jid, _, rest = route[5:].partition("/")
+            rows_from = 0
+            if rest:
+                if not rest.startswith("rows/"):
+                    return 404, {"ok": False, "error": f"no such route /api/{route}"}
+                rows_from = max(0, int(rest[5:]))
+            j = st.jobs.get(jid, rows_from)
             return 200 if j else 404, {"ok": True, "job": j} if j else {"ok": False, "error": "no such job"}
         else:
             return 404, {"ok": False, "error": f"no such route /api/{route}"}
@@ -426,17 +457,17 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _json(self, obj: Any, code: int = 200) -> None:
-        self._send(code, json.dumps(obj, ensure_ascii=False, allow_nan=False, default=_default).encode("utf-8"),
-                   "application/json; charset=utf-8")
+        self._send(code, dumps(obj).encode("utf-8"), "application/json; charset=utf-8")
 
     def do_GET(self):                                   # noqa: N802
         path = self.path.split("?", 1)[0]
         if path.startswith("/api/"):
             try:
                 code, obj = self.server.api.get(path[5:])        # type: ignore[attr-defined]
+                body = dumps(obj)
             except Exception as exc:                    # noqa: BLE001
-                code, obj = 500, {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
-            self._json(obj, code)
+                code, body = 500, dumps({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+            self._send(code, body.encode("utf-8"), "application/json; charset=utf-8")
             return
         rel = path.lstrip("/") or "index.html"
         target = (WWW / rel).resolve()
@@ -472,10 +503,14 @@ class _Handler(BaseHTTPRequestHandler):
 
 def _default(o):
     if hasattr(o, "item"):
-        return o.item()
-    if isinstance(o, float):
-        return str(o)
+        return _jsonable(o.item())
     raise TypeError(f"not JSON: {type(o).__name__}")
+
+
+def dumps(obj: Any) -> str:
+    """The one JSON encoder of both transports (HTTP handler, Android
+    bridge): numpy scalars unwrapped, non-finite floats as strings."""
+    return json.dumps(_jsonable(obj), ensure_ascii=False, allow_nan=False, default=_default)
 
 
 class _Server(ThreadingHTTPServer):

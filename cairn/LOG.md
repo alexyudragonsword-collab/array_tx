@@ -2,6 +2,23 @@
 
 本文件按时间倒序记录实质进展——新条目在顶。每条只写摘要与指针（数字写原值）；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-11-03 · 代码评审一轮（917f25d..42eef4c，8 个角度）：1 个会让页面停摆的 bug，1 处白做一倍的计算，其余是重复与竞态
+
+- **真 bug**：报告里出现非有限浮点（`coupling.scale_db = -inf` 时 `coupling_max_offdiag_db = -inf`——研究框占位提示的第一个取值）时，
+  `json.dumps(allow_nan=False)` 直接抛错，`do_GET` 又在 try 外发包，连接被掐断，页面的轮询 `S.polling=false` 后再也不取行。
+  修：`webhost.dumps` 是两种传输唯一的编码器，非有限浮点先变字符串 `"-inf" / "inf" / "nan"`（页面已把它们画成 "—"）；`_default` 里那条
+  永远到不了的 `isinstance(o, float)` 分支删掉（json 从不为 float 调 default）。回归测试：`-inf` 的 run 经 HTTP 取回 `"-inf"`。
+- **白做一倍**：开负载牵引时 `run` 对每个方案都先跑一遍无 DPD 的定点 radiate，但只有 per_element / pa_output 需要单元留着这个负载；
+  none 紧接着用同一组驱动再跑一遍，array 每轮 ILA 自己 radiate，antenna_port 在 `train` 里 radiate，而 `radiate` 每次都从匹配负载起步。
+  改成只在 per_element + pa_output 时预跑：六个 (observe, scheme) 组合的 `ys` SHA 逐位不变，smoke 的 none 0.6 → 0.3 s。
+- **竞态**：进程后端 `poll(0.1)` 为空、紧接着 `is_alive()` 为假就退出，worker 退出前一刻发的 `done` 还在管道里，任务被记成
+  "worker exited with code 0"。修：worker 已退出时把管道里剩的消息收完再退。
+- **页面取行**：每有新行就取整个任务（每行带约 100 KB 的图数据，21 行的研究取 231 行次）。新路由 `GET /api/jobs/<id>/rows/<from>` 只回 `rows[from:]`
+  和 `rows_from`，页面按 `S.seenRows` 取；Android 桥同一分发。
+- **重复**：SEM 的 23 dBm 在 `metrics.py` 和 `guiutil.py` 各写了一次 → `metrics.SEM_TX_POWER_DBM`；`_neighbour_shape` 自己重建类增益表并带第二个
+  对角默认值 → 直接收 `_class_gains` 的 dict。`ArraySim.last_load_pull` 在 `__init__` 初始化。
+- 指纹 168 项逐位相同；测试 146 → 147，Playwright 页面测试一起过；ex09 smoke 21.1 s。
+
 ## 2026-11-03 · 里程碑 2b：负载调制落地（ex09 全尺寸）——有效反射系数随扫描角变 0.84 → 1.27，0° 训练的 DPD 用到 60° 损失 2.5–2.9 dB，两种 DPD 在训练角度上仍只差 0.1–0.3 dB
 
 - 模型按 `load-pull-proposal.md`：`LoadPulledDPA` 继承 polar_tx `DPA`，Rapp 读在 drive·|1+κΓ_k|·r 再除以 |1+κΓ_k|，AM-PM 读在总摆幅；Γ_k 来自 `apply_coupling`

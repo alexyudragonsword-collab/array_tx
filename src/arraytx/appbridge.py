@@ -29,7 +29,7 @@ import traceback
 from pathlib import Path
 
 from .config import default_config
-from .webhost import Api, State, _default
+from .webhost import Api, State, dumps
 
 _API: Api | None = None
 
@@ -55,7 +55,7 @@ def call(route: str, args_json: str = "{}") -> str:
         _, obj = _api().call(str(route), req)
     except Exception as exc:                            # noqa: BLE001 (in-band error)
         obj = {"ok": False, "error": f"{type(exc).__name__}: {exc}", "traceback": traceback.format_exc()}
-    return json.dumps(obj, ensure_ascii=False, allow_nan=False, default=_default)
+    return dumps(obj)
 
 
 def reset() -> None:

@@ -4,12 +4,20 @@
 
 ## 未发布 / Unreleased
 
+### 代码评审一轮：页面轮询在 −∞ 上停摆的修复、负载牵引少跑一遍、管道竞态（2026-11-03）
+
+- `webhost.dumps`：HTTP 与 Android 桥共用的 JSON 编码器，非有限浮点写成 `"-inf" / "inf" / "nan"`（此前 `scale_db = -inf` 的报告让 `GET /api/jobs/<id>`
+  掐断连接、页面不再取行）；`do_GET` 的序列化错误也以 JSON 返回。
+- `GET /api/jobs/<id>/rows/<from>`：只回还没看过的行；页面轮询改用它。进程后端在 worker 退出后收完管道里剩余的消息（`done` 不再丢）。
+- `ArraySim.run`：只有 per_element + pa_output 需要预跑定工作点的 radiate，其余方案不再多跑一遍（六个组合的 `ys` 逐位不变）。
+- `metrics.SEM_TX_POWER_DBM` 取代两处 23.0；`_neighbour_shape` 直接收 `_class_gains` 的 dict。测试 146 → 147；指纹 168 项逐位相同。
+
 ### 里程碑 2b：负载调制 PA（ROADMAP A2，按 `cairn/load-pull-proposal.md` 实现）（2026-11-03）
 
 - `loadpull.py`：`LoadPulledDPA` 是 polar_tx `DPA` 的子类，无负载时逐位同原表；有负载时 Rapp 读在 `drive·|1+κ_a Γ|·r`、结果除以 |1+κ_a Γ|
   （耦合波由 `apply_coupling` 之后加上），AM-PM 读在 `r·|1+κ_p Γ|`；`active_reflection` 算 Γ_k = (r_k − y_k)/y_k，包络过零处置 0、|Γ| 截到 gamma_max。
 - `ArraySim.radiate`：开关开且有互耦时做定点迭代（默认两轮），单元保留最后一轮的负载作为工作点；`dpd.train` 走同一个 `radiate`，
-  所以阵列 DPD 与天线口观测看到的是迭代后的 PA，每单元 DPD 在 PA 前向口看到的是带负载的 PA。`run` 先用无 DPD 的导向驱动跑一次定工作点。
+  所以阵列 DPD 与天线口观测看到的是迭代后的 PA，每单元 DPD 在 PA 前向口看到的是带负载的 PA。`run` 在 per_element + pa_output 时先用无 DPD 的导向驱动跑一次定工作点（其余方案在训练里自己 radiate）。
 - 配置 `element.pa.load_pull{enabled false, kappa_amam 1, kappa_ampm 1, iterations 2, gamma_max 0.5, floor 0.05}`，κ 带 assumed 出处；
   开关关、S=0、理想 PA、rfdac / outphasing 拓扑下逐位不变（指纹 168 项相同，测试）。页面的 6 个新控件随开关显隐。
 - 示例 ex09、测试 138 → 146 项。数字与被推翻 / 证实的预期见 `cairn/LOG.md`。

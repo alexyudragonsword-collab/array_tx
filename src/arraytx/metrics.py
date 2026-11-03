@@ -26,6 +26,11 @@ from .vendor.polartx.metrics.sem import check_sem
 from .vendor.polartx.vendor.padpd.metrics import evm_of_signal, psd
 from .vendor.polartx.waveforms.base import Waveform
 
+#: the reference transmit power the stylized spectral-emission mask is drawn
+#: against (polar_tx's check_sem convention); the page's mask line uses the
+#: same constant so the plot and the SEM margin number cannot diverge
+SEM_TX_POWER_DBM = 23.0
+
 
 @dataclass
 class DirectionMetrics:
@@ -71,7 +76,7 @@ def _measure(y: np.ndarray, wf: Waveform, *, offsets, equalize: str, with_sem: b
     if with_sem:
         f, p = psd(y, wf.fs, nfft=4096)
         spec = default_mask_spec(wf)
-        sem = check_sem(f, p, spec, channel_bw_hz=wf.bw, tx_power_dbm=23.0)
+        sem = check_sem(f, p, spec, channel_bw_hz=wf.bw, tx_power_dbm=SEM_TX_POWER_DBM)
         sem["spec_source"] = spec.source
     return DirectionMetrics(domain, where, theta, float(e.db), float(e.percent),
                             {k: float(v) for k, v in ac.items()}, sem)

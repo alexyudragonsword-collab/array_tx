@@ -240,10 +240,10 @@ async function poll() {
       if (dup.length) { S.reports = S.reports.filter(r => !dup.includes(r)); if (dup.some(r => r.key === S.selected)) S.selected = null; delete S.jobs["prev." + j.id]; renderAll(); }
       if (["queued", "running"].includes(j.status)) active = true;
       const seen = S.seenRows[j.id] || 0;
-      if (j.n_rows > seen) {                           // new rows landed: fetch them
-        const full = (await api("jobs/" + j.id)).job;
-        full.rows.slice(seen).forEach((rep, k) => addReport(j, seen + k, rep));
-        S.seenRows[j.id] = full.rows.length;
+      if (j.n_rows > seen) {                           // new rows landed: fetch only those
+        const full = (await api("jobs/" + j.id + "/rows/" + seen)).job;
+        full.rows.forEach((rep, k) => addReport(j, full.rows_from + k, rep));
+        S.seenRows[j.id] = full.rows_from + full.rows.length;
       }
       if (old && old.status !== j.status && j.status === "error") showError(new Error(t("run_failed") + " #" + j.id + "\n" + (j.error || "")));
     }

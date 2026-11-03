@@ -96,6 +96,25 @@ def test_run_job_returns_the_report(server):
     assert any(x["id"] == done["id"] and "rows" not in x and x["n_rows"] == 1 for x in listing)
 
 
+def test_zero_coupling_report_serialises_and_rows_can_be_fetched_from_an_index(server):
+    """coupling.scale_db = -inf (the sweep placeholder's own first value)
+    puts coupling_max_offdiag_db = -inf in the report; the host must still
+    answer every job GET with JSON (json refuses non-finite floats), and the
+    page's poll fetches only the rows it has not seen."""
+    cfg = load_config(ROOT / "configs" / "fr2_4el_survey.yaml")
+    vals = {**values_from_config(cfg), "coupling.scale_db": "-inf"}
+    j = _post(server + "api/run", {"values": vals, "theta0_deg": 0, "scheme": "none", "n_symbols": SMOKE_SYMBOLS})
+    assert j["ok"], j
+    done = _wait(server, j["job"]["id"])
+    assert done["status"] == "done", done.get("error")
+    assert done["rows"][0]["info"]["coupling_max_offdiag_db"] == "-inf" and done["rows_from"] == 0
+    assert webhost.dumps({"a": float("nan"), "b": float("inf"), "c": [1.5, float("-inf")]}) == '{"a": "nan", "b": "inf", "c": [1.5, "-inf"]}'
+    tail = _get(server + f"api/jobs/{done['id']}/rows/1")["job"]
+    assert tail["rows"] == [] and tail["rows_from"] == 1 and tail["n_rows"] == 1
+    assert _get(server + f"api/jobs/{done['id']}/rows/0")["job"]["rows"] == done["rows"]
+    assert _get(server + f"api/jobs/{done['id']}/nope")["_code"] == 404
+
+
 def test_scan_job_streams_rows_and_can_be_cancelled(server):
     cfg = load_config(ROOT / "configs" / "fr2_4el_survey.yaml")
     vals = values_from_config(cfg)

@@ -81,6 +81,8 @@ class ArraySim:
         self.x = x
         self.coupling: CouplingMatrix = build_coupling(cfg, self.geom, self.wf.fs)
         self.elements: list[ElementChain] = build_elements(cfg, self.standard, self.tree, self.x, self.wf)
+        #: the last ``radiate`` with load modulation: iterations, deltas, |1+Gamma| stats (None otherwise)
+        self.last_load_pull: dict[str, Any] | None = None
 
     # ------------------------------------------------------------- pieces
     @property
@@ -155,9 +157,13 @@ class ArraySim:
         theta0 = float(cfg.beam.scan_deg[0] if theta0_deg is None else theta0_deg)
         scheme = scheme or cfg.dpd.scheme
         self.last_load_pull = None
-        if self.load_pull_active:
+        if self.load_pull_active and scheme == "per_element" and cfg.dpd.per_element_observe == "pa_output":
             # the operating point: every PA under the load the undistorted,
-            # steered drives put on it, before any DPD trains against it
+            # steered drives put on it, before the per-element DPDs train
+            # against their own PA.  The other schemes radiate these drives
+            # themselves (antenna_port in train(), array in every ILA pass,
+            # none right below), and radiate() starts from the matched load
+            # each time, so for them this pass would only repeat work.
             self.radiate(steer(self.x, self.geom, theta0, self.fs, cfg.beam.steering))
         bank = train(cfg, scheme, elements=self.elements, x=self.x, wf=self.wf, geom=self.geom,
                      coupling=self.coupling, theta0_deg=theta0, radiate=self.radiate)
