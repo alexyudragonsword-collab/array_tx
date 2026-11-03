@@ -94,3 +94,15 @@ def test_sweep_report_changes_one_leaf_and_keeps_the_rest(fr2_sim):
     off_on = sweep_report(fr2_sim.cfg, "element.lo.spurs", [False, True], 30.0, "none", with_plots=False)
     a, b = (r["ota"]["beam"]["evm_db"] for r in off_on["rows"])
     assert a == b                                      # the preset LO has no spur table: nothing to inject
+
+
+def test_sweep_report_groups_by_a_second_leaf(fr2_sim):
+    """ex06's two lines on the page: the same points once per value of a
+    second leaf; the group runs in order and each row names its group."""
+    from arraytx.guiutil import sweep_report
+    rep = sweep_report(fr2_sim.cfg, "array.n_elements", [2, 4], 60.0, "none", with_plots=False,
+                       group_path="beam.steering", group_values=["phase", "ttd"])
+    assert rep["group_values"] == ["phase", "ttd"] and len(rep["rows"]) == 4
+    assert [(r["sweep"]["group_value"], r["sweep"]["value"]) for r in rep["rows"]] == [("phase", 2), ("phase", 4), ("ttd", 2), ("ttd", 4)]
+    assert rep["rows"][3]["steering"] == "ttd" and rep["rows"][1]["steering"] == "phase"
+    assert rep["rows"][0]["sweep"]["n_groups"] == 2

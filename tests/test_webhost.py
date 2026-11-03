@@ -123,6 +123,15 @@ def test_sweep_job_runs_one_leaf_over_points_and_validates_first(server):
     bad = _post(server + "api/sweep", {"values": vals, "path": "dpd.scheme", "points": ["none", "magic"], "n_symbols": SMOKE_SYMBOLS})
     assert bad["ok"] is False and "dpd.scheme" in bad["error"]          # every point is validated before anything runs
     assert _post(server + "api/sweep", {"values": vals, "path": "nope.leaf", "points": [1]})["ok"] is False
+    assert _post(server + "api/sweep", {"values": vals, "path": "array.n_elements", "points": [2], "group_path": "array.n_elements",
+                                        "group_values": [4]})["ok"] is False                    # group must be another leaf
+    assert _post(server + "api/sweep", {"values": vals, "path": "array.n_elements", "points": [2], "group_path": "beam.steering",
+                                        "group_values": []})["ok"] is False
+    g = _post(server + "api/sweep", {"values": vals, "path": "array.n_elements", "points": [2], "group_path": "beam.steering",
+                                     "group_values": ["phase", "ttd"], "theta0_deg": 60, "scheme": "none", "n_symbols": SMOKE_SYMBOLS})["job"]
+    assert g["progress"] == [0, 2] and "⊗" in g["label"]
+    gd = _wait(server, g["id"])
+    assert [r["sweep"]["group_value"] for r in gd["rows"]] == ["phase", "ttd"] and gd["summary"]["group_path"] == "beam.steering"
     j = _post(server + "api/sweep", {"values": vals, "path": "array.n_elements", "points": [2, 4], "theta0_deg": 60,
                                      "scheme": "none", "n_symbols": SMOKE_SYMBOLS})["job"]
     assert j["kind"] == "sweep" and j["progress"] == [0, 2] and "n_elements" in j["label"]

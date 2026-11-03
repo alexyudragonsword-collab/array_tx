@@ -33,8 +33,6 @@ outphasing：分支恒包络、DPA 在满刻度——无 DPD −44.7 dBc，DPD �
 ### C1. GUI 的剩余宿主与页面
 桌面 / 浏览器的单页工作台已做（`arraytx-gui`，见 README）。没做的：
 - Android 宿主：页面已按 ≤ 760 px 切好底部导航，但没有 Chaquopy + WebView 的壳（照 polar_tx `android/`，`window.host` 桥替代 fetch）。
-- 中英双语标签（polar_tx 的页面有 `data-zh / data-en`，这里只有中文 + 英文单位）。
-- 扫描研究只扫一个控件；ex06 的"相移 vs 真延时两条线"要跑两次研究再用基线叠加，页面没有"按第二个控件分组"的图。
 
 ## D. 明确不做
 

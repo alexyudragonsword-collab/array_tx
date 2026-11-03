@@ -236,30 +236,43 @@ def scan_report(cfg: ArrayConfig | dict, scan_deg=None, schemes=None, *, n_symbo
 
 def sweep_report(cfg: ArrayConfig | dict, path: str, points, theta0_deg: float | None = None,
                  scheme: str | None = None, *, n_symbols: int | None = None, with_plots: bool = True,
-                 progress=None) -> dict[str, Any]:
+                 progress=None, group_path: str | None = None, group_values=None) -> dict[str, Any]:
     """One control, many values: the page's form of ex05 (clock profile),
     ex06 (element count) and ex07 (spurs on / off).  Every point is a fresh
     ArraySim built from the config with that one leaf changed through
     ``values_to_config`` (so the YAML the point would save is what ran),
     everything else -- seed, waveform, draws of the elements that still
-    exist -- unchanged (invariant 5).  Rows carry ``sweep`` = {path, value}."""
+    exist -- unchanged (invariant 5).  Rows carry ``sweep`` = {path, value}.
+
+    ``group_path`` / ``group_values`` repeat the sweep for each value of a
+    SECOND leaf (ex06's two lines: steering phase vs ttd); the rows then also
+    carry ``group_path`` / ``group_value`` and the page draws one line per
+    group.  The groups run in order, points within a group in order."""
     from .guispec import values_to_config
     base = _cfg(cfg)
     flat0 = values_from_config(base)
     rows = []
     t0 = time.time()
     pts = list(points)
-    for i, v in enumerate(pts):
-        flat = dict(flat0)
-        flat[path] = v
-        c = values_to_config(flat, base)
-        sim = ArraySim(c, n_symbols=n_symbols)
-        rep = report_from_result(sim, sim.run(theta0_deg, scheme), with_plots=with_plots)
-        rep["sweep"] = {"path": path, "value": _json(v), "index": i, "n": len(pts)}
-        rows.append(rep)
-        if progress is not None:
-            progress(i + 1, len(pts), rep)
-    return {"rows": rows, "path": path, "points": [_json(v) for v in pts], "seconds": time.time() - t0,
+    groups = [None] if not group_path else list(group_values or [])
+    n_total = len(pts) * len(groups)
+    for gi, gv in enumerate(groups):
+        for i, v in enumerate(pts):
+            flat = dict(flat0)
+            if group_path:
+                flat[group_path] = gv
+            flat[path] = v
+            c = values_to_config(flat, base)
+            sim = ArraySim(c, n_symbols=n_symbols)
+            rep = report_from_result(sim, sim.run(theta0_deg, scheme), with_plots=with_plots)
+            rep["sweep"] = {"path": path, "value": _json(v), "index": i, "n": len(pts)}
+            if group_path:
+                rep["sweep"].update({"group_path": group_path, "group_value": _json(gv), "group_index": gi, "n_groups": len(groups)})
+            rows.append(rep)
+            if progress is not None:
+                progress(len(rows), n_total, rep)
+    return {"rows": rows, "path": path, "points": [_json(v) for v in pts], "group_path": group_path,
+            "group_values": [_json(g) for g in groups] if group_path else None, "seconds": time.time() - t0,
             "engine_line": rows[0]["engine_line"] if rows else "", "repro": rows[0]["repro"] if rows else {}}
 
 

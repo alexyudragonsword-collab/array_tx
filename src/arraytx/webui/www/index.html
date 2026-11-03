@@ -15,81 +15,85 @@
 <header id="top">
   <span class="brand">array_tx</span>
   <span id="cfg-chip" class="chip" title="当前配置文件">…</span>
-  <button id="btn-open" class="btn" title="载入 YAML（桌面：输入路径；也可拖入 / 粘贴文本）">打开</button>
-  <button id="btn-save" class="btn" title="下载 YAML；桌面可写回文件">保存 YAML</button>
+  <button id="btn-open" class="btn" title="载入 YAML（桌面：输入路径；也可拖入 / 粘贴文本）" data-zh="打开" data-en="Open">打开</button>
+  <button id="btn-save" class="btn" title="下载 YAML；桌面可写回文件" data-zh="保存 YAML" data-en="Save YAML">保存 YAML</button>
   <label class="inline">seed <input id="seed" type="number" min="0" step="1"></label>
-  <label class="inline chk" title="2 个 OFDM 符号的短突发（CI 尺寸），快但指标偏乐观"><input id="smoke" type="checkbox"> 冒烟</label>
+  <label class="inline chk" title="2 个 OFDM 符号的短突发（CI 尺寸），快但指标偏乐观"><input id="smoke" type="checkbox"> <span data-zh="冒烟" data-en="smoke">冒烟</span></label>
   <span class="sp"></span>
   <label class="inline">θ0 <select id="run-theta"></select></label>
   <label class="inline">DPD <select id="run-scheme"></select></label>
-  <button id="btn-run" class="btn p">▶ 运行</button>
-  <button id="btn-scan" class="btn" title="scan_deg × 三方案，一次 ArraySim">⇄ 扫描</button>
+  <button id="btn-run" class="btn p" data-zh="▶ 运行" data-en="▶ Run">▶ 运行</button>
+  <button id="btn-scan" class="btn" title="scan_deg × 三方案，一次 ArraySim" data-zh="⇄ 扫描" data-en="⇄ Scan">⇄ 扫描</button>
+  <button id="lang" class="btn small" title="中文 / English">EN</button>
 </header>
 <div id="sweepbar" class="sweepbar">
-  <span class="muted">扫描研究</span>
+  <span class="muted" data-zh="扫描研究" data-en="Study">扫描研究</span>
   <select id="sweep-path" aria-label="swept control"></select>
   <input id="sweep-points" placeholder="取值列表，如 4, 8, 16, 32, 64 或 true, false" aria-label="points">
-  <button id="btn-sweep" class="btn small" title="一个控件 × 取值列表，其余不变（seed、波形、既有单元的抽取都不动）；ex05 / ex06 / ex07 的通用形式">▶ 研究</button>
+  <span class="muted" data-zh="按" data-en="by">按</span>
+  <select id="sweep-group" aria-label="group control" title="第二个控件：每个取值画一条线（ex06 的相移 vs 真延时）"></select>
+  <input id="sweep-group-values" placeholder="分组取值，如 phase, ttd" aria-label="group values" style="width:150px">
+  <button id="btn-sweep" class="btn small" title="一个控件 × 取值列表，其余不变（seed、波形、既有单元的抽取都不动）；ex05 / ex06 / ex07 的通用形式" data-zh="▶ 研究" data-en="▶ Study">▶ 研究</button>
   <span class="sp"></span>
-  <label class="inline">图上指标 <select id="sweep-metric"></select></label>
+  <label class="inline"><span data-zh="图上指标" data-en="metric">图上指标</span> <select id="sweep-metric"></select></label>
 </div>
 <div id="engine" class="engine">engine: — 尚未运行</div>
 <div id="error" class="error" hidden></div>
 
 <main id="main">
   <aside id="config" class="pane">
-    <div class="pane-h">配置 <span class="muted">= 唯一真值 · 每个控件一个 YAML 键</span>
+    <div class="pane-h"><span data-zh="配置" data-en="Config">配置</span> <span class="muted" data-zh="= 唯一真值 · 每个控件一个 YAML 键" data-en="= the one truth · one control, one YAML key">= 唯一真值 · 每个控件一个 YAML 键</span>
       <input id="filter" placeholder="筛选字段 / 说明 / 出处" aria-label="filter"></div>
     <div id="form"></div>
-    <div class="pane-f"><button id="btn-revert" class="btn small">还原到文件</button>
-      <button id="btn-defaults" class="btn small">全部默认</button>
+    <div class="pane-f"><button id="btn-revert" class="btn small" data-zh="还原到文件" data-en="Revert to file">还原到文件</button>
+      <button id="btn-defaults" class="btn small" data-zh="全部默认" data-en="All defaults">全部默认</button>
       <span id="validate" class="muted small"></span></div>
   </aside>
 
   <section id="results" class="pane">
     <div id="res-head" class="res-head">
-      <b id="res-title">结果</b> <span id="res-sub" class="muted"></span>
+      <b id="res-title" data-zh="结果" data-en="Results">结果</b> <span id="res-sub" class="muted"></span>
       <span class="sp"></span>
       <span id="baseline-chip" class="chip" hidden></span>
-      <button id="btn-pin" class="btn small" hidden>固定为基线</button>
-      <button id="btn-unpin" class="btn small" hidden>清除基线</button>
+      <button id="btn-pin" class="btn small" hidden data-zh="固定为基线" data-en="Pin as baseline">固定为基线</button>
+      <button id="btn-unpin" class="btn small" hidden data-zh="清除基线" data-en="Clear baseline">清除基线</button>
     </div>
     <div id="cards" class="cards"></div>
     <div id="sidelobe" class="sl muted"></div>
     <div class="plots">
-      <div class="plot"><div class="pt" id="pt-direction">ACLR1 随方向 · 失真往哪辐射 <span class="muted">零点涂灰、不报</span></div>
+      <div class="plot"><div class="pt" id="pt-direction"><span data-zh="ACLR1 随方向 · 失真往哪辐射" data-en="ACLR1 vs direction · where the distortion goes">ACLR1 随方向 · 失真往哪辐射</span> <span class="muted" data-zh="零点涂灰、不报" data-en="nulls greyed, not reported">零点涂灰、不报</span></div>
         <div id="plot-direction" class="svgbox"></div></div>
-      <div class="plot"><div class="pt" id="pt-spectrum">波束方向远场频谱 + 模板 <span id="mask-note" class="muted"></span></div>
+      <div class="plot"><div class="pt" id="pt-spectrum"><span data-zh="波束方向远场频谱 + 模板" data-en="far-field spectrum at the beam + mask">波束方向远场频谱 + 模板</span> <span id="mask-note" class="muted"></span></div>
         <div id="plot-spectrum" class="svgbox"></div></div>
       <div class="plot"><div class="pt" id="pt-grid">扫描角 × DPD · OTA ACLR1 @ 波束 [dBc] <span class="muted">点击一格切换</span></div>
         <div id="plot-grid" class="svgbox"></div></div>
-      <div class="plot"><div class="pt">星座 @ 波束 <span class="muted" id="const-note"></span></div>
+      <div class="plot"><div class="pt"><span data-zh="星座 @ 波束" data-en="constellation at the beam">星座 @ 波束</span> <span class="muted" id="const-note"></span></div>
         <div id="plot-constellation" class="svgbox"></div></div>
     </div>
-    <div class="tbl-h">结果表 <span class="muted">OTA · 波束方向与最高旁瓣 · 点击行切换上图</span></div>
+    <div class="tbl-h"><span data-zh="结果表" data-en="Results">结果表</span> <span class="muted" data-zh="OTA · 波束方向与最高旁瓣 · 点击行切换上图" data-en="OTA · beam and highest sidelobe · click a row">OTA · 波束方向与最高旁瓣 · 点击行切换上图</span></div>
     <div class="tbl-wrap"><table id="table"><thead><tr>
-      <th>#</th><th>θ0</th><th>DPD</th><th>导向</th><th>EVM dB</th><th>ACLR1</th><th>ACLR2</th><th>模板</th><th>旁瓣 θ</th><th>旁瓣 ACLR1</th><th>s</th>
+      <th>#</th><th>θ0</th><th>DPD</th><th data-zh="导向" data-en="steer">导向</th><th>EVM dB</th><th>ACLR1</th><th>ACLR2</th><th data-zh="模板" data-en="mask">模板</th><th data-zh="旁瓣 θ" data-en="SL θ">旁瓣 θ</th><th data-zh="旁瓣 ACLR1" data-en="SL ACLR1">旁瓣 ACLR1</th><th>s</th>
     </tr></thead><tbody></tbody></table></div>
-    <details class="diag"><summary>导通口诊断 — conducted_*，不是验收指标（铁律 2）</summary>
+    <details class="diag"><summary data-zh="导通口诊断 — conducted_*，不是验收指标（铁律 2）" data-en="conducted-port diagnostics — conducted_*, not acceptance numbers (rule 2)">导通口诊断 — conducted_*，不是验收指标（铁律 2）</summary>
       <div id="diag"></div></details>
   </section>
 
   <aside id="side" class="pane">
-    <div class="pane-h">运行队列 <span id="queue-sub" class="muted"></span></div>
+    <div class="pane-h"><span data-zh="运行队列" data-en="Queue">运行队列</span> <span id="queue-sub" class="muted"></span></div>
     <div id="queue" class="queue"></div>
-    <div class="pane-h">历史 <span class="muted">点击查看 · ◆ 基线</span></div>
+    <div class="pane-h"><span data-zh="历史" data-en="History">历史</span> <span class="muted" data-zh="点击查看 · ◆ 基线" data-en="click to show · ◆ baseline">点击查看 · ◆ 基线</span></div>
     <div id="history" class="history"></div>
-    <div class="pane-h">可复现</div>
+    <div class="pane-h" data-zh="可复现" data-en="Reproduce">可复现</div>
     <div id="repro" class="repro muted">—</div>
-    <div class="pane-h">出处 <span class="muted">点击控件旁的标签</span></div>
+    <div class="pane-h"><span data-zh="出处" data-en="Provenance">出处</span> <span class="muted" data-zh="点击控件旁的标签" data-en="click a control's pill">点击控件旁的标签</span></div>
     <div id="prov" class="prov muted">—</div>
   </aside>
 </main>
 
 <nav id="bottom-nav">
-  <button data-pane="config">⚙ 配置</button>
-  <button data-pane="results" class="on">▦ 结果</button>
-  <button data-pane="side">≡ 队列 / 历史</button>
+  <button data-pane="config" data-zh="⚙ 配置" data-en="⚙ Config">⚙ 配置</button>
+  <button data-pane="results" class="on" data-zh="▦ 结果" data-en="▦ Results">▦ 结果</button>
+  <button data-pane="side" data-zh="≡ 队列 / 历史" data-en="≡ Queue / History">≡ 队列 / 历史</button>
 </nav>
 <div id="tip" class="tip" hidden></div>
 <script src="charts.js"></script>

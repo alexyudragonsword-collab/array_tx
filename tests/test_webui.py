@@ -155,3 +155,27 @@ def test_a_sweep_draws_as_it_lands_and_history_survives_a_reload(server, browser
     page.goto(server)
     page.wait_for_function("[...document.querySelectorAll('#table tbody tr td')].some(td => td.textContent.includes('↺'))", timeout=15000)
     ctx.close()
+
+
+def test_grouped_study_and_the_language_toggle(server, browser):
+    ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = ctx.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(server + "?smoke=1&theta=60&sweep=array.n_elements,2,4&group=beam.steering,phase,ttd")
+    # the shared host still holds earlier tests' sweeps: wait for THIS study's last group
+    page.wait_for_function("[...document.querySelectorAll('#table tbody tr')].filter(tr => tr.textContent.includes('steering=ttd')).length >= 2", timeout=300000)
+    assert not errors, errors
+    assert "⊗ beam.steering" in page.text_content("#pt-grid")
+    assert page.evaluate("document.querySelectorAll('#plot-grid svg circle').length") >= 4          # two lines, two points each
+    assert "beam.steering=ttd" in page.text_content("#res-title")
+    # the language toggle relabels the static text and the rendered results, and survives a reload
+    page.click("#lang")
+    assert page.text_content("#btn-run").strip() == "▶ Run" and "no DPD" in page.text_content("#res-title")
+    assert "Queue" in page.text_content("#side .pane-h")
+    page.reload()
+    page.wait_for_selector("#form .row", timeout=30000)
+    assert page.text_content("#btn-run").strip() == "▶ Run"
+    page.click("#lang")
+    assert page.text_content("#btn-run").strip() == "▶ 运行"
+    ctx.close()

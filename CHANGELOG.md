@@ -4,6 +4,13 @@
 
 ## 未发布 / Unreleased
 
+### 页面：研究按第二个控件分组（双线），中英双语（2026-11-03）
+
+- `sweep_report` / `POST /api/sweep` 加 `group_path` / `group_values`：同一组取值对第二个控件的每个值各跑一遍，行带 `group_value`；
+  宿主先把每个组合建成合法配置。页面"按"下拉 + 分组取值，研究图一组一条线（ex06 的相移 vs 真延时），布尔 / 枚举取值用一组一行的格子。
+- 双语：静态文本 `data-zh / data-en`，动态文本走 `T` 字典，右上角切换并记在 localStorage；指标名用 spec 里的 zh / en；控件说明保持英文元数据。
+- 测试 128 → 130 项。
+
 ### 里程碑 2a：矩形面阵、扫描切面、二维互耦邻域；互耦远邻相位改按电长度并加无源性检查（2026-11-03）
 
 - `geometry.ArrayGeometry(n_x, n_y, dx, dy, f0, pattern, plane_phi_deg)`：row-major 单元序（第一行就是原线阵），`delays_s(θ)` 在配置的
