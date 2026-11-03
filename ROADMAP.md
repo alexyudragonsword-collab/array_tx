@@ -30,9 +30,9 @@ outphasing：分支恒包络、DPA 在满刻度——无 DPD −44.7 dBc，DPD �
 
 ## C. 工程维护
 
-### C1. Android APK 没有真机 / CI 构建记录
-`android/` 与 `android.yml` 已写（照 polar_tx 的版本集），桥与页面在没有 Android 的机器上测过；APK 本身要手动触发工作流构建，
-真机上的首次导入时间、128 单元的内存都没有数字。页面的"打开 / 保存"在手机上只按默认路径走（prompt 被 WebChromeClient 按默认值确认），没有文件选择器。
+### C1. Android APK 没有真机数字
+APK 在 CI 上构建过一次（2026-11-03，84.7 MB，两个 ABI），桥与页面在没有 Android 的机器上测过；真机上的首次导入时间、128 单元的内存、
+线程后端下一次 run 的耗时都没有数字。页面的"打开 / 保存"在手机上只按默认路径走（prompt 被 WebChromeClient 按默认值确认），没有文件选择器。
 
 ## D. 明确不做
 

@@ -9,7 +9,8 @@
 - `cairn/load-pull-proposal.md`（status: proposed）：一阶电压模负载牵引——Rapp 驱动量乘 |1+κΓ_k(t)|，Γ_k 由 `apply_coupling` 的泄漏算出，
   定点迭代两轮，arraytx 侧包 `LoadPulledDPA` 不改 vendor，默认关。先写明预期：单波束、单元全同时 Γ_k 是常数（有源阻抗），每单元 DPD 在训练角度上
   仍能补偿；能分开两种 DPD 的是换扫描角不重训、单元差异带来的时变部分、面阵内部单元的 12 个邻居。实现等用户审阅。
-- APK：`android.yml` 用 workflow_dispatch 在分支上触发了第一次构建，结果记在下一条。
+- APK：`android.yml` 用 workflow_dispatch 在分支 ad0fdb6 上第一次构建就绿：run 41612446494，175 s，产物 `arraytx-debug-apk` 84.7 MB
+  （arm64-v8a + x86_64 两个 ABI 各带 CPython 3.10 + numpy / scipy / matplotlib），四个页面文件在 assets/www 下的检查通过。真机数字仍没有。
 
 ## 2026-11-03 · Android 壳：一份分发两种传输，线程后端队列；APK 工作流写好但没在这里跑
 

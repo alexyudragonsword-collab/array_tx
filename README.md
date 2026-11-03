@@ -43,7 +43,7 @@ GUI 里改过的 survey 数字自动降为 `assumed` 并注明。
 `arraytx.appbridge.call(route, json)`，它和本地服务共用 `webhost.Api` 的分发，任务跑在线程后端（取消只能在行与行之间）。APK 用
 `.github/workflows/android.yml` 手动触发构建（Python 3.10 / Chaquopy 15 / AGP 8.1，版本集与 polar_tx 一致）；本仓库的测试在没有 Android 的
 机器上覆盖桥的全部路由（`tests/test_appbridge.py`）、壳的文本约束（`tests/test_android.py`）和页面走桥的路径（Playwright 注入 `window.host`）。
-APK 本身在这里没有构建过。
+APK 在 CI 上构建过一次（2026-11-03：175 s，84.7 MB，arm64-v8a + x86_64），真机数字还没有。
 
 ## 一次仿真的数据流
 
