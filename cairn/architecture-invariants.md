@@ -5,8 +5,8 @@ summary: 六条铁律各自落在哪个模块、由哪些测试守着
 tags: [invariants, tests, architecture]
 contains: [decision]
 created: 2026-10-13
-updated: 2026-10-13
-related: [AGENTS.md]
+updated: 2026-11-03
+related: [AGENTS.md, coupling-model.md, squint-and-evm.md, fr2-floor-lo.md, gui.md, load-pull-proposal.md]
 authoring_mode: ai_generated
 ---
 

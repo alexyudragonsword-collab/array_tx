@@ -2,6 +2,15 @@
 
 本文件按时间倒序记录实质进展——新条目在顶。每条只写摘要与指针（数字写原值）；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-11-03 · 主题笔记沉淀：互耦模型、斜视与 EVM、FR2 的底与 LO、GUI；A2 负载调制的模型提案（等审阅）；APK 首次构建已触发
+
+- LOG 14 条里的稳定结论按规则进四个主题笔记（当前真值，原地更新；坑写进正文）：`cairn/coupling-model.md`、`squint-and-evm.md`、
+  `fr2-floor-lo.md`、`gui.md`；`architecture-invariants.md` 的 related 指向它们。LOG 条目不动，只做历史。
+- `cairn/load-pull-proposal.md`（status: proposed）：一阶电压模负载牵引——Rapp 驱动量乘 |1+κΓ_k(t)|，Γ_k 由 `apply_coupling` 的泄漏算出，
+  定点迭代两轮，arraytx 侧包 `LoadPulledDPA` 不改 vendor，默认关。先写明预期：单波束、单元全同时 Γ_k 是常数（有源阻抗），每单元 DPD 在训练角度上
+  仍能补偿；能分开两种 DPD 的是换扫描角不重训、单元差异带来的时变部分、面阵内部单元的 12 个邻居。实现等用户审阅。
+- APK：`android.yml` 用 workflow_dispatch 在分支上触发了第一次构建，结果记在下一条。
+
 ## 2026-11-03 · Android 壳：一份分发两种传输，线程后端队列；APK 工作流写好但没在这里跑
 
 - 分层：`webhost.Api` 是唯一分发，HTTP 处理器和 `appbridge.call` 都只是传输；`execute()` 是进程 / 线程两种后端共用的执行体，线程后端的取消
