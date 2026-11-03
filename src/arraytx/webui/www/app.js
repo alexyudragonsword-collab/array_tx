@@ -49,10 +49,23 @@ const S = {                       // page state
 };
 
 /* ----------------------------------------------------------------- api */
+/* Two transports, one API (webhost.Api): on a laptop fetch() reaches the
+ * local server; in the Android WebView the activity injects window.host
+ * and the reply comes back through window.onHostReply (async, because a
+ * @JavascriptInterface call arrives on a binder thread). */
+const ON_DEVICE = !!(window.host && window.host.call);
+const pendingHost = {}; let hostSeq = 0;
+window.onHostReply = (id, text) => { const p = pendingHost[id]; delete pendingHost[id]; if (p) p(text); };
 async function api(route, body) {
-  const r = await fetch("api/" + route, body === undefined ? {} :
-    { method: "POST", headers: { "Content-Type": "application/json", "X-ArrayTX": "1" }, body: JSON.stringify(body) });
-  const j = await r.json();
+  let j;
+  if (ON_DEVICE) {
+    const text = await new Promise(res => { const id = String(++hostSeq); pendingHost[id] = res; window.host.call(id, route, JSON.stringify(body === undefined ? {} : body)); });
+    j = JSON.parse(text);
+  } else {
+    const r = await fetch("api/" + route, body === undefined ? {} :
+      { method: "POST", headers: { "Content-Type": "application/json", "X-ArrayTX": "1" }, body: JSON.stringify(body) });
+    j = await r.json();
+  }
   if (j.ok === false) throw new Error(j.error || ("api/" + route + " failed"));
   return j;
 }

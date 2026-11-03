@@ -14,7 +14,7 @@ polar_tx 的姊妹库（polar_tx ROADMAP D：GUI 里不再加架构、不做接�
 pip install -e ".[test,dev]"
 python examples/ex00_single_element_equals_polartx.py   # sub-6、S=0、1 单元：与 polar_tx 逐位相同
 python examples/ex03_scan_angle_x_dpd.py                # 扫描角 × DPD 方案的 OTA EVM / ACLR 表
-pytest -q                                               # 130 项（页面测试无 Chromium 时跳过）
+pytest -q                                               # 138 项（页面测试无 Chromium 时跳过）
 ARRAYTX_SMOKE=1 python examples/ex04_aclr_vs_direction.py   # 短突发（CI 用的尺寸）
 ```
 
@@ -38,6 +38,12 @@ GUI 里改过的 survey 数字自动降为 `assumed` 并注明。
 `element.lo.clock_profile` × 几个 `bundled:` 剖面、`element.lo.spurs` × `false, true`），其余不变，指标随取值的曲线边跑边画；
 "按"第二个控件分组（如 `beam.steering` × `phase, ttd`）就是 ex06 的两条线。最近 12 条结果存在浏览器 localStorage 里，刷新不丢（标 ↺）。
 右上角 EN / 中 切换界面语言（控件说明来自配置字段的英文元数据，不翻译）。
+
+**Android**：同一份页面的第三个宿主。`android/` 是 Chaquopy + WebView 的壳（照 polar_tx），`MainActivity.kt` 只做一件事：把页面的请求转给
+`arraytx.appbridge.call(route, json)`，它和本地服务共用 `webhost.Api` 的分发，任务跑在线程后端（取消只能在行与行之间）。APK 用
+`.github/workflows/android.yml` 手动触发构建（Python 3.10 / Chaquopy 15 / AGP 8.1，版本集与 polar_tx 一致）；本仓库的测试在没有 Android 的
+机器上覆盖桥的全部路由（`tests/test_appbridge.py`）、壳的文本约束（`tests/test_android.py`）和页面走桥的路径（Playwright 注入 `window.host`）。
+APK 本身在这里没有构建过。
 
 ## 一次仿真的数据流
 
@@ -97,7 +103,7 @@ print(r.info["engine_line"]); print(r.beam.row()); print(r.sidelobe.row())
 | `dpd.py` | none / per_element（导通口 ILA-GMP）/ array（远场 ILA-GMP） | — |
 | `sim.py` / `report.py` | `ArraySim` 串联；引擎行与免责声明 | — |
 | `guispec.py` / `guiutil.py` | GUI 契约（控件 = YAML 键、指标域、图）/ 报告（run / scan、绘图数据、可复现卡、YAML 往返） | 1, 2 |
-| `webhost.py` / `webui/www/` | 本地宿主（JSON API、子进程队列、应用窗口）/ 一份页面 | — |
+| `webhost.py` / `appbridge.py` / `webui/www/` | `Api`（一份分发）+ 本地宿主（子进程队列、应用窗口）/ Android 桥（线程队列）/ 一份页面 | — |
 | `tools/fingerprint.py` | 重构前后逐位比对 | 6 |
 | `tools/vendor_check.py` | vendor 树对上游 pin 的漂移检查（`--strict`） | — |
 

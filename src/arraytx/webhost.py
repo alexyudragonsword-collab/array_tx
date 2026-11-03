@@ -61,47 +61,70 @@ POST_HEADER = "X-ArrayTX"
 
 
 # ------------------------------------------------------------------ jobs
-def _worker(conn, kind: str, cfg_yaml: str, source_path: str | None, params: dict) -> None:
-    """Runs in a child process.  Sends ("row", report) per scan row, then
-    ("done", summary); or ("error", text)."""
+class Cancelled(Exception):
+    """Raised inside a thread-backend job when it was cancelled between rows."""
+
+
+def execute(kind: str, cfg_yaml: str, source_path: str | None, params: dict, emit, cancelled=None) -> None:
+    """Run one job and hand every row, then the summary, to ``emit(msg,
+    payload)``: msg is "row", "done" or "error".  Used by the process
+    worker (emit = pipe.send) and the thread backend (emit = append under a
+    lock).  ``cancelled()`` is polled between rows on the thread backend,
+    where there is no process to terminate."""
     try:
         from .guiutil import run_report, scan_report, sweep_report
         cfg = config_from_dict(yaml.safe_load(cfg_yaml), source_path)
         n_symbols = params.get("n_symbols")
+
+        def progress(i, n, row):
+            emit("row", row)
+            if cancelled is not None and cancelled():
+                raise Cancelled()
         if kind == "run":
             rep = run_report(cfg, params.get("theta0_deg"), params.get("scheme"), n_symbols=n_symbols)
-            conn.send(("row", rep))
-            conn.send(("done", {"seconds": rep["seconds"]}))
+            emit("row", rep)
+            emit("done", {"seconds": rep["seconds"]})
         elif kind == "scan":
-            def progress(i, n, row):
-                conn.send(("row", row))
-            rep = scan_report(cfg, params.get("scan_deg"), params.get("schemes"), n_symbols=n_symbols,
-                              progress=progress)
-            conn.send(("done", {k: v for k, v in rep.items() if k != "rows"}))
+            rep = scan_report(cfg, params.get("scan_deg"), params.get("schemes"), n_symbols=n_symbols, progress=progress)
+            emit("done", {k: v for k, v in rep.items() if k != "rows"})
         elif kind == "sweep":
-            def progress(i, n, row):
-                conn.send(("row", row))
             rep = sweep_report(cfg, params["path"], params["points"], params.get("theta0_deg"), params.get("scheme"),
                                n_symbols=n_symbols, progress=progress,
                                group_path=params.get("group_path"), group_values=params.get("group_values"))
-            conn.send(("done", {k: v for k, v in rep.items() if k != "rows"}))
+            emit("done", {k: v for k, v in rep.items() if k != "rows"})
         else:
-            conn.send(("error", f"unknown job kind {kind!r}"))
+            emit("error", f"unknown job kind {kind!r}")
+    except Cancelled:
+        emit("cancelled", None)
     except Exception:                               # noqa: BLE001 (reported in-band)
-        conn.send(("error", traceback.format_exc()))
+        emit("error", traceback.format_exc())
+
+
+def _worker(conn, kind: str, cfg_yaml: str, source_path: str | None, params: dict) -> None:
+    """The child process: ``execute`` with the pipe as the sink."""
+    try:
+        execute(kind, cfg_yaml, source_path, params, lambda msg, payload: conn.send((msg, payload)))
     finally:
         conn.close()
 
 
 class JobQueue:
-    """Background jobs, ``workers`` at a time, each in its own process."""
+    """Background jobs, ``workers`` at a time.
 
-    def __init__(self, workers: int = 2):
+    ``backend="process"`` (the desktop): each job in its own spawned
+    process, cancel is a terminate.  ``backend="thread"`` (Android, where
+    Chaquopy has no multiprocessing): each job on a worker thread, cancel is
+    cooperative between rows -- a long single run cannot be interrupted."""
+
+    def __init__(self, workers: int = 2, backend: str = "process"):
+        if backend not in ("process", "thread"):
+            raise ValueError(f"backend must be process or thread, got {backend!r}")
+        self.backend = backend
         self.workers = max(1, int(workers))
         self.jobs: dict[str, dict[str, Any]] = {}
         self._ids = itertools.count(1)
         self._lock = threading.Lock()
-        self._ctx = mp.get_context("spawn")
+        self._ctx = mp.get_context("spawn") if backend == "process" else None
         self._procs: dict[str, Any] = {}
         self._cv = threading.Condition(self._lock)
         for _ in range(self.workers):
@@ -169,6 +192,9 @@ class JobQueue:
             self._run(job)
 
     def _run(self, job: dict) -> None:
+        if self.backend == "thread":
+            self._run_thread(job)
+            return
         parent, child = self._ctx.Pipe(duplex=False)
         p = self._ctx.Process(target=_worker, args=(child, job["kind"], job["_yaml"], job["_source_path"], job["params"]),
                               daemon=True)
@@ -212,11 +238,41 @@ class JobQueue:
             parent.close()
 
 
+    def _run_thread(self, job: dict) -> None:
+        def emit(msg, payload):
+            with self._lock:
+                if msg == "row":
+                    job["rows"].append(payload)
+                    job["progress"][0] = len(job["rows"])
+                elif msg == "done":
+                    job["summary"] = payload
+                    job["status"] = "done"
+                elif msg == "error":
+                    job["error"] = payload
+                    job["status"] = "error"
+                elif msg == "cancelled":
+                    job["status"] = "cancelled"
+        try:
+            execute(job["kind"], job["_yaml"], job["_source_path"], job["params"], emit, lambda: job["cancel"])
+        finally:
+            with self._lock:
+                if job["status"] == "running":
+                    job["status"] = "cancelled" if job["cancel"] else "error"
+                job["finished"] = time.time()
+
+
 # ------------------------------------------------------------------ state
 class State:
-    def __init__(self, cfg: ArrayConfig, workers: int = 2):
+    def __init__(self, cfg: ArrayConfig, workers: int = 2, backend: str = "process", home: str | Path | None = None):
         self.cfg = cfg
-        self.jobs = JobQueue(workers)
+        self.jobs = JobQueue(workers, backend)
+        #: where a relative config path in load / save lands (the phone's own
+        #: files directory); None = the process's working directory
+        self.home = Path(home) if home else None
+
+    def path(self, p: str) -> Path:
+        q = Path(str(p))
+        return q if q.is_absolute() or self.home is None else self.home / q
 
     def config_payload(self) -> dict:
         c = self.cfg
@@ -248,100 +304,51 @@ def _from_json(values: dict) -> dict:
     return out
 
 
-# --------------------------------------------------------------- handler
-class _Handler(BaseHTTPRequestHandler):
-    server_version = "arraytx-webhost"
-    state: State            # set on the server class
+# ------------------------------------------------------------------- api
+class Api:
+    """The JSON API, independent of the transport: the HTTP handler and the
+    Android bridge (``arraytx.appbridge``) both call ``get`` / ``post`` and
+    get ``(status, payload)`` back.  Payloads always carry ``ok``."""
+    GET_ROUTES = ("version", "spec", "config", "jobs")
 
-    def log_message(self, fmt, *args):      # quiet: this is a desktop app
-        pass
+    def __init__(self, state: State):
+        self.state = state
 
-    def _send(self, code: int, body: bytes, ctype: str) -> None:
-        self.send_response(code)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(body)
-
-    def _json(self, obj: Any, code: int = 200) -> None:
-        self._send(code, json.dumps(obj, ensure_ascii=False, allow_nan=False, default=_default).encode("utf-8"),
-                   "application/json; charset=utf-8")
-
-    def do_GET(self):                                   # noqa: N802
-        path = self.path.split("?", 1)[0]
-        if path.startswith("/api/"):
-            try:
-                self._api_get(path[5:])
-            except Exception as exc:                    # noqa: BLE001
-                self._json({"ok": False, "error": f"{type(exc).__name__}: {exc}"}, 500)
-            return
-        rel = path.lstrip("/") or "index.html"
-        target = (WWW / rel).resolve()
-        if WWW.resolve() not in target.parents or not target.is_file():
-            self._send(404, b"not found", "text/plain; charset=utf-8")
-            return
-        ctype = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
-        if ctype.startswith("text/") or ctype.endswith("javascript"):
-            ctype += "; charset=utf-8"
-        self._send(200, target.read_bytes(), ctype)
-
-    def _api_get(self, route: str) -> None:
-        st = self.server.state                           # type: ignore[attr-defined]
+    def get(self, route: str) -> tuple[int, dict]:
+        st = self.state
         if route == "version":
-            self._json({"ok": True, "lib": "arraytx", "version": __version__, "python": sys.version.split()[0],
-                        "pins": pins(), "workers": st.jobs.workers})
+            return 200, {"ok": True, "lib": "arraytx", "version": __version__, "python": sys.version.split()[0],
+                        "pins": pins(), "workers": st.jobs.workers}
         elif route == "spec":
-            self._json({"ok": True, **spec()})
+            return 200, {"ok": True, **spec()}
         elif route == "config":
-            self._json({"ok": True, **st.config_payload()})
+            return 200, {"ok": True, **st.config_payload()}
         elif route == "jobs":
-            self._json({"ok": True, "jobs": st.jobs.listing()})
+            return 200, {"ok": True, "jobs": st.jobs.listing()}
         elif route.startswith("jobs/"):
             j = st.jobs.get(route[5:])
-            self._json({"ok": True, "job": j} if j else {"ok": False, "error": "no such job"}, 200 if j else 404)
+            return 200 if j else 404, {"ok": True, "job": j} if j else {"ok": False, "error": "no such job"}
         else:
-            self._json({"ok": False, "error": f"no such route /api/{route}"}, 404)
-
-    def do_POST(self):                                  # noqa: N802
-        path = self.path.split("?", 1)[0]
-        if not path.startswith("/api/"):
-            self._send(404, b"not found", "text/plain; charset=utf-8")
-            return
-        if self.headers.get(POST_HEADER) != "1":
-            self._json({"ok": False, "error": f"missing {POST_HEADER} header"}, 403)
-            return
-        n = int(self.headers.get("Content-Length") or 0)
-        try:
-            req = json.loads(self.rfile.read(n) or b"{}")
-        except ValueError as exc:
-            self._json({"ok": False, "error": f"bad request: {exc}"}, 400)
-            return
-        try:
-            self._api_post(path[5:], req)
-        except (ValueError, TypeError, KeyError, OSError) as exc:
-            self._json({"ok": False, "error": f"{type(exc).__name__}: {exc}"}, 400)
-        except Exception as exc:                        # noqa: BLE001
-            self._json({"ok": False, "error": f"{type(exc).__name__}: {exc}", "traceback": traceback.format_exc()}, 500)
-
-    def _api_post(self, route: str, req: dict) -> None:
-        st = self.server.state                           # type: ignore[attr-defined]
+            return 404, {"ok": False, "error": f"no such route /api/{route}"}
+    def post(self, route: str, req: dict) -> tuple[int, dict]:
+        st = self.state
         if route == "config/load":
-            st.cfg = load_config(str(req["path"]))
-            self._json({"ok": True, **st.config_payload()})
+            st.cfg = load_config(st.path(req["path"]))
+            return 200, {"ok": True, **st.config_payload()}
         elif route == "config/text":
             st.cfg = config_from_dict(yaml.safe_load(str(req.get("yaml", ""))) or {}, req.get("source_path"))
-            self._json({"ok": True, **st.config_payload()})
+            return 200, {"ok": True, **st.config_payload()}
         elif route == "validate":
             cfg = st.build(req.get("values") or {})
-            self._json({"ok": True, "sha256": config_sha(cfg), "diff": _jsonable(diff(st.cfg, cfg)), "yaml": to_yaml(cfg),
-                        "provenance": {k: {"source": v.source, "ref": v.ref} for k, v in cfg.provenance.items()}})
+            return 200, {"ok": True, "sha256": config_sha(cfg), "diff": _jsonable(diff(st.cfg, cfg)), "yaml": to_yaml(cfg),
+                        "provenance": {k: {"source": v.source, "ref": v.ref} for k, v in cfg.provenance.items()}}
         elif route == "save":
             cfg = st.build(req.get("values") or {})
-            p = Path(str(req["path"]))
+            p = st.path(req["path"])
+            p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(to_yaml(cfg), encoding="utf-8")
             st.cfg = load_config(p)
-            self._json({"ok": True, **st.config_payload()})
+            return 200, {"ok": True, **st.config_payload()}
         elif route == "run":
             cfg = st.build(req.get("values") or {})
             params = {"theta0_deg": None if req.get("theta0_deg") is None else float(req["theta0_deg"]),
@@ -349,7 +356,7 @@ class _Handler(BaseHTTPRequestHandler):
                       "n_symbols": None if req.get("n_symbols") in (None, "") else int(req["n_symbols"])}
             th = cfg.beam.scan_deg[0] if params["theta0_deg"] is None else params["theta0_deg"]
             job = st.jobs.submit("run", cfg, params, f"{th:+.0f}° · {params['scheme']} · {cfg.beam.steering}")
-            self._json({"ok": True, "job": job})
+            return 200, {"ok": True, "job": job}
         elif route == "scan":
             cfg = st.build(req.get("values") or {})
             scan = [float(t) for t in (req.get("scan_deg") or cfg.beam.scan_deg)]
@@ -357,7 +364,7 @@ class _Handler(BaseHTTPRequestHandler):
             params = {"scan_deg": scan, "schemes": schemes,
                       "n_symbols": None if req.get("n_symbols") in (None, "") else int(req["n_symbols"])}
             job = st.jobs.submit("scan", cfg, params, f"扫描 {len(scan)}×{len(schemes)} · {cfg.beam.steering}")
-            self._json({"ok": True, "job": job})
+            return 200, {"ok": True, "job": job}
         elif route == "sweep":
             cfg = st.build(req.get("values") or {})
             path = str(req["path"])
@@ -385,13 +392,83 @@ class _Handler(BaseHTTPRequestHandler):
                       "n_symbols": None if req.get("n_symbols") in (None, "") else int(req["n_symbols"])}
             label = f"研究 {path.split('.')[-1]} × {len(points)}" + (f" ⊗ {gpath.split('.')[-1]} × {len(gvals)}" if gpath else "") + f" · {params['scheme']}"
             job = st.jobs.submit("sweep", cfg, params, label)
-            self._json({"ok": True, "job": job})
+            return 200, {"ok": True, "job": job}
         elif route.startswith("jobs/") and route.endswith("/cancel"):
             ok = st.jobs.cancel(route[5:-7])
-            self._json({"ok": ok, **({} if ok else {"error": "not cancellable"})})
+            return 200, {"ok": ok, **({} if ok else {"error": "not cancellable"})}
         else:
-            self._json({"ok": False, "error": f"no such route /api/{route}"}, 404)
+            return 404, {"ok": False, "error": f"no such route /api/{route}"}
+    def call(self, route: str, req: dict | None = None) -> tuple[int, dict]:
+        """GET when the route is a GET route (and ``jobs/<id>``), else POST;
+        errors come back in-band as the handler would send them."""
+        is_get = route in self.GET_ROUTES or (route.startswith("jobs/") and not route.endswith("/cancel"))
+        try:
+            return self.get(route) if is_get else self.post(route, req or {})
+        except (ValueError, TypeError, KeyError, OSError) as exc:
+            return 400, {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+        except Exception as exc:                        # noqa: BLE001
+            return 500, {"ok": False, "error": f"{type(exc).__name__}: {exc}", "traceback": traceback.format_exc()}
 
+
+# --------------------------------------------------------------- handler
+class _Handler(BaseHTTPRequestHandler):
+    server_version = "arraytx-webhost"
+
+    def log_message(self, fmt, *args):      # quiet: this is a desktop app
+        pass
+
+    def _send(self, code: int, body: bytes, ctype: str) -> None:
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _json(self, obj: Any, code: int = 200) -> None:
+        self._send(code, json.dumps(obj, ensure_ascii=False, allow_nan=False, default=_default).encode("utf-8"),
+                   "application/json; charset=utf-8")
+
+    def do_GET(self):                                   # noqa: N802
+        path = self.path.split("?", 1)[0]
+        if path.startswith("/api/"):
+            try:
+                code, obj = self.server.api.get(path[5:])        # type: ignore[attr-defined]
+            except Exception as exc:                    # noqa: BLE001
+                code, obj = 500, {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+            self._json(obj, code)
+            return
+        rel = path.lstrip("/") or "index.html"
+        target = (WWW / rel).resolve()
+        if WWW.resolve() not in target.parents or not target.is_file():
+            self._send(404, b"not found", "text/plain; charset=utf-8")
+            return
+        ctype = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+        if ctype.startswith("text/") or ctype.endswith("javascript"):
+            ctype += "; charset=utf-8"
+        self._send(200, target.read_bytes(), ctype)
+
+    def do_POST(self):                                  # noqa: N802
+        path = self.path.split("?", 1)[0]
+        if not path.startswith("/api/"):
+            self._send(404, b"not found", "text/plain; charset=utf-8")
+            return
+        if self.headers.get(POST_HEADER) != "1":
+            self._json({"ok": False, "error": f"missing {POST_HEADER} header"}, 403)
+            return
+        n = int(self.headers.get("Content-Length") or 0)
+        try:
+            req = json.loads(self.rfile.read(n) or b"{}")
+        except ValueError as exc:
+            self._json({"ok": False, "error": f"bad request: {exc}"}, 400)
+            return
+        try:
+            code, obj = self.server.api.post(path[5:], req)      # type: ignore[attr-defined]
+        except (ValueError, TypeError, KeyError, OSError) as exc:
+            code, obj = 400, {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+        except Exception as exc:                        # noqa: BLE001
+            code, obj = 500, {"ok": False, "error": f"{type(exc).__name__}: {exc}", "traceback": traceback.format_exc()}
+        self._json(obj, code)
 
 def _default(o):
     if hasattr(o, "item"):
@@ -405,6 +482,7 @@ class _Server(ThreadingHTTPServer):
     allow_reuse_address = sys.platform != "win32"
     daemon_threads = True
     state: State
+    api: Api
 
 
 def make_server(port: int = 0, host: str = "127.0.0.1", cfg: ArrayConfig | None = None,
@@ -412,6 +490,7 @@ def make_server(port: int = 0, host: str = "127.0.0.1", cfg: ArrayConfig | None 
     """A server bound to ``host:port`` (0 picks a free port).  Not started."""
     srv = _Server((host, port), _Handler)
     srv.state = State(cfg if cfg is not None else default_config(), workers)
+    srv.api = Api(srv.state)
     return srv
 
 

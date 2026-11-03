@@ -179,3 +179,29 @@ def test_grouped_study_and_the_language_toggle(server, browser):
     page.click("#lang")
     assert page.text_content("#btn-run").strip() == "▶ 运行"
     ctx.close()
+
+
+def test_the_page_works_through_an_injected_host_bridge(server, browser):
+    """The Android path without Android: inject a window.host whose call()
+    answers through the real Api (via the server) and replies by
+    window.onHostReply, exactly as the WebView activity does.  The page must
+    take that transport for every request."""
+    ctx = browser.new_context(viewport={"width": 390, "height": 844})
+    page = ctx.new_page()
+    page.add_init_script("""
+      window.host = { calls: 0, call(id, route, argsJson) {
+        window.host.calls++;
+        const isGet = ["version", "spec", "config", "jobs"].includes(route) || (route.startsWith("jobs/") && !route.endsWith("/cancel"));
+        fetch("api/" + route, isGet ? {} : { method: "POST", headers: { "Content-Type": "application/json", "X-ArrayTX": "1" }, body: argsJson })
+          .then(r => r.text()).then(t => window.onHostReply(id, t))
+          .catch(e => window.onHostReply(id, JSON.stringify({ ok: false, error: String(e) })));
+      } };
+    """)
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(server + "?smoke=1&run=0,none")
+    page.wait_for_function("[...document.querySelectorAll('#table tbody tr')].some(tr => tr.textContent.includes('0°'))", timeout=180000)
+    assert not errors, errors
+    assert page.evaluate("window.host.calls") >= 4                      # spec, config, validate, run, jobs...
+    assert "线性化引擎" in page.text_content("#engine")
+    ctx.close()

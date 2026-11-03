@@ -4,6 +4,16 @@
 
 ## 未发布 / Unreleased
 
+### Android 壳：appbridge + 线程后端队列 + android/（2026-11-03）
+
+- `webhost.Api`：把 HTTP 处理器里的分发抽出来，`get / post / call(route, req) -> (code, payload)`，HTTP 与 Android 桥共用一份。
+  `JobQueue(backend="thread")`：Chaquopy 没有 multiprocessing，任务跑在线程上，取消在行与行之间协作完成；`execute()` 是两种后端共用的执行体。
+- `appbridge.call(route, json) -> json`：永不抛错，坏路由 / 坏 JSON / 库内异常都在带内返回；相对路径落在 `ARRAYTX_HOME`（应用私有目录）。
+- `app.js`：`window.host` 存在时所有请求走桥（`onHostReply` 回包），否则 fetch；Playwright 注入假桥测这条路。
+- `android/`（Gradle 8.1 / Kotlin 1.9 / Chaquopy 15.0.1 / Python 3.10，assets 直接指向 `src/arraytx/webui`），`MainActivity.kt` 约 80 行，
+  WebChromeClient 把页面的 prompt 按默认值确认；`.github/workflows/android.yml` 手动构建 APK（未在此运行）。
+- 测试 130 → 138 项（appbridge 4、android 3、webui 1）。ROADMAP C1 关闭。
+
 ### 页面：研究按第二个控件分组（双线），中英双语（2026-11-03）
 
 - `sweep_report` / `POST /api/sweep` 加 `group_path` / `group_values`：同一组取值对第二个控件的每个值各跑一遍，行带 `group_value`；

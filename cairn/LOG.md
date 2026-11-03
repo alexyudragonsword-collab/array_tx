@@ -2,6 +2,16 @@
 
 本文件按时间倒序记录实质进展——新条目在顶。每条只写摘要与指针（数字写原值）；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-11-03 · Android 壳：一份分发两种传输，线程后端队列；APK 工作流写好但没在这里跑
+
+- 分层：`webhost.Api` 是唯一分发，HTTP 处理器和 `appbridge.call` 都只是传输；`execute()` 是进程 / 线程两种后端共用的执行体，线程后端的取消
+  在 `progress` 回调里检查标志（一次 run 内不能打断）。`State.home` 让相对路径落在应用目录而不是 chdir——第一版用 chdir，测试进程里
+  后面所有相对路径都跟着挂，改掉。
+- 页面：`api()` 在 `window.host` 存在时走桥、`onHostReply` 回包；Playwright 注入假桥（fetch 转发）跑通整页，桥调用 ≥ 4 次。
+- 壳照 polar_tx：Kotlin 约 80 行，加了 WebChromeClient 把 prompt 按默认值确认（页面的打开 / 保存靠 prompt，WebView 默认吞掉）。
+  版本集沿用 polar_tx 的闸门（Python 3.10 是 Chaquopy 有 scipy 轮子的最新版本）；APK 工作流手动触发，这里没有 Android SDK，没有构建过。
+- 测试 138 项。
+
 ## 2026-11-03 · 页面研究支持按第二个控件分组；界面中英双语
 
 - 分组研究 = ex06 在页面上的完整形式：`array.n_elements` × {4, 16, 64} ⊗ `beam.steering` × {phase, ttd}，60° 波束，冒烟尺寸从页面发起 16.8 s，
