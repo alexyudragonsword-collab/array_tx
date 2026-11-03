@@ -38,6 +38,7 @@ import numpy as np
 
 from .config import ArrayConfig
 from .lo import ClockProfileLO, spur_phase_rad
+from .loadpull import LoadPulledDPA
 from .seeds import SeedTree
 from .standards import Standard
 from .vendor.polartx import DPAConfig
@@ -177,6 +178,25 @@ class ElementChain:
                 self.preset = wifi_rfdac(**kw2)
             self.tx = self.preset.tx
         self._pin()
+        # load modulation (A2): the polar DPA becomes load-pulled; the RF-DAC
+        # has no compression and the outphasing branches run at full scale
+        # on their own combiner, so for them the switch is reported inert
+        lp = cfg.element.pa.load_pull
+        self.load_pull_effective = bool(lp.enabled and self.topology == "polar" and cfg.element.pa.amam != "ideal")
+        if lp.enabled and self.topology == "polar":
+            self.tx.dpa = LoadPulledDPA(self.dpa_cfg, lp.kappa_amam, lp.kappa_ampm)
+
+    def set_load(self, gamma) -> None:
+        """Active reflection coefficient per sample for this element's PA
+        (None = matched); a no-op on topologies without a load-pulled DPA."""
+        dpa = getattr(self.tx, "dpa", None)
+        if isinstance(dpa, LoadPulledDPA):
+            dpa.set_load(gamma)
+
+    @property
+    def load(self):
+        dpa = getattr(self.tx, "dpa", None)
+        return dpa.gamma if isinstance(dpa, LoadPulledDPA) else None
 
     # ------------------------------------------------------------ wiring
     def _pin(self) -> None:
@@ -232,7 +252,13 @@ class ElementChain:
                            "lo_pn_seed": self.lo_pn_seed, "fs_scale": self.fs_scale,
                            "dpa_mismatch_seed": self.dpa_cfg.seed, "lo_spurs": len(self.spurs),
                            "pa_deviation_effective": self.pa_deviation_effective,
-                           "shared_lo_effective": self.shared_lo_effective}
+                           "shared_lo_effective": self.shared_lo_effective,
+                           "load_pull_effective": getattr(self, "load_pull_effective", False)}
+        g = self.load
+        if g is not None:
+            ga = np.abs(1.0 + self.cfg.element.pa.load_pull.kappa_amam * g)
+            info["element"]["load"] = {"abs_1pg_mean": float(ga.mean()), "abs_1pg_std": float(ga.std()),
+                                       "abs_gamma_max": float(np.abs(g).max())}
         return ElementResult(y=y, info=info, raw=r)
 
 

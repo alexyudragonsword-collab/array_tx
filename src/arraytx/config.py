@@ -72,6 +72,21 @@ class ElementErrorsCfg:
     pa_dev_sigma: float = _f(0.05, "", "relative 1-sigma deviation of the PA's compression knee (rapp drive) and AM-PM scale")
 
 
+LOADPULL_REF = ("assumed: ideal voltage-source reading of a switched-capacitor / class-D DPA -- the port swing is v_fwd (1 + Gamma) "
+                "and the supply rail limits that total swing, so compression is read at |1 + Gamma| times the drive; a measured "
+                "load-pull table (source: measured) would replace this scalar (cairn/load-pull-proposal.md)")
+
+
+@dataclass
+class LoadPullCfg:
+    enabled: bool = _f(False, "", "load modulation: each element's PA compresses on its total port swing |1 + Gamma_k| (Gamma_k from the coupling leakage); off = milestone-1 linear leakage")
+    kappa_amam: float = _f(1.0, "", "how much of Gamma reaches the AM-AM knee (1 = ideal voltage source)", source="assumed", ref=LOADPULL_REF)
+    kappa_ampm: float = _f(1.0, "", "how much of Gamma reaches the AM-PM (1 = read at the total swing)", source="assumed", ref=LOADPULL_REF)
+    iterations: int = _f(2, "", "fixed-point rounds Gamma -> PA -> Gamma per radiate (|S| <= -16 dB converges in 2)")
+    gamma_max: float = _f(0.5, "", "clip on |Gamma_k| (a passive matrix keeps it below the leakage gain; the clip is a guard, not physics)")
+    floor: float = _f(0.05, "", "Gamma_k = 0 where |y_k| < floor x full scale (the ratio means nothing near an envelope zero)")
+
+
 @dataclass
 class ElementPACfg:
     n_bits: int = _f(10, "bit", "DPA amplitude resolution (polar_tx DPAConfig)")
@@ -81,6 +96,7 @@ class ElementPACfg:
     rapp_p: float = _f(2.0, "", "Rapp smoothness (CMOS PA ~1-3); used when amam=rapp")
     rapp_drive: float = _f(1.0, "", "Rapp drive at full scale (compression depth); used when amam=rapp")
     ampm_deg_at_fs: float = _f(8.0, "deg", "AM-PM at full scale, quadratic in amplitude (0 = none)")
+    load_pull: LoadPullCfg = field(default_factory=LoadPullCfg)
 
 
 @dataclass
@@ -229,6 +245,9 @@ class ArrayConfig:
             raise ValueError("coupling.source=touchstone needs coupling.touchstone.path")
         if self.dpd.n_iterations < 1:
             raise ValueError("dpd.n_iterations must be >= 1")
+        lp = self.element.pa.load_pull
+        if lp.iterations < 1 or not 0.0 < lp.gamma_max <= 1.0 or not 0.0 <= lp.floor < 1.0:
+            raise ValueError("element.pa.load_pull: iterations >= 1, 0 < gamma_max <= 1, 0 <= floor < 1")
         # the survey block: every number carries a WRITTEN provenance.  A value
         # read from a paper says survey + citation; one that is not in any
         # paper says assumed (or derived) + why.  A bare scalar, or survey

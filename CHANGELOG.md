@@ -4,6 +4,16 @@
 
 ## 未发布 / Unreleased
 
+### 里程碑 2b：负载调制 PA（ROADMAP A2，按 `cairn/load-pull-proposal.md` 实现）（2026-11-03）
+
+- `loadpull.py`：`LoadPulledDPA` 是 polar_tx `DPA` 的子类，无负载时逐位同原表；有负载时 Rapp 读在 `drive·|1+κ_a Γ|·r`、结果除以 |1+κ_a Γ|
+  （耦合波由 `apply_coupling` 之后加上），AM-PM 读在 `r·|1+κ_p Γ|`；`active_reflection` 算 Γ_k = (r_k − y_k)/y_k，包络过零处置 0、|Γ| 截到 gamma_max。
+- `ArraySim.radiate`：开关开且有互耦时做定点迭代（默认两轮），单元保留最后一轮的负载作为工作点；`dpd.train` 走同一个 `radiate`，
+  所以阵列 DPD 与天线口观测看到的是迭代后的 PA，每单元 DPD 在 PA 前向口看到的是带负载的 PA。`run` 先用无 DPD 的导向驱动跑一次定工作点。
+- 配置 `element.pa.load_pull{enabled false, kappa_amam 1, kappa_ampm 1, iterations 2, gamma_max 0.5, floor 0.05}`，κ 带 assumed 出处；
+  开关关、S=0、理想 PA、rfdac / outphasing 拓扑下逐位不变（指纹 168 项相同，测试）。页面的 6 个新控件随开关显隐。
+- 示例 ex09、测试 138 → 146 项。数字与被推翻 / 证实的预期见 `cairn/LOG.md`。
+
 ### Android 壳：appbridge + 线程后端队列 + android/（2026-11-03）
 
 - `webhost.Api`：把 HTTP 处理器里的分发抽出来，`get / post / call(route, req) -> (code, payload)`，HTTP 与 Android 桥共用一份。

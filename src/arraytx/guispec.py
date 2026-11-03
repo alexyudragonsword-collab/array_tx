@@ -52,6 +52,7 @@ VISIBLE_WHEN: dict[str, tuple[str, tuple[Any, ...]]] = {
     "dpd.gmp.": ("dpd.scheme", ("per_element", "array")),
     "dpd.per_element_observe": ("dpd.scheme", ("per_element",)),
     "element.lo.spurs": ("element.lo.clock_profile", ("<set>",)),
+    "element.pa.load_pull.": ("element.pa.load_pull.enabled", (True,)),
 }
 #: hidden from the page (CI-only or structural), still part of the YAML
 HIDDEN = ("arraytx_config", "sim.smoke_n_symbols")
@@ -121,7 +122,7 @@ def controls() -> list[Control]:
             continue
         vis = None
         for prefix, rule in VISIBLE_WHEN.items():
-            if ff.path.startswith(prefix):
+            if ff.path.startswith(prefix) and ff.path != rule[0]:      # the switch itself is always shown
                 vis = rule
                 break
         choices = ff.choices

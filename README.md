@@ -6,6 +6,7 @@ polar_tx 的姊妹库（polar_tx ROADMAP D：GUI 里不再加架构、不做接�
 
 状态：里程碑 1 完成——4 单元 λ/2 线阵、FR2 28 GHz / 400 MHz / 120 kHz、三种互耦来源、三种 DPD 方案、OTA 指标；
 里程碑 2a——矩形面阵（`array.n_rows`，row-major 单元序）、任意方位切面扫描（`beam.plane_phi_deg`）、二维互耦邻域（x1 / x2 / y1 / y2 / d1）与无源性检查。
+里程碑 2b——负载调制 PA（`element.pa.load_pull`，默认关）：每单元 DPA 在自己的总端口摆幅 |1+Γ_k| 上压缩，Γ_k 由互耦泄漏算出，定点迭代两轮。
 数字见 `cairn/LOG.md`，没做的见 `ROADMAP.md`。
 
 ## 快速开始
@@ -14,7 +15,7 @@ polar_tx 的姊妹库（polar_tx ROADMAP D：GUI 里不再加架构、不做接�
 pip install -e ".[test,dev]"
 python examples/ex00_single_element_equals_polartx.py   # sub-6、S=0、1 单元：与 polar_tx 逐位相同
 python examples/ex03_scan_angle_x_dpd.py                # 扫描角 × DPD 方案的 OTA EVM / ACLR 表
-pytest -q                                               # 138 项（页面测试无 Chromium 时跳过）
+pytest -q                                               # 146 项（页面测试无 Chromium 时跳过）
 ARRAYTX_SMOKE=1 python examples/ex04_aclr_vs_direction.py   # 短突发（CI 用的尺寸）
 ```
 
@@ -85,6 +86,7 @@ print(r.info["engine_line"]); print(r.beam.row()); print(r.sidelobe.row())
 | `ex03_scan_angle_x_dpd` | 0 / 30 / 60° × 三方案，波束与旁瓣方向；带边斜视 vs 解析；导通诊断 |
 | `ex04_aclr_vs_direction` | ACLR 随方向：非线性互调往哪辐射（方向图零点已标出） |
 | `ex05_lo_profiles` | 共用 LO 换成 pll_simulator 导出的 18 个时钟剖面之一（随包提供，`bundled:<preset>`），EVM / ACLR 随 LO |
+| `ex09_load_pull` | 负载调制：|1+Γ_k| 随扫描角与位置，三方案在训练角度上的差，0° 训练的 DPD 用到 60° 的损失，单元偏差带来的残余 |
 | `ex08_planar_array` | 8 × 8 面阵 vs 同单元数的 64 × 1 行阵：两个主平面与对角切面的波束宽、斜视代价、旁瓣，阵列 DPD 后失真往哪辐射，二维互耦矩阵 |
 | `ex07_lo_spurs` | 时钟剖面的离散杂散（参考 / 小数杂散）按载频换算后注入共用 LO：9 个带杂散剖面的 EVM / ACLR 关 / 开，小角度估计 vs 实测 |
 | `ex06_element_count_squint` | 单元数 4…128 × 0/30/60° × 相移 / 真延时：斜视从指向效应变成波束 EVM 的 n（闭式预测 vs 实测，per-tone 均衡抹平） |
@@ -96,7 +98,7 @@ print(r.info["engine_line"]); print(r.beam.row()); print(r.sidelobe.row())
 | `config.py` | YAML → 数据类树，provenance，表单字段声明 | 1 |
 | `standards.py` | `fr2_nr400`（TS 38.101-2 出处，波形走 polar_tx `nr_waveform`）、`sub6_nr100`（polar_tx 原样） | — |
 | `seeds.py` | `SeedSequence` 派生：每单元、每损伤独立流 | 5 |
-| `element.py` / `lo.py` | polar_tx 预设建链、固定 fs_scale、单元误差抽了再置零、共用 LO；`bundled:<preset>` 时钟剖面按 (f_c/f0)² 换算到载频，其 `spurs:` 表按 f_c/f0 换算成相位旋转注入（`element.lo.spurs`） | 5 |
+| `element.py` / `lo.py` / `loadpull.py` | polar_tx 预设建链、固定 fs_scale、单元误差抽了再置零、共用 LO；负载牵引的 DPA 包装（不改 vendor）；`bundled:<preset>` 时钟剖面按 (f_c/f0)² 换算到载频，其 `spurs:` 表按 f_c/f0 换算成相位旋转注入（`element.lo.spurs`） | 5 |
 | `geometry.py` / `beam.py` | 矩形面阵几何（一行 = 线阵，逐位相同）、扫描切面、相移 / 真延时导向、频域远场合成、斜视解析式 | 4 |
 | `coupling.py` / `touchstone.py` | 三来源 → `CouplingMatrix` → 唯一的 `apply_coupling`；二维邻域类、远邻相位按电长度、无源性检查；.sNp 读写 | 3 |
 | `metrics.py` | `ota_metrics`（验收）与 `conducted_metrics`（诊断） | 2 |

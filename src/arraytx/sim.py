@@ -18,12 +18,13 @@ from typing import Any
 
 import numpy as np
 
-from .beam import far_field, far_field_many, highest_sidelobe_direction
+from .beam import far_field, far_field_many, highest_sidelobe_direction, steer
 from .config import ArrayConfig
 from .coupling import CouplingMatrix, apply_coupling, build_coupling
 from .dpd import DPDBank, predistort_drives, train
 from .element import ElementChain, ElementResult, build_elements
 from .geometry import ArrayGeometry
+from .loadpull import active_reflection
 from .metrics import DirectionMetrics, conducted_metrics, ota_metrics
 from .report import engine_line
 from .seeds import SeedTree
@@ -95,10 +96,48 @@ class ArraySim:
             return highest_sidelobe_direction(self.geom, theta0_deg, self.cfg.beam.steering)
         return float(self.cfg.beam.sidelobe)
 
-    def radiate(self, drives: list[np.ndarray]) -> tuple[list[ElementResult], np.ndarray, np.ndarray]:
+    @property
+    def load_pull_active(self) -> bool:
+        """Load modulation runs when it is switched on, at least one element
+        has a load-pulled DPA, and there is coupling to pull with (S = 0
+        leaves Gamma = 0, and the plain path, bit for bit)."""
+        return (self.cfg.element.pa.load_pull.enabled and not self.coupling.is_zero
+                and any(getattr(e, "load_pull_effective", False) for e in self.elements))
+
+    def _run_all(self, drives):
         res = [el.run(d, self.wf, noise=self.cfg.sim.noise) for el, d in zip(self.elements, drives)]
-        ys = np.stack([r.y for r in res])
+        return res, np.stack([r.y for r in res])
+
+    def radiate(self, drives: list[np.ndarray]) -> tuple[list[ElementResult], np.ndarray, np.ndarray]:
+        """Element outputs and the radiated (coupled) waves for these drives.
+
+        With load modulation: start from the matched-load PAs, compute each
+        element's active reflection coefficient from the leakage, re-run
+        the PAs under that load, ``iterations`` times (the fixed point of
+        Gamma -> PA -> Gamma); the elements keep the last load, which is
+        the operating point a per-element DPD then trains against."""
+        if not self.load_pull_active:
+            res, ys = self._run_all(drives)
+            return res, ys, apply_coupling(ys, self.coupling, self.fs, self.f0)
+        lp = self.cfg.element.pa.load_pull
+        for el in self.elements:
+            el.set_load(None)
+        res, ys = self._run_all(drives)
+        floors = [lp.floor * (el.fs_scale if el.fs_scale else float(np.abs(y).max())) for el, y in zip(self.elements, ys)]
+        deltas = []
+        for _ in range(int(lp.iterations)):
+            rs = apply_coupling(ys, self.coupling, self.fs, self.f0)
+            gamma = active_reflection(ys, rs, floors, lp.gamma_max)
+            for el, g in zip(self.elements, gamma):
+                el.set_load(g)
+            res, ys_new = self._run_all(drives)
+            deltas.append(float(np.linalg.norm(ys_new - ys) / max(np.linalg.norm(ys), 1e-300)))
+            ys = ys_new
         rs = apply_coupling(ys, self.coupling, self.fs, self.f0)
+        ga = np.abs(1.0 + lp.kappa_amam * gamma)
+        self.last_load_pull = {"iterations": int(lp.iterations), "deltas": deltas,
+                               "abs_1pg_mean": ga.mean(axis=1).tolist(), "abs_1pg_std": ga.std(axis=1).tolist(),
+                               "abs_gamma_max": np.abs(gamma).max(axis=1).tolist()}
         return res, ys, rs
 
     def far_field(self, rs: np.ndarray, theta_deg: float) -> np.ndarray:
@@ -115,8 +154,13 @@ class ArraySim:
         cfg = self.cfg
         theta0 = float(cfg.beam.scan_deg[0] if theta0_deg is None else theta0_deg)
         scheme = scheme or cfg.dpd.scheme
+        self.last_load_pull = None
+        if self.load_pull_active:
+            # the operating point: every PA under the load the undistorted,
+            # steered drives put on it, before any DPD trains against it
+            self.radiate(steer(self.x, self.geom, theta0, self.fs, cfg.beam.steering))
         bank = train(cfg, scheme, elements=self.elements, x=self.x, wf=self.wf, geom=self.geom,
-                     coupling=self.coupling, theta0_deg=theta0)
+                     coupling=self.coupling, theta0_deg=theta0, radiate=self.radiate)
         drives = predistort_drives(bank, self.x, self.geom, theta0, self.fs, cfg.beam.steering)
         res, ys, rs = self.radiate(drives)
         sl = self.sidelobe_direction(theta0)
@@ -139,6 +183,7 @@ class ArraySim:
                            info={"coupling_source": self.coupling.source,
                                  "coupling_max_offdiag_db": self.coupling.max_offdiag_db(),
                                  "n_symbols": self.n_symbols, "fs": self.fs,
+                                 "load_pull": self.last_load_pull,
                                  "engine_line": engine_line(modes, cfg.element.topology)})
 
     def run_matrix(self, scan_deg=None, schemes=None) -> dict[tuple[float, str], ArrayResult]:

@@ -67,8 +67,20 @@ def _run_all(elements: list[ElementChain], drives: list[np.ndarray], wf: Wavefor
 
 
 def train(cfg: ArrayConfig, scheme: str, *, elements: list[ElementChain], x: np.ndarray,
-          wf: Waveform, geom: ArrayGeometry, coupling: CouplingMatrix, theta0_deg: float) -> DPDBank:
-    """Train the scheme's predistorter(s) for the beam at theta0."""
+          wf: Waveform, geom: ArrayGeometry, coupling: CouplingMatrix, theta0_deg: float,
+          radiate=None) -> DPDBank:
+    """Train the scheme's predistorter(s) for the beam at theta0.
+
+    ``radiate(drives) -> (results, ys, rs)`` is the simulator's own path
+    (``ArraySim.radiate``); with load modulation on it iterates the PAs'
+    operating points, so the array DPD and the antenna-port observation
+    see the same PAs the final run uses.  Without it the plain chain +
+    coupling is used (identical when load modulation is off)."""
+    def _radiate(drives):
+        if radiate is not None:
+            return radiate(drives)
+        ys = _run_all(elements, drives, wf, noise)
+        return None, ys, apply_coupling(ys, coupling, fs, f0)
     if scheme not in SCHEMES:
         raise ValueError(f"unknown DPD scheme {scheme!r}; one of {SCHEMES}")
     noise = cfg.sim.noise
@@ -84,7 +96,7 @@ def train(cfg: ArrayConfig, scheme: str, *, elements: list[ElementChain], x: np.
         if observe == "antenna_port":
             # the neighbours' drives do not change while element k trains:
             # run them once and substitute row k inside the loop (O(n), not O(n^2))
-            ys_fixed = _run_all(elements, drives, wf, noise)
+            ys_fixed = _radiate(drives)[1]
         for k, el in enumerate(elements):
             if observe == "pa_output":
                 pa: Callable[[np.ndarray], np.ndarray] = lambda u, el=el: el.run(u, wf, noise=noise).y
@@ -102,7 +114,7 @@ def train(cfg: ArrayConfig, scheme: str, *, elements: list[ElementChain], x: np.
     # array: one DPD, trained on the far field at the beam
     def pa_array(u):
         ds = steer(u, geom, theta0_deg, fs, cfg.beam.steering)
-        rs = apply_coupling(_run_all(elements, ds, wf, noise), coupling, fs, f0)
+        rs = _radiate(ds)[2]
         return far_field(rs, geom, theta0_deg, fs)
     ila = make_ila(cfg)
     ila.fit(pa_array, x)

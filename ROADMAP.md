@@ -8,9 +8,9 @@
 `configs/*.yaml` 里 `coupling.survey` 的相邻耦合 −16 dB 只有摘要级出处（见 config 里 `ref`），本环境网络策略打不开 arXiv / PMC 全文。
 拿到实测 `.sNp` 就切 `coupling.source: touchstone`，不改任何别的抽取（铁律 5）。
 
-### A2. 负载调制下的 PA
-里程碑 1 的互耦是线性泄漏（铁律 3）。PA_DPD 的 PA 模型没有负载依赖。一阶电压模模型的提案在 `cairn/load-pull-proposal.md`（状态 proposed，
-等用户审阅）：压缩点随 |1+Γ_k| 移动，Γ_k 由互耦矩阵算出，定点迭代两轮，默认关。提案里先写了单波束下它能 / 不能分开什么。
+### A2. 负载调制：只有一阶电压模，没有实测 load-pull 表
+`element.pa.load_pull` 已实现（`cairn/load-pull-proposal.md`），κ = 1 是 assumed。真实 PA 的压缩等高线在 Smith 圆图上不是圆（Γ 相位相关），
+要更真得换 source: measured 的 load-pull 表替换 `loadpull.amam_loaded` 的映射。outphasing 的合路器负载是另一个模型，没做。
 
 ## B. 已知模型缺口
 

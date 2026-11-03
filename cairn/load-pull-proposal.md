@@ -1,7 +1,7 @@
 ---
 type: project_topic
-status: proposed
-summary: ROADMAP A2 的具体模型提案——电压模 DPA 的压缩点随有效反射系数 |1+Γ_k| 移动，Γ_k 由互耦矩阵算出，定点迭代两轮；先说清单波束下它能和不能分开什么
+status: active
+summary: ROADMAP A2 的模型（已实现，2026-11-03）——电压模 DPA 的压缩点随有效反射系数 |1+Γ_k| 移动，Γ_k 由互耦矩阵算出，定点迭代两轮；先说清单波束下它能和不能分开什么
 tags: [load-pull, coupling, dpd, proposal]
 contains: [decision, prediction]
 created: 2026-11-03
@@ -11,7 +11,7 @@ authoring_mode: ai_generated
 ---
 # 负载调制 PA（ROADMAP A2）：模型提案
 
-> 状态：提案，等用户审阅。审完再实现；实现前先把"预期"写进这里，结果不论哪边都记。
+> 状态：用户 2026-11-03 批准"按提案做"，已实现（`loadpull.py`、`sim.radiate`、`element.pa.load_pull`，ex09）。预期的检验结果在文末。
 
 ## 为什么里程碑 1 的互耦分不开两种 DPD
 
