@@ -53,7 +53,8 @@ for name, nx, ny, phi in layouts:
             if th == 0.0 and steering == "ttd":
                 continue                                            # identical to phase at broadside by construction
             r = sim.run(th, "none", conducted_diagnostics=False)
-            store[(name, phi, steering, th)] = r
+            # keep numbers, not the ArrayResult: 64 elements x 8 symbols is ~0.5 GB per result
+            store[(name, phi, steering, th)] = {"evm_db": r.beam.evm_db, "aclr1_db": r.beam.aclr1_db}
             rows.append({"array": name, "plane phi": phi, "steering": steering, "beam deg": th,
                          "3dB bw deg": beamwidth_3db_deg(sim.geom, th, steering),
                          "EVM dB": r.beam.evm_db, "ACLR1": r.beam.aclr1_db,
@@ -66,7 +67,7 @@ print(table(rows))
 print("\nphase - TTD EVM penalty at 60 deg:")
 for name, nx, ny, phi in layouts:
     p, t = store[(name, phi, "phase", 60.0)], store[(name, phi, "ttd", 60.0)]
-    print(f"  {name} phi {phi:.0f}: {p.beam.evm_db - t.beam.evm_db:+.2f} dB  (3 dB beamwidth {beamwidth_3db_deg(sim_for(nx, ny, phi).geom, 60.0):.2f} deg)")
+    print(f"  {name} phi {phi:.0f}: {p['evm_db'] - t['evm_db']:+.2f} dB  (3 dB beamwidth {beamwidth_3db_deg(sim_for(nx, ny, phi).geom, 60.0):.2f} deg)")
 
 print("\nPart 2 — ACLR1 vs direction, 8 x 8 with the array DPD at the 30 deg beam, three cuts:")
 th_grid = np.arange(-90.0, 90.5, 1.0)
@@ -76,10 +77,11 @@ for phi in (COLORS if not smoke() else (0.0, 90.0)):
     r = sim.run(30.0, "array", conducted_diagnostics=False)
     a, p = direction_scan(sim, r.rs, th_grid)
     p = p - p.max()
-    cuts[phi] = (a, p, r)
+    cuts[phi] = (a, p, r.beam.aclr1_db)
     vis = p > -15
     print(f"  phi {phi:3.0f}: beam ACLR1 {r.beam.aclr1_db:6.1f} dBc, worst in-pattern direction {th_grid[vis][np.argmax(a[vis])]:+.0f} deg "
           f"at {a[vis].max():6.1f} dBc, sidelobe {r.sidelobe_deg:+.1f} deg")
+    del r, sim
 
 print("\nPart 3 — the 8 x 8 coupling matrix at f0 (survey; element 11 = row 1, column 3 and its neighbours):")
 S = grid0.coupling.at(grid0.f0)
@@ -90,7 +92,7 @@ print(table(crow))
 print(f"  non-zero pairs: {len(grid0.coupling.nonzero_pairs())} of {64 * 63} (classes x1 / x2 / y1 / y2 / d1); max |S| {grid0.coupling.max_offdiag_db():.1f} dB")
 
 fig, ax = plt.subplots(1, 2, figsize=(11, 4))
-for phi, (a, p, r) in cuts.items():
+for phi, (a, p, _) in cuts.items():
     vis = p > -15
     ax[0].plot(th_grid, p, color=COLORS[phi], lw=1, ls=":", label=f"pattern phi {phi:.0f}")
     ax[1].plot(th_grid[vis], a[vis], color=COLORS[phi], lw=1.6, label=f"ACLR1 phi {phi:.0f} (array DPD)")
