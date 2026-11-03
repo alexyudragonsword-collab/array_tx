@@ -4,6 +4,19 @@
 
 ## 未发布 / Unreleased
 
+### 里程碑 2a：矩形面阵、扫描切面、二维互耦邻域；互耦远邻相位改按电长度并加无源性检查（2026-11-03）
+
+- `geometry.ArrayGeometry(n_x, n_y, dx, dy, f0, pattern, plane_phi_deg)`：row-major 单元序（第一行就是原线阵），`delays_s(θ)` 在配置的
+  切面里算，一行 + φ=0 走原表达式逐位相同；`LinearArray(n, …)` 保留为一行的构造。`with_plane(φ)` 换切面。所有 beam / dpd / sim 函数签名不变。
+- 配置：`array.n_rows`、`array.spacing_y_lambda`、`beam.plane_phi_deg`；analytic / survey 块加 `c1y_rel_db`、`c_diag_rel_db`（assumed，带理由）
+  和 `phase_from_distance`。新配置 `configs/fr2_8x8_survey.yaml`。
+- 互耦：邻域类 x1 / x2 / y1 / y2 / d1；**物理修正**：远邻的 f0 相位 = c1 相位 + 超出一个间距的自由空间电长度（λ/2 间距的 x2 +180°，
+  对角 +74.5°），与 `path_delay_from_spacing` 的"纯延时"一致。此前所有邻居都放在 c1 相位：一行上无源（泄漏增益 0.33），
+  8 × 8 上泄漏增益 1.13 > 1，广播向的波束几乎抵消（EVM −5.9 dB）——不是物理，是假设错。`build_coupling` 现在算泄漏矩阵的最大奇异值，
+  > 1 拒绝加载。指纹：168 项中 81 项变（analytic / survey 的互耦矩阵及其下游；锚点、单元抽取、导通输出不变），
+  4 单元 survey 的波束指标移动 ≤ 0.05 dB（30° ACLR1 −37.313 → −37.310，阵列 DPD −43.743 → −43.702）。
+- 示例 ex08，测试 122 → 128 项（`tests/test_planar.py` 5 项 + ex08 冒烟）。
+
 ### 页面上的扫描研究 + 历史持久化（2026-11-03）
 
 - `guiutil.sweep_report` / `POST /api/sweep`：一个控件 × 取值列表，每点一个 ArraySim（经 `values_to_config`，其余叶子不动），逐行回传；

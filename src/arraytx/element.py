@@ -264,4 +264,4 @@ def build_elements(cfg: ArrayConfig, standard: Standard, tree: SeedTree,
     if np.isnan(fs_scale):
         fs_scale = None
     return [ElementChain(cfg, standard, tree, k, fs_scale=fs_scale, lo_pn_seed=lo_seed, lo_obj=lo_obj)
-            for k in range(cfg.array.n_elements)]
+            for k in range(cfg.array.n_elements * cfg.array.n_rows)]

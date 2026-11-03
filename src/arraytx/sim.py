@@ -23,7 +23,7 @@ from .config import ArrayConfig
 from .coupling import CouplingMatrix, apply_coupling, build_coupling
 from .dpd import DPDBank, predistort_drives, train
 from .element import ElementChain, ElementResult, build_elements
-from .geometry import LinearArray
+from .geometry import ArrayGeometry
 from .metrics import DirectionMetrics, conducted_metrics, ota_metrics
 from .report import engine_line
 from .seeds import SeedTree
@@ -66,9 +66,10 @@ class ArraySim:
     def __init__(self, cfg: ArrayConfig, *, n_symbols: int | None = None):
         self.cfg = cfg
         self.standard: Standard = get_standard(cfg.standard)
-        self.tree = SeedTree(cfg.seed, cfg.array.n_elements)
-        self.geom = LinearArray(cfg.array.n_elements, cfg.array.spacing_lambda,
-                                float(self.standard.carrier_hz.value), cfg.array.element_pattern)
+        self.tree = SeedTree(cfg.seed, cfg.array.n_elements * cfg.array.n_rows)
+        self.geom = ArrayGeometry(cfg.array.n_elements, cfg.array.n_rows, cfg.array.spacing_lambda,
+                                  cfg.array.spacing_y_lambda, float(self.standard.carrier_hz.value),
+                                  cfg.array.element_pattern, cfg.beam.plane_phi_deg)
         if n_symbols is None:
             n_symbols = cfg.sim.smoke_n_symbols if smoke() else cfg.sim.n_symbols
         self.n_symbols = int(n_symbols)

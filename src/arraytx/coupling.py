@@ -34,7 +34,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .config import ArrayConfig
-from .geometry import C0, LinearArray
+from .geometry import C0, ArrayGeometry
 from .touchstone import read_touchstone, write_touchstone
 
 TWO_PI = 2.0 * np.pi
@@ -67,6 +67,15 @@ class CouplingMatrix:
     @property
     def is_zero(self) -> bool:
         return bool(np.all(self.offdiag() == 0.0))
+
+    def max_gain(self) -> float:
+        """Largest singular value of the OFF-DIAGONAL matrix over the grid: the
+        most any drive vector can be amplified by the leakage alone.  A
+        passive network has |S| <= 1 whole; a leakage-only matrix above 1
+        means the neighbours add up to more than the element itself -- a
+        sign the phases are not physical (all farther neighbours in phase)."""
+        od = self.offdiag()
+        return float(max(np.linalg.svd(od[i], compute_uv=False)[0] for i in range(od.shape[0]))) if self.n > 1 else 0.0
 
     def max_offdiag_db(self) -> float:
         mx = float(np.abs(self.offdiag()).max()) if self.n > 1 else 0.0
@@ -112,43 +121,107 @@ class CouplingMatrix:
 
 
 # ------------------------------------------------------------- the sources
-def _neighbour_shape(n: int, c1: complex, c2_rel: float) -> np.ndarray:
-    m = np.zeros((n, n), dtype=complex)
-    for k in range(n):
-        for j in range(n):
-            d = abs(k - j)
-            if d == 1:
-                m[k, j] = c1
-            elif d == 2:
-                m[k, j] = c1 * c2_rel
+def _neighbour_classes(geom):
+    """(k, j, rel) for every coupled pair: ``rel`` names the class --
+    'x1' adjacent along the row, 'x2' next-adjacent along the row, 'y1'
+    adjacent across rows, 'y2' two rows away, 'd1' the diagonal neighbour.
+    Along one row only x1 / x2 occur: the milestone-1 shape, same order."""
+    dix, diy = geom.grid_offsets()
+    out = []
+    for k in range(geom.n):
+        for j in range(geom.n):
+            dx, dy = int(dix[k, j]), int(diy[k, j])
+            if dy == 0 and dx == 1:
+                out.append((k, j, "x1"))
+            elif dy == 0 and dx == 2:
+                out.append((k, j, "x2"))
+            elif dx == 0 and dy == 1:
+                out.append((k, j, "y1"))
+            elif dx == 0 and dy == 2:
+                out.append((k, j, "y2"))
+            elif dx == 1 and dy == 1:
+                out.append((k, j, "d1"))
+    return out
+
+
+def _class_gains(c2_rel_db: float, c1y_rel_db: float = 0.0, c_diag_rel_db: float = -6.0) -> dict[str, float]:
+    """Magnitude of each class relative to c1 (linear).  'x1' is exactly 1."""
+    r2 = 10.0 ** (c2_rel_db / 20.0)
+    ry = 10.0 ** (c1y_rel_db / 20.0)
+    rd = 10.0 ** (c_diag_rel_db / 20.0)
+    return {"x1": 1.0, "x2": r2, "y1": ry, "y2": ry * r2, "d1": rd}
+
+
+def _extra_phase_rad(geom, k: int, j: int, f0: float, phase_from_distance: bool) -> float:
+    """Phase a farther neighbour has beyond the adjacent one: the free-space
+    electrical length of the extra distance, 2 pi f0 (d_kj - d_x1) / c0.
+    Exactly 0.0 for the adjacent class along the row, and for every class
+    when the switch is off (the milestone-1 reading: all classes at
+    c1_deg)."""
+    if not phase_from_distance:
+        return 0.0
+    extra = geom.pair_distance_m(k, j) - geom.spacing_m
+    return 0.0 if extra == 0.0 else TWO_PI * f0 * extra / C0
+
+
+def _neighbour_shape(geom, c1: complex, c2_rel: float, c1y_rel: float = 1.0, c_diag_rel: float = 10 ** (-6 / 20),
+                     *, f0: float | None = None, phase_from_distance: bool = False) -> np.ndarray:
+    m = np.zeros((geom.n, geom.n), dtype=complex)
+    g = {"x1": 1.0, "x2": c2_rel, "y1": c1y_rel, "y2": c1y_rel * c2_rel, "d1": c_diag_rel}
+    for k, j, rel in _neighbour_classes(geom):
+        v = c1 if rel == "x1" else c1 * g[rel]
+        if rel != "x1" and phase_from_distance:
+            v = v * np.exp(1j * _extra_phase_rad(geom, k, j, f0, True))
+        m[k, j] = v
     return m
 
 
-def analytic_matrix(n: int, c1_db: float, c1_deg: float, c2_rel_db: float,
-                    f_lo: float, f_hi: float) -> CouplingMatrix:
+def analytic_matrix(geom, c1_db: float, c1_deg: float, c2_rel_db: float,
+                    f_lo: float, f_hi: float, *, c1y_rel_db: float = 0.0, c_diag_rel_db: float = -6.0,
+                    phase_from_distance: bool = False) -> CouplingMatrix:
+    """``geom`` is an ArrayGeometry (an int is read as a one-row array of that size)."""
+    geom = _geom(geom, f_lo, f_hi)
     c1 = 10.0 ** (c1_db / 20.0) * np.exp(1j * np.deg2rad(c1_deg))
-    m = _neighbour_shape(n, c1, 10.0 ** (c2_rel_db / 20.0))
+    g = _class_gains(c2_rel_db, c1y_rel_db, c_diag_rel_db)
+    m = _neighbour_shape(geom, c1, g["x2"], g["y1"], g["d1"], f0=geom.f0_hz, phase_from_distance=phase_from_distance)
     return CouplingMatrix(np.array([f_lo, f_hi]), np.stack([m, m]), "analytic")
 
 
-def survey_matrix(n: int, c1_db: float, c1_deg_at_f0: float, c2_rel_db: float,
-                  f0: float, spacing_m: float, f_grid, *, path_delay: bool = True) -> CouplingMatrix:
+def survey_matrix(geom, c1_db: float, c1_deg_at_f0: float, c2_rel_db: float,
+                  f0: float, spacing_m: float, f_grid, *, path_delay: bool = True,
+                  c1y_rel_db: float = 0.0, c_diag_rel_db: float = -6.0,
+                  phase_from_distance: bool = False) -> CouplingMatrix:
     """Published-magnitude coupling with a linear-phase (pure delay) frequency
-    dependence: phi_kj(f) = phi0 - 2 pi (f - f0) * |k - j| d / c0."""
+    dependence: phi_kj(f) = phi0_kj - 2 pi (f - f0) * d_kj / c0, d_kj the
+    centre-to-centre distance (|k - j| d along a row).  With
+    ``phase_from_distance`` phi0 of a farther class carries the electrical
+    length beyond one pitch (so the farther neighbours do not all add in
+    phase at f0: on a 2-D grid they would sum past 1 otherwise).
+    ``spacing_m`` is kept for the one-row callers; an ArrayGeometry carries
+    its own pitches."""
     f_grid = np.asarray(f_grid, dtype=float)
+    geom = _geom(geom, f0, f0, spacing_m)
     a1 = 10.0 ** (c1_db / 20.0)
-    r2 = 10.0 ** (c2_rel_db / 20.0)
-    s = np.zeros((f_grid.size, n, n), dtype=complex)
-    for k in range(n):
-        for j in range(n):
-            d = abs(k - j)
-            if d not in (1, 2):
-                continue
-            mag = a1 if d == 1 else a1 * r2
-            tau = (d * spacing_m / C0) if path_delay else 0.0
-            ph = np.deg2rad(c1_deg_at_f0) - TWO_PI * (f_grid - f0) * tau
-            s[:, k, j] = mag * np.exp(1j * ph)
+    g = _class_gains(c2_rel_db, c1y_rel_db, c_diag_rel_db)
+    s = np.zeros((f_grid.size, geom.n, geom.n), dtype=complex)
+    for k, j, rel in _neighbour_classes(geom):
+        mag = a1 if rel == "x1" else a1 * g[rel]
+        tau = (geom.pair_distance_m(k, j) / C0) if path_delay else 0.0
+        ph = np.deg2rad(c1_deg_at_f0) - TWO_PI * (f_grid - f0) * tau
+        if rel != "x1" and phase_from_distance:
+            ph = ph + _extra_phase_rad(geom, k, j, f0, True)
+        s[:, k, j] = mag * np.exp(1j * ph)
     return CouplingMatrix(f_grid, s, "survey")
+
+
+def _geom(geom, f_lo, f_hi, spacing_m: float | None = None):
+    """Accept an ArrayGeometry, or an int (one row) for the older callers."""
+    if isinstance(geom, (int, np.integer)):
+        f0 = 0.5 * (f_lo + f_hi)
+        lam = C0 / f0
+        pitch = (spacing_m / lam) if spacing_m else 0.5
+        return ArrayGeometry(int(geom), 1, pitch, pitch, f0)
+    return geom
 
 
 def touchstone_matrix(path: str) -> CouplingMatrix:
@@ -161,7 +234,7 @@ def write_matrix_touchstone(path: str, m: CouplingMatrix, comments=()) -> str:
     return str(path)
 
 
-def build_coupling(cfg: ArrayConfig, geom: LinearArray, fs: float) -> CouplingMatrix:
+def build_coupling(cfg: ArrayConfig, geom: ArrayGeometry, fs: float) -> CouplingMatrix:
     """The config's coupling matrix on a grid covering the burst (f0 +- fs/2),
     scaled by ``coupling.scale_db``.  One entry point for all three sources."""
     c = cfg.coupling
@@ -169,19 +242,29 @@ def build_coupling(cfg: ArrayConfig, geom: LinearArray, fs: float) -> CouplingMa
     f_lo, f_hi = f0 - fs / 2.0, f0 + fs / 2.0
     if c.source == "analytic":
         a = c.analytic
-        m = analytic_matrix(geom.n, a.c1_db, a.c1_deg, a.c2_rel_db, f_lo, f_hi)
+        m = analytic_matrix(geom, a.c1_db, a.c1_deg, a.c2_rel_db, f_lo, f_hi,
+                            c1y_rel_db=a.c1y_rel_db, c_diag_rel_db=a.c_diag_rel_db,
+                            phase_from_distance=a.phase_from_distance)
     elif c.source == "survey":
         s = c.survey
         grid = np.linspace(f_lo, f_hi, 257)
-        m = survey_matrix(geom.n, s.c1_db, s.c1_deg_at_f0, s.c2_rel_db, f0,
-                          geom.spacing_m, grid, path_delay=s.path_delay_from_spacing)
+        m = survey_matrix(geom, s.c1_db, s.c1_deg_at_f0, s.c2_rel_db, f0,
+                          geom.spacing_m, grid, path_delay=s.path_delay_from_spacing,
+                          c1y_rel_db=s.c1y_rel_db, c_diag_rel_db=s.c_diag_rel_db,
+                          phase_from_distance=s.phase_from_distance)
     elif c.source == "touchstone":
         m = touchstone_matrix(c.touchstone.path)
         if m.n != geom.n:
             raise ValueError(f"touchstone has {m.n} ports, array has {geom.n} elements")
     else:
         raise ValueError(f"unknown coupling source {c.source!r}")
-    return m.scaled(float(c.scale_db))
+    m = m.scaled(float(c.scale_db))
+    g = m.max_gain()
+    if g > 1.0:
+        raise ValueError(f"coupling matrix is not passive: the leakage alone has gain {g:.2f} > 1 (source {m.source}, "
+                         f"{geom.n_x} x {geom.n_y}); lower c1_db / scale_db, or do not put every neighbour class at the "
+                         f"same phase (phase_from_distance)")
+    return m
 
 
 # ------------------------------------------------------------ the one path

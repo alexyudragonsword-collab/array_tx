@@ -32,6 +32,10 @@ authoring_mode: ai_generated
   剖面的离散杂散走不了 PSD（polar_tx 按 PSD 抽随机幅度，杂散是已知幅度的正弦），改为链输出乘 exp(jφ_spur(t))：polar_tx 把 LO 相位加在
   DPA 的相位输入上、DPA 的 AM-AM / AM-PM 只看幅度码，二者是同一信号（`tests/test_lo_profiles.py::test_spur_rotation_of_the_output_equals_an_lo_phase_added_at_the_drive`）。
   起始相位来自 `lo_spurs` 流（共用 LO 时全阵一个抽取；新流只追加在元组末尾，既有流逐位不动）。
+- **面阵 = 一行的推广，逐位相同**：`ArrayGeometry` 的单元序 row-major，`delays_s` 在 n_y = 1、φ = 0 时走原来的 `x·sinθ/c0` 表达式；
+  互耦的邻域类在一行上只出现 x1 / x2；`tests/test_planar.py` 钉住一列在 y-z 面 = 一行在 x-z 面、第一行块 = 4 单元矩阵。
+- **互耦矩阵必须无源**：`build_coupling` 算泄漏矩阵（零对角）的最大奇异值，> 1 抛错。里程碑 1 把所有邻居放在同一相位，一行上碰巧无源（0.33），
+  8 × 8 上 1.13——远邻相位现在按电长度（`phase_from_distance`），默认开。这是物理修正，指纹 81/168 项随之变，见 CHANGELOG 2026-11-03。
 - **`apply_coupling` 的累加顺序**：只对非零 S_kj 对累加，实部虚部分开累加以复现 numpy 复数 einsum 的位序；
   `tests/test_coupling.py::test_pair_sparse_leak_equals_the_dense_einsum_bit_for_bit` 钉住，换成"复数乘再加"会差 1e-15 而不再逐位相同。
 - **逐位相同的边界**：S 恰为全零时 `apply_coupling` 原样返回；单元误差开关关闭时增益 ×1.0、相位 ×(1+0j)、时延 0 跳过分数延时——这三条是"1 单元 = polar_tx 逐位相同"成立的前提。

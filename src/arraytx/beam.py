@@ -5,7 +5,7 @@ Far field
 ---------
 E(theta, f) = g(theta) / n * sum_k R_k(f) * exp(+j 2 pi (f0 + f) tau_k(theta))
 
-with tau_k(theta) = x_k sin(theta) / c0 (see ``geometry.LinearArray``) and f
+with tau_k(theta) = x_k sin(theta) / c0 (see ``geometry.ArrayGeometry``) and f
 the BASEBAND frequency of the FFT bin.  Every baseband frequency gets its own
 phase, so a phase-shifter-steered array points each subcarrier somewhere
 slightly different, which is the squint; a true-time-delay array does not.
@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .geometry import C0, LinearArray
+from .geometry import C0, ArrayGeometry
 
 TWO_PI = 2.0 * np.pi
 
@@ -38,13 +38,13 @@ def _bb_freqs(n_samples: int, fs: float) -> np.ndarray:
     return np.fft.fftfreq(n_samples, 1.0 / fs)
 
 
-def steering_phase_weights(geom: LinearArray, theta0_deg: float) -> np.ndarray:
+def steering_phase_weights(geom: ArrayGeometry, theta0_deg: float) -> np.ndarray:
     """Phase-shifter weights (complex, per element), aligned at f0."""
     tau = geom.delays_s(theta0_deg)
     return np.exp(-1j * TWO_PI * geom.f0_hz * tau)
 
 
-def steer(x: np.ndarray, geom: LinearArray, theta0_deg: float, fs: float,
+def steer(x: np.ndarray, geom: ArrayGeometry, theta0_deg: float, fs: float,
           mode: str) -> list[np.ndarray]:
     """Per-element drives for the common signal ``x`` steered to theta0."""
     if mode not in ("phase", "ttd"):
@@ -60,7 +60,7 @@ def steer(x: np.ndarray, geom: LinearArray, theta0_deg: float, fs: float,
     return [np.fft.ifft(X * np.exp(-1j * TWO_PI * (geom.f0_hz + f) * tk)) for tk in tau]
 
 
-def far_field(ys, geom: LinearArray, theta_deg: float, fs: float,
+def far_field(ys, geom: ArrayGeometry, theta_deg: float, fs: float,
               *, normalize: bool = True) -> np.ndarray:
     """Far-field signal in direction ``theta_deg`` from the radiated element
     signals ``ys`` (list or (n, N) array), as a complex baseband burst."""
@@ -79,7 +79,7 @@ def far_field(ys, geom: LinearArray, theta_deg: float, fs: float,
     return np.fft.ifft((Y * ph).sum(axis=0)) * scale
 
 
-def far_field_many(ys, geom: LinearArray, thetas_deg, fs: float,
+def far_field_many(ys, geom: ArrayGeometry, thetas_deg, fs: float,
                    *, normalize: bool = True) -> np.ndarray:
     """``far_field`` for many directions with the element FFTs done once.
     Returns (len(thetas), N)."""
@@ -97,7 +97,7 @@ def far_field_many(ys, geom: LinearArray, thetas_deg, fs: float,
 
 
 # ------------------------------------------------------------ CW analysis
-def array_factor_cw(geom: LinearArray, theta0_deg: float, f_offset_hz: float,
+def array_factor_cw(geom: ArrayGeometry, theta0_deg: float, f_offset_hz: float,
                     thetas_deg, mode: str) -> np.ndarray:
     """|AF(theta)| (normalised to 1 at a perfectly coherent sum) for a CW tone
     at f0 + f_offset after steering to theta0 — the same phase model
@@ -118,7 +118,7 @@ def array_factor_cw(geom: LinearArray, theta0_deg: float, f_offset_hz: float,
     return af
 
 
-def peak_direction_cw(geom: LinearArray, theta0_deg: float, f_offset_hz: float,
+def peak_direction_cw(geom: ArrayGeometry, theta0_deg: float, f_offset_hz: float,
                       mode: str, *, search_deg: float = 15.0, step_deg: float = 0.01) -> float:
     """Direction of the main-lobe peak for a CW tone at f0 + f_offset, by a
     fine grid around theta0 plus a parabolic refinement."""
@@ -142,7 +142,7 @@ def squint_analytic_deg(theta0_deg: float, f0_hz: float, f_offset_hz: float) -> 
     return float(np.degrees(np.arcsin(np.clip(s, -1.0, 1.0))) - theta0_deg)
 
 
-def highest_sidelobe_direction(geom: LinearArray, theta0_deg: float, mode: str,
+def highest_sidelobe_direction(geom: ArrayGeometry, theta0_deg: float, mode: str,
                                *, step_deg: float = 0.1) -> float | None:
     """Direction of the highest sidelobe of |AF| at f0 for the beam steered to
     theta0, or None when the pattern has no sidelobe (n = 1)."""
@@ -172,7 +172,7 @@ def tone_frequencies_hz(wf) -> np.ndarray:
     return np.asarray(ref.tone_indices, dtype=float) * scs
 
 
-def beam_response(geom: LinearArray, theta0_deg: float, f_bb_hz, mode: str) -> np.ndarray:
+def beam_response(geom: ArrayGeometry, theta0_deg: float, f_bb_hz, mode: str) -> np.ndarray:
     """The frequency response the far field in the BEAM direction sees after
     steering to theta0 with an ideal, identical element behind every port:
 
@@ -191,7 +191,7 @@ def beam_response(geom: LinearArray, theta0_deg: float, f_bb_hz, mode: str) -> n
     return np.exp(1j * TWO_PI * np.outer(f, tau)).sum(axis=1) / geom.n
 
 
-def squint_evm_closed_form_db(geom: LinearArray, theta0_deg: float, f_tones_hz,
+def squint_evm_closed_form_db(geom: ArrayGeometry, theta0_deg: float, f_tones_hz,
                               equalize: str = "scalar") -> float:
     """EVM (dB) the phase-steering squint alone costs at the beam, on tones of
     equal power: the residual of ``beam_response`` after the equaliser the
@@ -209,7 +209,7 @@ def squint_evm_closed_form_db(geom: LinearArray, theta0_deg: float, f_tones_hz,
     return -np.inf if rms == 0.0 else float(20.0 * np.log10(rms))
 
 
-def _af_vectorised(geom: LinearArray, theta0_deg: float, f_offset_hz: float,
+def _af_vectorised(geom: ArrayGeometry, theta0_deg: float, f_offset_hz: float,
                    thetas_deg: np.ndarray, mode: str) -> np.ndarray:
     """|AF| as ``array_factor_cw`` computes it, vectorised over theta (used
     for the fine beamwidth grids; ``array_factor_cw`` is kept as is so the
@@ -218,13 +218,13 @@ def _af_vectorised(geom: LinearArray, theta0_deg: float, f_offset_hz: float,
     f_rf = geom.f0_hz + f_offset_hz
     w = np.exp(-1j * TWO_PI * (geom.f0_hz if mode == "phase" else f_rf) * tau0)
     s = np.sin(np.deg2rad(thetas_deg))
-    tau = np.outer(s, geom.positions_m) / C0                     # (T, n)
+    tau = np.outer(s, geom.plane_m) / C0                         # (T, n): positions along the scan plane
     af = np.abs(np.exp(1j * TWO_PI * f_rf * tau) @ w) / geom.n
     g = np.array([geom.element_gain(t) for t in thetas_deg])
     return af * g
 
 
-def beamwidth_3db_deg(geom: LinearArray, theta0_deg: float, mode: str = "phase",
+def beamwidth_3db_deg(geom: ArrayGeometry, theta0_deg: float, mode: str = "phase",
                       f_offset_hz: float = 0.0) -> float:
     """Half-power width of the main lobe (degrees) at f0 + f_offset: the
     contiguous run around the peak where |AF| >= peak / sqrt(2), on a grid
@@ -233,7 +233,7 @@ def beamwidth_3db_deg(geom: LinearArray, theta0_deg: float, mode: str = "phase",
     if geom.n < 2:
         return 180.0
     c = max(np.cos(np.deg2rad(theta0_deg)), 1e-3)
-    guess = np.degrees(0.886 / (geom.n * geom.spacing_lambda * c))
+    guess = np.degrees(0.886 * geom.wavelength_m / (geom.aperture_m * c))
     half = max(1.5 * guess, 0.5)
     th = np.linspace(theta0_deg - half, theta0_deg + half, 4001)
     th = th[(th > -90.0) & (th < 90.0)]

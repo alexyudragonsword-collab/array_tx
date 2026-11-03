@@ -29,7 +29,7 @@ from .beam import far_field, steer
 from .config import ArrayConfig
 from .coupling import CouplingMatrix, apply_coupling
 from .element import ElementChain
-from .geometry import LinearArray
+from .geometry import ArrayGeometry
 from .vendor.polartx.vendor.padpd.dpd import ILAPredistorter
 from .vendor.polartx.vendor.padpd.pa.gmp import GMPModel
 from .vendor.polartx.waveforms.base import Waveform
@@ -67,7 +67,7 @@ def _run_all(elements: list[ElementChain], drives: list[np.ndarray], wf: Wavefor
 
 
 def train(cfg: ArrayConfig, scheme: str, *, elements: list[ElementChain], x: np.ndarray,
-          wf: Waveform, geom: LinearArray, coupling: CouplingMatrix, theta0_deg: float) -> DPDBank:
+          wf: Waveform, geom: ArrayGeometry, coupling: CouplingMatrix, theta0_deg: float) -> DPDBank:
     """Train the scheme's predistorter(s) for the beam at theta0."""
     if scheme not in SCHEMES:
         raise ValueError(f"unknown DPD scheme {scheme!r}; one of {SCHEMES}")
@@ -111,7 +111,7 @@ def train(cfg: ArrayConfig, scheme: str, *, elements: list[ElementChain], x: np.
     return bank
 
 
-def predistort_drives(bank: DPDBank, x: np.ndarray, geom: LinearArray, theta0_deg: float,
+def predistort_drives(bank: DPDBank, x: np.ndarray, geom: ArrayGeometry, theta0_deg: float,
                       fs: float, steering: str) -> list[np.ndarray]:
     """The element drives for the common signal ``x`` under the bank's scheme."""
     if bank.scheme == "none":

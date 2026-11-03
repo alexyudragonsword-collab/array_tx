@@ -56,8 +56,10 @@ def _f(default, unit: str, help: str, choices: tuple | None = None,
 
 @dataclass
 class ArrayGeometryCfg:
-    n_elements: int = _f(4, "", "number of elements in the linear array")
-    spacing_lambda: float = _f(0.5, "lambda0", "element pitch in carrier wavelengths (0.5 = half wave)")
+    n_elements: int = _f(4, "", "elements per row (along x); the whole array is n_elements x n_rows, row-major")
+    n_rows: int = _f(1, "", "rows (along y); 1 = the linear array")
+    spacing_lambda: float = _f(0.5, "lambda0", "element pitch along x in carrier wavelengths (0.5 = half wave)")
+    spacing_y_lambda: float = _f(0.5, "lambda0", "row pitch along y in carrier wavelengths")
     element_pattern: str = _f("isotropic", "", "element pattern applied to the far field", ("isotropic", "cos"))
 
 
@@ -102,6 +104,9 @@ class CouplingAnalyticCfg:
     c1_db: float = _f(-16.0, "dB", "adjacent-element coupling magnitude, flat over frequency")
     c1_deg: float = _f(180.0, "deg", "adjacent-element coupling phase, flat over frequency")
     c2_rel_db: float = _f(-6.0, "dB", "next-adjacent coupling relative to c1; further neighbours are zero")
+    c1y_rel_db: float = _f(0.0, "dB", "adjacent coupling ALONG Y (next row) relative to c1 (planar arrays only)")
+    c_diag_rel_db: float = _f(-6.0, "dB", "diagonal neighbour (next row, next column) relative to c1 (planar arrays only)")
+    phase_from_distance: bool = _f(True, "", "phase of the farther classes = c1_deg + the free-space electrical length beyond one pitch (x2 at lambda/2 pitch: +180 deg); off = every class at c1_deg (the milestone-1 reading, not passive on a 2-D grid)")
 
 
 SURVEY_REF_C1 = ("abstract-level only (full texts unreachable from the build environment, see ROADMAP A1); "
@@ -114,6 +119,10 @@ SURVEY_REF_PHASE = ("assumed: sign convention only -- the adjacent coupled wave 
                     "at f0 for lambda/2 pitch; the papers above do not publish the phase")
 SURVEY_REF_C2 = ("assumed: next-adjacent coupling 6 dB below adjacent is the common reading of published S-parameter "
                  "plots for lambda/2 patch rows (free-space 1/r over twice the distance); no paper-level number")
+SURVEY_REF_C1Y = ("assumed: the same adjacent coupling along y as along x -- the papers above are linear rows and give "
+                  "no H-plane number; for patches the E- and H-plane couplings differ by several dB, which this knob is for")
+SURVEY_REF_DIAG = ("assumed: a diagonal neighbour at sqrt(2) pitch 6 dB below adjacent -- free-space 1/r would give 3 dB, "
+                   "published patch S-parameter plots fall faster than 1/r; no paper-level number")
 
 
 @dataclass
@@ -122,12 +131,16 @@ class CouplingSurveyCfg:
                       source="survey", ref=SURVEY_REF_C1)
     c1_deg_at_f0: float = _f(180.0, "deg", "adjacent coupling phase at f0", source="assumed", ref=SURVEY_REF_PHASE)
     c2_rel_db: float = _f(-6.0, "dB", "next-adjacent coupling relative to c1", source="assumed", ref=SURVEY_REF_C2)
+    c1y_rel_db: float = _f(0.0, "dB", "adjacent coupling along y (next row) relative to c1 (planar arrays only)",
+                           source="assumed", ref=SURVEY_REF_C1Y)
+    c_diag_rel_db: float = _f(-6.0, "dB", "diagonal neighbour relative to c1 (planar arrays only)", source="assumed", ref=SURVEY_REF_DIAG)
+    phase_from_distance: bool = _f(True, "", "phase at f0 of the farther classes = c1_deg_at_f0 + free-space electrical length beyond one pitch (consistent with path_delay_from_spacing); off = every class at c1_deg_at_f0")
     path_delay_from_spacing: bool = _f(True, "", "phase slope vs frequency = free-space delay over the element pitch (linear phase)")
 
 
 @dataclass
 class CouplingTouchstoneCfg:
-    path: str | None = _f(None, "path", ".sNp file with N = n_elements ports; interpolated onto the baseband grid")
+    path: str | None = _f(None, "path", ".sNp file with N = n_elements x n_rows ports in row-major element order; interpolated onto the baseband grid")
 
 
 @dataclass
@@ -142,7 +155,8 @@ class CouplingCfg:
 @dataclass
 class BeamCfg:
     steering: str = _f("phase", "", "phase shifters (aligned at f0, squints) or true time delay", ("phase", "ttd"))
-    scan_deg: list = _f([0.0, 30.0, 60.0], "deg", "scan angles to evaluate")
+    scan_deg: list = _f([0.0, 30.0, 60.0], "deg", "scan angles (theta from broadside) to evaluate, in the plane below")
+    plane_phi_deg: float = _f(0.0, "deg", "azimuth of the scan / observation plane from the row direction x: 0 = the x-z plane (a linear array's plane), 90 = the y-z plane")
     sidelobe: "float | str" = _f("auto", "deg", "sidelobe direction for the second metric set: auto = highest sidelobe of the array factor at f0, or an angle")
 
 
@@ -209,8 +223,8 @@ class ArrayConfig:
                 v = _get(self, ff.path)
                 if v not in ff.choices:
                     raise ValueError(f"{ff.path}={v!r} not in {ff.choices}")
-        if self.array.n_elements < 1:
-            raise ValueError("array.n_elements must be >= 1")
+        if self.array.n_elements < 1 or self.array.n_rows < 1:
+            raise ValueError("array.n_elements and array.n_rows must be >= 1")
         if self.coupling.source == "touchstone" and not self.coupling.touchstone.path:
             raise ValueError("coupling.source=touchstone needs coupling.touchstone.path")
         if self.dpd.n_iterations < 1:

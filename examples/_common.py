@@ -40,8 +40,9 @@ def banner(title: str, sim) -> float:
     print(f"standard {sim.standard.name}: f0 {sim.f0 / 1e9:.1f} GHz, BW {sim.wf.bw / 1e6:.0f} MHz, "
           f"fs {sim.fs / 1e9:.5f} GS/s, {sim.n_symbols} OFDM symbols ({sim.wf.n} samples)"
           + ("  [ARRAYTX_SMOKE: short burst]" if smoke() else ""))
-    print(f"array: {sim.geom.n} x lambda/2 linear, coupling {sim.coupling.source}, "
-          f"max |S_kj| {sim.coupling.max_offdiag_db():.1f} dB")
+    g = sim.geom
+    shape = f"{g.n_x} x lambda/2 linear" if g.is_linear else f"{g.n_x} x {g.n_y} grid ({g.spacing_lambda:g} / {g.spacing_y_lambda:g} lambda), scan plane phi {g.plane_phi_deg:g} deg"
+    print(f"array: {shape}, coupling {sim.coupling.source}, max |S_kj| {sim.coupling.max_offdiag_db():.1f} dB")
     return time.time()
 
 
