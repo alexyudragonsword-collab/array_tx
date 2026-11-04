@@ -10,8 +10,9 @@
 
 ### A2. 负载调制：只有一阶电压模，没有实测 load-pull 表
 `element.pa.load_pull` 已实现（`cairn/load-pull-proposal.md`），κ = 1 是 assumed。真实 PA 的压缩等高线在 Smith 圆图上不是圆（Γ 相位相关），
-要更真得换 source: measured 的 load-pull 表替换 `loadpull.amam_loaded` 的映射。outphasing 的合路器负载是另一个模型，没做。
-效率（`info["efficiency"]`）仍按匹配负载的 DPA 律算，有源阻抗对效率的影响没建模，所以 ex10 的效率代价只含回退本身。
+要更真得换 source: measured 的 load-pull 表替换 `loadpull.amam_loaded` 的映射。
+效率已含 Γ（端口净功率，`cairn/loaded-efficiency-proposal.md`），但只有 SCPA 的开关损耗；导通损耗 |i|²R_on 随 |1−Γ|² 变，没有 R_on 的出处，没建。
+outphasing 的效率仍是 polar_tx 的 Chireix 律，没接 Γ。
 
 ## B. 已知模型缺口
 
@@ -27,11 +28,11 @@ ex11：负载牵引下 30° 网格的系数表在 45° 插值仍比重训差 2.3
 polar_tx ROADMAP B1：event 引擎 LTE-20 带宽已 29 % 相位推进不可用。FR2 400 MHz 只能用 response / dtc_openloop，
 杂散与互调结论一律标"线性化引擎，不能背书"。
 
-### B3. outphasing / rfdac 拓扑：能跑 FR2，DPD 能跑但没有东西可校
-两者按 FR2 的载频和 LO 建链并有测试（`tests/test_element.py::test_other_topologies_run_at_fr2`）。
-rfdac：polar_tx@008cc90 起 `CartesianTX` 读 `fs_scale_fixed`，满刻度钉住、DPD 能跑；但 polar_tx 的 RF-DAC 模型只有失配没有压缩，无可校之处。
-outphasing：分支恒包络、DPA 在满刻度——无 DPD −44.7 dBc，DPD 后 −44.6（2 单元冒烟）。
-要让这两种拓扑的 DPD 有意义，得给 RF-DAC 加压缩模型（属 polar_tx），给 outphasing 加合路器 / 分支失配的校正（不是 ILA-GMP 这类）。
+### B3. rfdac 拓扑：能跑 FR2，DPD 能跑但没有东西可校；outphasing 的 ρ 没有出处
+rfdac 按 FR2 的载频和 LO 建链并有测试（`tests/test_element.py::test_other_topologies_run_at_fr2`）；polar_tx@008cc90 起 `CartesianTX` 读 `fs_scale_fixed`，
+满刻度钉住、DPD 能跑，但 polar_tx 的 RF-DAC 模型只有失配没有压缩，无可校之处。要给它加压缩模型（属 polar_tx）。
+outphasing 已有分支源阻抗 ρ × Chireix 电纳的 AM-AM（`cairn/outphasing-load-proposal.md`，ex12），DPD 在 ρ = 0.1 时追回 9 dB；
+但 ρ 是 assumed，没有 28 GHz 分支 R_on / Z0 的出处。非线性源阻抗（R_on 随电流）没建，那是负载能够到 outphasing 非线性的唯一一阶路径。
 
 ## C. 工程维护
 

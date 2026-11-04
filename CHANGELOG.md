@@ -4,6 +4,14 @@
 
 ## 未发布 / Unreleased
 
+### 效率进负载模型 + outphasing 分支源阻抗（两份提案落地，ex10 重跑、ex12）（2026-11-04）
+
+- `loadpull.loaded_power_terms` / `LoadPulledDPA.forward_amplitude`：端口净功率 |a|²(1−|Γ|²) 与按码的 SCPA 开关损耗。
+  `info["efficiency"]` 新增 `eta_loaded_*`、`eta_loaded_per_element`、`eta_array_loaded`、`eta_array_matched`、`n_backflow`；报告 `eta_avg_pct` 改为阵列 loaded，`eta_matched_pct` 为对照。
+- `loadpull.SourceImpedanceCombiner` 与 `element.outphasing.source_impedance_rel`（默认 0 逐位不变）：分支源阻抗 × Chireix 电纳的闭式合路，阵列 Γ 经戴维南因子进入。
+  outphasing 拓扑下负载牵引开关在 ρ > 0 时生效。页面控件仅在 outphasing 拓扑下显示。
+- ex10 加 loaded 效率列与 8 × 8 每单元效率热图；ex12 检验提案的四条预期。测试 156 → 179；指纹 168 项逐位相同。
+
 ### 多扫描角 DPD（ex11）+ 页面按效率画研究 + 两份模型提案（2026-11-03）
 
 - `dpd.train_angles_deg`：两种 DPD 都可在若干扫描角上联合拟合（GMP 基矩阵拼接成一个最小二乘），每角度保留自己的负载工作点；联合 bank 每个 ArraySim 训一次复用。

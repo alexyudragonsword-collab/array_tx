@@ -8,8 +8,8 @@ import pytest
 
 from arraytx import ArraySim, config_from_dict, load_config
 from arraytx.guispec import controls
-from arraytx.loadpull import LoadPulledDPA, active_reflection, amam_loaded
-from arraytx.vendor.polartx.dpa.characteristics import amam_curve
+from arraytx.loadpull import LoadPulledDPA, active_reflection, amam_loaded, loaded_power_terms
+from arraytx.vendor.polartx.dpa.characteristics import amam_curve, efficiency_curve
 from arraytx.vendor.polartx.dpa.dpa import DPA, DPAConfig
 
 ON = {"element": {"pa": {"load_pull": {"enabled": True}}}}
@@ -105,7 +105,7 @@ def test_backoff_raises_the_pinned_full_scale_and_costs_efficiency():
     """element.pa.backoff_db: 0 is polar_tx's pin (bit for bit, fingerprint);
     3 dB puts the undistorted peak at 10^(-3/20) of the code range, which the
     polar_tx DPA law prices as lower average drain efficiency; the report
-    carries that number labelled as the matched-load law."""
+    carries that number, matched-load and loaded."""
     base = ArraySim(load_config("configs/fr2_4el_survey.yaml"))
     bo = ArraySim(config_from_dict({"element": {"pa": {"backoff_db": 3.0}}}))
     assert bo.elements[0].fs_scale == pytest.approx(base.elements[0].fs_scale * 10 ** (3 / 20))
@@ -143,3 +143,31 @@ def test_joint_bank_is_trained_once_and_reused_at_every_angle():
     assert r60.seconds < r0.seconds                      # no ILA on the second call
     with pytest.raises(ValueError):
         config_from_dict({"dpd": {"train_angles_deg": [95.0]}})
+
+
+
+def test_loaded_power_terms_are_the_scpa_law_at_gamma_0_and_cost_1_minus_gamma2():
+    """cairn/loaded-efficiency-proposal.md: switching loss set by the code,
+    net port power |a|^2 (1 - |Gamma|^2).  At Gamma = 0 the ratio is the
+    matched SCPA average; a constant |Gamma| = 0.3 keeps the loss and takes
+    9 % of the net power; |Gamma| > 1 samples count zero and are reported."""
+    a = np.linspace(0.05, 1.0, 200)
+    law = ("scpa", 0.67, 0.85)
+    t0 = loaded_power_terms(a, a, None, law)
+    p = a * a
+    assert t0["p_net"] == pytest.approx(p.sum()) and t0["p_matched"] == pytest.approx(p.sum())
+    assert t0["p_net"] / (t0["p_net"] + t0["p_loss"]) == pytest.approx(p.sum() / (p / efficiency_curve(law, a)).sum())
+    t3 = loaded_power_terms(a, a, np.full(a.size, 0.3j), law)
+    assert t3["p_loss"] == t0["p_loss"] and t3["p_net"] == pytest.approx(0.91 * t0["p_net"])
+    tb = loaded_power_terms(a, a, np.r_[np.zeros(199), 1.2], law)
+    assert tb["n_backflow"] == 1 and tb["p_net"] == pytest.approx(t0["p_net"] - p[-1])
+
+
+def test_loaded_efficiency_is_polar_tx_number_without_load_and_drops_with_it():
+    off = ArraySim(load_config("configs/fr2_4el_survey.yaml")).run(60.0, "none", conducted_diagnostics=False)
+    e = off.info["efficiency"]
+    assert e["eta_loaded_per_element"] == [r.info["element"]["efficiency"]["eta_avg"] for r in off.element_results]
+    assert e["eta_array_loaded"] == e["eta_array_matched"] and e["n_backflow"] == 0
+    on = ArraySim(config_from_dict(ON)).run(60.0, "none", conducted_diagnostics=False).info["efficiency"]
+    assert on["eta_array_loaded"] < on["eta_array_matched"] - 0.01          # |Gamma|^2 ~ 0.08 at 60 deg on 4 x 1
+    assert on["eta_avg_mean"] == pytest.approx(e["eta_avg_mean"])           # no DPD: same codes, same matched law

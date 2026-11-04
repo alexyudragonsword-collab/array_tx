@@ -12,7 +12,7 @@ const T = {
         vs_base: "对基线", results_none: "还没有结果：改好配置后按 ▶ 运行，或 ⇄ 扫描。", symbols: "符号", eq: "均衡", elements: "单元",
         queued: "排队", running: "运行中", done: "完成", error: "失败", cancelled: "已取消", cancel: "取消", idle: "空闲", active: "个在跑 / 排队",
         info: "信息", limit: "64-QAM 限值 8 %", pass: "✓ 通过", fail: "✗ 越限", pertone_note: "逐子载波均衡能抹掉的线性部分",
-        bw3: "3 dB 波束宽", backoff: "回退", eta_x_note: "匹配负载律，每组按研究顺序连线", ttd: "真延时", phase: "相移器", no_sidelobe: "单元数 1：无旁瓣", highest_sl: "最高旁瓣",
+        bw3: "3 dB 波束宽", backoff: "回退", eta_x_note: "阵列，含 Γ，每组按研究顺序连线", matched: "匹配负载", ttd: "真延时", phase: "相移器", no_sidelobe: "单元数 1：无旁瓣", highest_sl: "最高旁瓣",
         form_changed: "（当前表单已改）", study: "研究", points: "点，边跑边画", low_good: "低 = 好", high_good: "高 = 好",
         grid_title: "扫描角 × DPD · OTA ACLR1 @ 波束 [dBc]", grid_sub: "点击一格切换", mask_note: "stylized 工程模板，非一致性条款",
         element: "单元", errors_hdr: "误差抽取 gain / phase / delay / PA", prev: "上次会话", valid: "合法", differ: "处与文件不同",
@@ -23,7 +23,7 @@ const T = {
         vs_base: "vs baseline", results_none: "No results yet: set the config and press ▶ Run or ⇄ Scan.", symbols: "symbols", eq: "EQ", elements: "elements",
         queued: "queued", running: "running", done: "done", error: "failed", cancelled: "cancelled", cancel: "cancel", idle: "idle", active: "running / queued",
         info: "info", limit: "64-QAM limit 8 %", pass: "✓ pass", fail: "✗ fail", pertone_note: "the linear part a per-tone equaliser removes",
-        bw3: "3 dB beamwidth", backoff: "backoff", eta_x_note: "matched-load law, each group joined in study order", ttd: "true time delay", phase: "phase shifters", no_sidelobe: "one element: no sidelobe", highest_sl: "highest sidelobe",
+        bw3: "3 dB beamwidth", backoff: "backoff", eta_x_note: "array, Gamma included, each group joined in study order", matched: "matched load", ttd: "true time delay", phase: "phase shifters", no_sidelobe: "one element: no sidelobe", highest_sl: "highest sidelobe",
         form_changed: "(form edited since)", study: "study", points: "points, drawn as they land", low_good: "lower = better", high_good: "higher = better",
         grid_title: "scan angle × DPD · OTA ACLR1 @ beam [dBc]", grid_sub: "click a cell", mask_note: "stylized template, not a conformance clause",
         element: "element", errors_hdr: "drawn errors gain / phase / delay / PA", prev: "previous session", valid: "valid", differ: "differ from the file",
@@ -307,7 +307,7 @@ function renderCards() {
     ["sem_margin_db", beam.sem_margin_db, bb && bb.sem_margin_db, (beam.sem_passes ? `<span class='ok'>${t("pass")}</span>` : `<span class='fail'>${t("fail")}</span>`) + " · " + M().sem_margin_db["note_" + LANG]],
     ["evm_per_tone_db", beam.evm_per_tone_db, bb && bb.evm_per_tone_db, t("pertone_note")],
     ["squint_deg", rep.info.squint_deg, null, `${t("bw3")} ${f(rep.info.beamwidth_deg, 2)}° · ${t(rep.steering)}`],
-    ["eta_avg_pct", rep.info.eta_avg_pct, bb && b.rep.info.eta_avg_pct, `${t("backoff")} ${f(rep.info.backoff_db, 1)} dB · ${M().eta_avg_pct["note_" + LANG]}`]];
+    ["eta_avg_pct", rep.info.eta_avg_pct, bb && b.rep.info.eta_avg_pct, `${t("backoff")} ${f(rep.info.backoff_db, 1)} dB · ${t("matched")} ${f(rep.info.eta_matched_pct, 1)} % · ${M().eta_avg_pct["note_" + LANG]}`]];
   items.forEach(([id, v, bv, sub]) => { const m = M()[id]; const c = document.createElement("div"); c.className = "card";
     c.innerHTML = `<div class="t"><span>${m[LANG]}${id === "squint_deg" ? " (+BW/2)" : ""}</span><span class="dom ${m.domain}">${m.domain === "ota" ? "OTA" : t("info")}</span></div>` +
       `<div class="v">${f(v, m.digits)}<small>${m.unit}</small></div><div class="d">${deltaHtml(id, v, bv) || `<span class="muted">${sub}</span>`}</div>` + (deltaHtml(id, v, bv) && sub ? `<div class="d muted">${sub}</div>` : "");

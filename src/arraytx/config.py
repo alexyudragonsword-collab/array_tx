@@ -108,12 +108,22 @@ class ElementLOCfg:
     spurs: bool = _f(True, "", "inject the clock profile's discrete spurs (reference / fractional, its spurs: table) as sinusoidal LO phase modulation at the carrier, start phase per spur from its own seed stream; off = L(f) curve only (the phases are still drawn)")
 
 
+OUTPHASING_RHO_REF = ("assumed: no published R_on / Z0 for a 28 GHz outphasing branch was found; 0 = ideal voltage "
+                      "sources (polar_tx), 0.02-0.1 is the range the study scans (cairn/outphasing-load-proposal.md)")
+
+
+@dataclass
+class ElementOutphasingCfg:
+    source_impedance_rel: float = _f(0.0, "", "branch PA source impedance relative to the branch load (rho): with the Chireix susceptance it distorts AM-AM; the array's Gamma enters only as a complex gain (Thevenin). 0 = polar_tx's ideal combiner, bit for bit", source="assumed", ref=OUTPHASING_RHO_REF)
+
+
 @dataclass
 class ElementCfg:
     topology: str = _f("polar", "", "element TX topology (polar_tx class)", ("polar", "outphasing", "rfdac"))
     errors: ElementErrorsCfg = field(default_factory=ElementErrorsCfg)
     pa: ElementPACfg = field(default_factory=ElementPACfg)
     lo: ElementLOCfg = field(default_factory=ElementLOCfg)
+    outphasing: ElementOutphasingCfg = field(default_factory=ElementOutphasingCfg)
 
 
 @dataclass
@@ -247,6 +257,8 @@ class ArrayConfig:
             raise ValueError("coupling.source=touchstone needs coupling.touchstone.path")
         if self.dpd.n_iterations < 1:
             raise ValueError("dpd.n_iterations must be >= 1")
+        if not 0.0 <= self.element.outphasing.source_impedance_rel < 1.0:
+            raise ValueError("element.outphasing.source_impedance_rel must be in [0, 1)")
         if self.element.pa.backoff_db < 0.0:
             raise ValueError("element.pa.backoff_db must be >= 0 (a negative value would clip the undistorted peak)")
         lp = self.element.pa.load_pull

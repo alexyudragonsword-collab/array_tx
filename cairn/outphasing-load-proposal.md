@@ -1,17 +1,17 @@
 ---
 type: project_topic
-status: proposed
-summary: ROADMAP B3 的 outphasing 合路器负载——一阶线性模型下阵列 Γ 只是一个复增益（戴维南），够不到非线性；提案只建分支源阻抗 ρ × Chireix 补偿电纳带来的单链 AM-AM，给 outphasing 的 DPD 一个可校的对象，等审阅
+status: active
+summary: ROADMAP B3 的 outphasing 合路器负载（方案 A 已实现，2026-11-04）——线性源 + 线性合路器下阵列 Γ 只是复增益（戴维南），实测负载牵引动 ACLR ≤ 0.07 dB；ρ × Chireix 电纳给单链 AM-AM，ρ = 0.1 时 DPD 追回 9 dB
 tags: [outphasing, combiner, load-pull, proposal]
 contains: [decision, prediction]
 created: 2026-11-03
-updated: 2026-11-03
+updated: 2026-11-04
 related: [load-pull-proposal.md, loaded-efficiency-proposal.md, ROADMAP.md]
 authoring_mode: ai_generated
 ---
-# outphasing 合路器负载（ROADMAP B3）：提案（等审阅）
+# outphasing 合路器负载（ROADMAP B3）
 
-> 状态：proposed。用户审阅前不实现。原选题是"给 outphasing 加合路器负载，看两种 DPD 能否分开"。动手前的电路解改变了结论，所以提案的范围比选题小。
+> 状态：用户 2026-11-04 选方案 A 并批准实现（`loadpull.SourceImpedanceCombiner`、`element.outphasing.source_impedance_rel`、ex12）。原选题是"给 outphasing 加合路器负载，看两种 DPD 能否分开"；动手前的电路解改变了结论，所以范围比选题小。检验结果在文末。
 
 ## 现状
 
@@ -60,4 +60,15 @@ ROADMAP B3 记着"DPD 能跑但没有东西可校"。
 - 非线性源阻抗（R_on 随电流）不建：没有出处，且需要器件模型。
 - λ/4 线的频率色散不建：合路器按瞬时网络处理，与 polar_tx 相同。
 - 效率：Chireix 律不动；若第 1 项（`loaded-efficiency-proposal.md`）批准，outphasing 是否也接 loaded 效率，另行决定。
-- 原始电路解在本条目的表里，没有进代码；实现时会写成测试，对拍两种拓扑的数值解。
+- 电路解已写成测试（`tests/test_outphasing_load.py`）：闭式解与串联网络数值解一致到 1e-12，失真形状与 λ/4 网络一致到 1e-10。
+
+## 检验结果（2026-11-04，ex12 全尺寸，FR2 4 × 1 survey）
+
+- **预期 1 证实**：ρ = 0 时 `combine` 直接调父类，指纹 168 项逐位相同，测试守着。
+- **预期 2 证实**：单单元、无互耦，ACLR1 无 DPD / 每单元 DPD（dBc）：ρ 0 −41.88 / −41.88，0.02 −40.59 / −41.97，0.05 −36.90 / −41.96，0.10 −32.35 / −41.42。
+  ρ = 0 时 DPD 什么也没做，ρ = 0.1 时追回 9.1 dB。B3 的"outphasing 的 DPD 无物可校"由此有了对象。
+- **预期 3 证实**：ρ = 0.05、开负载牵引，阵列 − 每单元 ACLR1 = +0.099 / +0.097 / −0.045 dB（0 / 30 / 60°），无牵引 +0.103 / +0.078 / −0.043。
+  负载牵引让每单元 DPD 的 ACLR1 只动 +0.073 / +0.031 / −0.056 dB。0° 训练用到 60° 的损失 −0.006（每单元）/ −0.019 dB（阵列），polar DPA 是 +2.87 / +2.51 dB。
+- **预期 4 证实**：无 DPD 时负载牵引让波束功率变 −0.29 / −0.09 / +0.36 dB（ρ = 0.1，0 / 30 / 60°），旁瓣 +0.07 / −0.22 / +0.24 dB，ACLR1 不动（≤ 0.01 dB）。
+  ρ|Γ|max = 0.05 对应 20 lg 1.05 = 0.42 dB，量级相符。ρ = 0.02 时 ≤ 0.08 dB。
+- 坑：60° 时 |Γ| 最大到 0.49–0.50，碰到 `gamma_max` = 0.5 的截断，所以 60° 的波束功率变化可能被低估。截断是护栏，不是物理。

@@ -35,7 +35,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from .vendor.polartx.dpa.characteristics import ampm_curve
+from .vendor.polartx.dpa.characteristics import ampm_curve, efficiency_curve
+from .vendor.polartx.dpa.combiner import OutphasingCombiner
 from .vendor.polartx.dpa.dpa import DPA, DPAConfig
 from .vendor.polartx.dpa.mismatch import code_amplitude_table
 
@@ -90,6 +91,14 @@ class LoadPulledDPA(DPA):
             return None
         return np.abs(1.0 + self.kappa_amam * self.gamma), np.abs(1.0 + self.kappa_ampm * self.gamma)
 
+    def forward_amplitude(self, code: np.ndarray) -> np.ndarray:
+        """|forward wave| per sample of the code stream under the current load
+        (the matched table with no load set)."""
+        code = np.asarray(code, dtype=np.int64)
+        if self.gamma is None:
+            return self.amp_table[code]
+        return amam_loaded(self.cfg.amam, self.r[code], self.load_factors[0])
+
     def __call__(self, code: np.ndarray, phase: np.ndarray) -> np.ndarray:
         if self.gamma is None:
             return super().__call__(code, phase)
@@ -108,6 +117,34 @@ class LoadPulledDPA(DPA):
         return amp * np.exp(1j * (np.asarray(phase, float) + ph))
 
 
+def loaded_power_terms(amp_matched: np.ndarray, amp_fwd: np.ndarray, gamma, eff_spec) -> dict:
+    """The two terms of the loaded efficiency (cairn/loaded-efficiency-proposal.md).
+
+    * switching loss per sample, from the SCPA law on the MATCHED amplitude
+      of the code: P_loss = a_m^2 (1 / eta(a_m) - 1).  The cell-capacitor
+      charging C V^2 f is set by the code, not by the load (source: assumed,
+      the Yoo & Walling derivation's premise);
+    * net power out of the port, P_net = |a|^2 (1 - |Gamma|^2), a the forward
+      wave the loaded DPA produces: port voltage a (1 + Gamma), current
+      a (1 - Gamma), real part of their product.  Samples with |Gamma| > 1
+      (power flowing INTO the PA) count 0 and are reported.
+
+    Returns the sums, so an element and the whole array combine the same
+    way: eta = sum P_net / sum (P_net + P_loss)."""
+    a_m = np.asarray(amp_matched, dtype=float)
+    a = np.asarray(amp_fwd, dtype=float)
+    eta = efficiency_curve(eff_spec, a_m)
+    p_m = a_m * a_m
+    loss = np.zeros_like(p_m)
+    on = eta > 0
+    loss[on] = p_m[on] / eta[on] - p_m[on]
+    g2 = np.zeros_like(a) if gamma is None else np.abs(np.asarray(gamma)) ** 2
+    back = g2 > 1.0
+    net = np.where(back, 0.0, a * a * (1.0 - g2))
+    return {"p_net": float(net.sum()), "p_loss": float(loss.sum()), "p_matched": float(p_m.sum()),
+            "n_backflow": int(back.sum()), "n": int(a.size)}
+
+
 def active_reflection(ys: np.ndarray, rs: np.ndarray, floors, gamma_max: float) -> np.ndarray:
     """Gamma_k(t) = (r_k - y_k) / y_k per element and sample, with the two
     guards: 0 where |y_k| is below the element's floor (the ratio means
@@ -122,3 +159,60 @@ def active_reflection(ys: np.ndarray, rs: np.ndarray, floors, gamma_max: float) 
     over = g > gamma_max
     gamma = np.where(over, gamma * (gamma_max / np.where(over, g, 1.0)), gamma)
     return gamma
+
+
+class SourceImpedanceCombiner(OutphasingCombiner):
+    """polar_tx's outphasing combiner with a finite branch source impedance
+    (ROADMAP B3; cairn/outphasing-load-proposal.md, option A).
+
+    Each branch PA is a voltage source v_k behind rho (relative to the
+    branch load); the Chireix compensation sits at the branch node as a
+    susceptance +-jB (polar_tx's b = 1/2 sin 2 theta_c; 0 in isolated mode);
+    the branches combine in series into Z_L = 2 (1 + Gamma) / (1 - Gamma).
+    Solving that linear network (Thevenin at the load port):
+
+        y = [sum_k y_k / (1 + j rho B_k)] / (S / 2)  x  F(Gamma),
+        S = sum_k 1 / (1 + j rho B_k),
+        F = [Z_L / (Z_L + rho S)] / [Z_0 / (Z_0 + rho S)],  Z_0 = 2,
+
+    normalised so that Gamma = 0, theta = 0 is the ideal sum.  The first
+    factor carries the distortion (cos theta + rho B sin theta at small
+    rho: the output does not reach zero at theta = 90 deg) and does NOT
+    depend on Gamma; the array's load enters only through F, a complex
+    gain per sample.  rho = 0 is the parent's ``combine``, bit for bit.
+    ``tests/test_outphasing_load.py`` checks the closed form against a
+    numerical solve of the series and the lambda/4-line networks."""
+
+    def __init__(self, *args, source_impedance_rel: float = 0.0, **kw):
+        super().__init__(*args, **kw)
+        self.rho = float(source_impedance_rel)
+        self.gamma: np.ndarray | None = None
+
+    @property
+    def susceptances(self) -> tuple[float, float]:
+        b = float(self._b) if self.mode == "chireix" else 0.0
+        return b, -b
+
+    def set_load(self, gamma) -> None:
+        self.gamma = None if gamma is None else np.asarray(gamma, dtype=complex)
+
+    def load_factor(self, gamma) -> np.ndarray | complex:
+        """F(Gamma): the array's load at the combiner output as a complex gain."""
+        b1, b2 = self.susceptances
+        S = 1.0 / (1.0 + 1j * self.rho * b1) + 1.0 / (1.0 + 1j * self.rho * b2)
+        g = np.asarray(gamma, dtype=complex)
+        zl = 2.0 * (1.0 + g) / (1.0 - g)
+        return (zl / (zl + self.rho * S)) / (2.0 / (2.0 + self.rho * S))
+
+    def combine(self, y1: np.ndarray, y2: np.ndarray) -> np.ndarray:
+        if self.rho == 0.0:
+            return super().combine(y1, y2)
+        b1, b2 = self.susceptances
+        d1, d2 = 1.0 + 1j * self.rho * b1, 1.0 + 1j * self.rho * b2
+        half_s = 0.5 * (1.0 / d1 + 1.0 / d2)
+        y = super().combine(np.asarray(y1) / d1, np.asarray(y2) / d2) / half_s
+        if self.gamma is not None:
+            if self.gamma.shape[0] != y.shape[0]:
+                raise ValueError(f"load has {self.gamma.shape[0]} samples, the branches {y.shape[0]}")
+            y = y * self.load_factor(self.gamma)
+        return y

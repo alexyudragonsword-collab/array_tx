@@ -38,7 +38,7 @@ import numpy as np
 
 from .config import ArrayConfig
 from .lo import ClockProfileLO, spur_phase_rad
-from .loadpull import LoadPulledDPA
+from .loadpull import LoadPulledDPA, SourceImpedanceCombiner, loaded_power_terms
 from .seeds import SeedTree
 from .standards import Standard
 from .vendor.polartx import DPAConfig
@@ -162,6 +162,11 @@ class ElementChain:
             if lo_obj is None and not standard.polartx_native:
                 kw2["lo_pn"] = fr2_lo_like_polartx(fout)
             if self.topology == "outphasing":
+                rho = float(cfg.element.outphasing.source_impedance_rel)
+                if rho != 0.0:
+                    # B3 option A: finite branch source impedance in the Chireix combiner
+                    # (polar_tx's default combiner otherwise, untouched)
+                    kw2["combiner"] = SourceImpedanceCombiner(mode="chireix", source_impedance_rel=rho)
                 self.preset = wifi_outphasing(**kw2)
             else:
                 # the RF-DAC is the element's array: the config's PA block
@@ -179,24 +184,38 @@ class ElementChain:
             self.tx = self.preset.tx
         self._pin()
         # load modulation (A2): the polar DPA becomes load-pulled; the RF-DAC
-        # has no compression and the outphasing branches run at full scale
-        # on their own combiner, so for them the switch is reported inert
+        # has no compression, so the switch is reported inert for it; the
+        # outphasing branches run at full scale, and the load reaches their
+        # output only through a finite source impedance (B3 option A)
         lp = cfg.element.pa.load_pull
-        self.load_pull_effective = bool(lp.enabled and self.topology == "polar" and cfg.element.pa.amam != "ideal")
+        self.load_pull_effective = bool(lp.enabled and (
+            (self.topology == "polar" and cfg.element.pa.amam != "ideal")
+            # outphasing: the array's Gamma reaches the output through the source
+            # impedance (a complex gain); with rho = 0 there is nothing to pull with
+            or (self.topology == "outphasing" and cfg.element.outphasing.source_impedance_rel != 0.0)))
         if lp.enabled and self.topology == "polar":
             self.tx.dpa = LoadPulledDPA(self.dpa_cfg, lp.kappa_amam, lp.kappa_ampm)
 
-    def set_load(self, gamma) -> None:
-        """Active reflection coefficient per sample for this element's PA
-        (None = matched); a no-op on topologies without a load-pulled DPA."""
+    def _load_target(self):
+        """What takes the array's load: the load-pulled DPA (polar) or the
+        source-impedance combiner (outphasing); None otherwise."""
         dpa = getattr(self.tx, "dpa", None)
         if isinstance(dpa, LoadPulledDPA):
-            dpa.set_load(gamma)
+            return dpa
+        comb = getattr(self.tx, "combiner", None)
+        return comb if isinstance(comb, SourceImpedanceCombiner) else None
+
+    def set_load(self, gamma) -> None:
+        """Active reflection coefficient per sample (None = matched); a no-op
+        on topologies with nothing for the load to act on."""
+        t = self._load_target()
+        if t is not None:
+            t.set_load(gamma)
 
     @property
     def load(self):
-        dpa = getattr(self.tx, "dpa", None)
-        return dpa.gamma if isinstance(dpa, LoadPulledDPA) else None
+        t = self._load_target()
+        return None if t is None else t.gamma
 
     # ------------------------------------------------------------ wiring
     def _pin(self) -> None:
@@ -262,11 +281,22 @@ class ElementChain:
         dpa = getattr(self.tx, "dpa", None)
         if self.topology == "polar" and hasattr(r, "avg_efficiency") and getattr(getattr(dpa, "cfg", None), "eff", None):
             # polar_tx's modulated average drain efficiency over this run's
-            # code stream, on the DPA's own (matched-load) law: Gamma does not
-            # enter it (the proposal keeps efficiency out of the load model)
+            # code stream, on the DPA's own matched-load law (kept as "eta_avg")
             eff = r.avg_efficiency(dpa)
-            info["element"]["efficiency"] = {"eta_avg": eff["eta_avg"], "backoff_db": eff["backoff_db"],
-                                             "law": list(dpa.cfg.eff), "load": "matched"}
+            # the loaded reading (cairn/loaded-efficiency-proposal.md): net port power
+            # |a|^2 (1 - |Gamma|^2) over net + the code-set switching loss.  The sums are
+            # kept so the array combines elements as power, not as a mean of ratios.
+            code = np.asarray(r.env_code, dtype=np.int64)
+            loaded = isinstance(dpa, LoadPulledDPA) and dpa.gamma is not None
+            fwd = dpa.forward_amplitude(code) if loaded else dpa.amp_table[code]
+            t = loaded_power_terms(dpa.amp_table[code], fwd, dpa.gamma if loaded else None, dpa.cfg.eff)
+            den = t["p_net"] + t["p_loss"]
+            info["element"]["efficiency"] = {
+                "eta_avg": eff["eta_avg"], "backoff_db": eff["backoff_db"], "law": list(dpa.cfg.eff),
+                # Gamma = 0: the loaded reading IS polar_tx's number (reported as that, bit for bit)
+                "eta_loaded": (t["p_net"] / den if den > 0 else 0.0) if loaded else eff["eta_avg"],
+                "p_net": t["p_net"], "p_loss": t["p_loss"], "p_matched": t["p_matched"],
+                "n_backflow": t["n_backflow"], "load": "loaded" if loaded else "matched"}
         return ElementResult(y=y, info=info, raw=r)
 
 

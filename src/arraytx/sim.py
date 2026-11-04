@@ -193,12 +193,22 @@ class ArraySim:
             cond = [conducted_metrics(ys[k], self.wf, k, offsets=offsets, equalize=cfg.metrics.evm_equalize)
                     for k in range(self.geom.n)]
         modes = [r.phasemod_mode for r in res]
-        etas = [r.info["element"]["efficiency"]["eta_avg"] for r in res if "efficiency" in r.info["element"]]
+        effs = [r.info["element"]["efficiency"] for r in res if "efficiency" in r.info["element"]]
         efficiency = None
-        if etas:
-            law = res[0].info["element"]["efficiency"]["law"]
+        if effs:
+            etas = [e["eta_avg"] for e in effs]
+            lo = [e["eta_loaded"] for e in effs]
             efficiency = {"eta_avg_mean": float(np.mean(etas)), "eta_avg_min": float(min(etas)), "eta_avg_max": float(max(etas)),
-                          "law": law, "note": "polar_tx DPA law on the matched-load amplitude table; Gamma does not enter"}
+                          "eta_loaded_mean": float(np.mean(lo)), "eta_loaded_min": float(min(lo)), "eta_loaded_max": float(max(lo)),
+                          "eta_loaded_per_element": [float(v) for v in lo], "law": effs[0]["law"],
+                          "note": "eta_avg_*: polar_tx DPA law on the matched-load table; eta_loaded_*: net port power "
+                                  "|a|^2 (1 - |Gamma|^2) over net + switching loss (cairn/loaded-efficiency-proposal.md)"}
+            # the array: total radiated power (= the sum of net port powers, lossless
+            # antennas) over total DC; the matched figure the same way, for comparison
+            pn, pl, pm = (sum(e[k] for e in effs) for k in ("p_net", "p_loss", "p_matched"))
+            efficiency["eta_array_loaded"] = pn / (pn + pl) if pn + pl > 0 else 0.0
+            efficiency["eta_array_matched"] = pm / (pm + pl) if pm + pl > 0 else 0.0
+            efficiency["n_backflow"] = int(sum(e["n_backflow"] for e in effs))
         return ArrayResult(theta0, scheme, sl, drives, res, ys, rs, far, ota, cond, bank, modes,
                            time.time() - t0,
                            info={"coupling_source": self.coupling.source,
