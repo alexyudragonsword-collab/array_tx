@@ -162,12 +162,13 @@ class ElementChain:
             if lo_obj is None and not standard.polartx_native:
                 kw2["lo_pn"] = fr2_lo_like_polartx(fout)
             if self.topology == "outphasing":
+                self.preset = wifi_outphasing(**kw2)
                 rho = float(cfg.element.outphasing.source_impedance_rel)
                 if rho != 0.0:
-                    # B3 option A: finite branch source impedance in the Chireix combiner
-                    # (polar_tx's default combiner otherwise, untouched)
-                    kw2["combiner"] = SourceImpedanceCombiner(mode="chireix", source_impedance_rel=rho)
-                self.preset = wifi_outphasing(**kw2)
+                    # B3 option A: polar_tx's own combiner, with a finite branch source
+                    # impedance added (rho = 0 leaves the preset's combiner untouched)
+                    tx = self.preset.tx
+                    tx.combiner = SourceImpedanceCombiner.from_combiner(tx.combiner, rho)
             else:
                 # the RF-DAC is the element's array: the config's PA block
                 # (bits, thermometer MSBs, mismatch) and THIS element's
@@ -216,6 +217,40 @@ class ElementChain:
     def load(self):
         t = self._load_target()
         return None if t is None else t.gamma
+
+    def load_gain(self, gamma) -> np.ndarray:
+        """|what the load does| per sample: the factor on the polar DPA's knee,
+        |1 + kappa_amam Gamma|, or the outphasing combiner's complex gain |F(Gamma)|."""
+        t = self._load_target()
+        g = np.asarray(gamma)
+        if isinstance(t, SourceImpedanceCombiner):
+            return np.abs(t.load_factor(g))
+        return np.abs(1.0 + self.cfg.element.pa.load_pull.kappa_amam * g)
+
+    def efficiency(self, res: "ElementResult") -> dict | None:
+        """Average drain efficiency of one run (polar only), matched and loaded.
+
+        ``eta_avg``: polar_tx's modulated average over the code stream on the
+        DPA's own matched-load law.  ``eta_loaded`` (cairn/loaded-efficiency-proposal.md):
+        net port power |a|^2 (1 - |Gamma|^2) over net + the code-set switching
+        loss, under the load the element holds NOW -- so call it right after the
+        run it describes (``ArraySim.run`` does, once, after the final radiate).
+        The power sums are returned so the array combines elements as power."""
+        dpa = getattr(self.tx, "dpa", None)
+        r = res.raw
+        if self.topology != "polar" or not hasattr(r, "avg_efficiency") or not getattr(getattr(dpa, "cfg", None), "eff", None):
+            return None
+        eff = r.avg_efficiency(dpa)
+        code = np.asarray(r.env_code, dtype=np.int64)
+        loaded = isinstance(dpa, LoadPulledDPA) and dpa.gamma is not None
+        fwd = dpa.forward_amplitude(code) if loaded else dpa.amp_table[code]
+        t = loaded_power_terms(dpa.amp_table[code], fwd, dpa.gamma if loaded else None, dpa.cfg.eff)
+        den = t["p_net"] + t["p_loss"]
+        return {"eta_avg": eff["eta_avg"], "backoff_db": eff["backoff_db"], "law": list(dpa.cfg.eff),
+                # Gamma = 0: the loaded reading IS polar_tx's number (reported as that, bit for bit)
+                "eta_loaded": (t["p_net"] / den if den > 0 else 0.0) if loaded else eff["eta_avg"],
+                "p_net": t["p_net"], "p_loss": t["p_loss"], "p_matched": t["p_matched"],
+                "n_backflow": t["n_backflow"], "load": "loaded" if loaded else "matched"}
 
     # ------------------------------------------------------------ wiring
     def _pin(self) -> None:
@@ -275,28 +310,12 @@ class ElementChain:
                            "load_pull_effective": getattr(self, "load_pull_effective", False)}
         g = self.load
         if g is not None:
-            ga = np.abs(1.0 + self.cfg.element.pa.load_pull.kappa_amam * g)
+            # |1 + Gamma| describes the active impedance (any topology); load_gain is
+            # what it does to this element (the DPA's knee, or the combiner's gain)
+            ga, lg = np.abs(1.0 + g), self.load_gain(g)
             info["element"]["load"] = {"abs_1pg_mean": float(ga.mean()), "abs_1pg_std": float(ga.std()),
+                                       "load_gain_mean": float(lg.mean()), "load_gain_std": float(lg.std()),
                                        "abs_gamma_max": float(np.abs(g).max())}
-        dpa = getattr(self.tx, "dpa", None)
-        if self.topology == "polar" and hasattr(r, "avg_efficiency") and getattr(getattr(dpa, "cfg", None), "eff", None):
-            # polar_tx's modulated average drain efficiency over this run's
-            # code stream, on the DPA's own matched-load law (kept as "eta_avg")
-            eff = r.avg_efficiency(dpa)
-            # the loaded reading (cairn/loaded-efficiency-proposal.md): net port power
-            # |a|^2 (1 - |Gamma|^2) over net + the code-set switching loss.  The sums are
-            # kept so the array combines elements as power, not as a mean of ratios.
-            code = np.asarray(r.env_code, dtype=np.int64)
-            loaded = isinstance(dpa, LoadPulledDPA) and dpa.gamma is not None
-            fwd = dpa.forward_amplitude(code) if loaded else dpa.amp_table[code]
-            t = loaded_power_terms(dpa.amp_table[code], fwd, dpa.gamma if loaded else None, dpa.cfg.eff)
-            den = t["p_net"] + t["p_loss"]
-            info["element"]["efficiency"] = {
-                "eta_avg": eff["eta_avg"], "backoff_db": eff["backoff_db"], "law": list(dpa.cfg.eff),
-                # Gamma = 0: the loaded reading IS polar_tx's number (reported as that, bit for bit)
-                "eta_loaded": (t["p_net"] / den if den > 0 else 0.0) if loaded else eff["eta_avg"],
-                "p_net": t["p_net"], "p_loss": t["p_loss"], "p_matched": t["p_matched"],
-                "n_backflow": t["n_backflow"], "load": "loaded" if loaded else "matched"}
         return ElementResult(y=y, info=info, raw=r)
 
 

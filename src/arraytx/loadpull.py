@@ -183,10 +183,17 @@ class SourceImpedanceCombiner(OutphasingCombiner):
     ``tests/test_outphasing_load.py`` checks the closed form against a
     numerical solve of the series and the lambda/4-line networks."""
 
-    def __init__(self, *args, source_impedance_rel: float = 0.0, **kw):
+    def __init__(self, *args, source_impedance_rel: float, **kw):
         super().__init__(*args, **kw)
         self.rho = float(source_impedance_rel)
         self.gamma: np.ndarray | None = None
+
+    @classmethod
+    def from_combiner(cls, c: OutphasingCombiner, source_impedance_rel: float) -> "SourceImpedanceCombiner":
+        """The same combiner (mode, compensation angle, loss, imbalance -- whatever
+        polar_tx's preset built) with a branch source impedance added."""
+        from dataclasses import fields
+        return cls(**{f.name: getattr(c, f.name) for f in fields(c)}, source_impedance_rel=source_impedance_rel)
 
     @property
     def susceptances(self) -> tuple[float, float]:

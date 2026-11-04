@@ -4,6 +4,13 @@
 
 ## 未发布 / Unreleased
 
+### 代码评审一轮：页面效率轴回退、报告键改名、联合 bank 缓存键、训练合并为一条路径（2026-11-04）
+
+- 报告 `info.eta_avg_pct` / `eta_matched_pct` 改名为 `eta_array_pct` / `eta_array_matched_pct`（含义上一版已变，旧名会让存下的基线错比）。
+- `info["load_pull"]` 与单元 `load`：`abs_1pg_*` 为 |1+Γ|（不再乘 κ），新增 `load_gain_*`（实际作用在单元上的因子）。
+- `SourceImpedanceCombiner` 不再有自己的默认值，`from_combiner` 从 preset 的合路器复制参数。效率只在 `ArraySim.run` 末尾算一次。
+- `dpd.train` 单角度与多角度共用 `_train_joint`；联合 bank 的缓存键含 DPD 配置。指纹与负载牵引六组合逐位不变。测试 179 → 182。
+
 ### 效率进负载模型 + outphasing 分支源阻抗（两份提案落地，ex10 重跑、ex12）（2026-11-04）
 
 - `loadpull.loaded_power_terms` / `LoadPulledDPA.forward_amplitude`：端口净功率 |a|²(1−|Γ|²) 与按码的 SCPA 开关损耗。

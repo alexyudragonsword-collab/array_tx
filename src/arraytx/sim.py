@@ -18,7 +18,7 @@ from typing import Any
 
 import numpy as np
 
-from .beam import far_field, far_field_many, highest_sidelobe_direction, steer
+from .beam import far_field, far_field_many, highest_sidelobe_direction
 from .config import ArrayConfig
 from .coupling import CouplingMatrix, apply_coupling, build_coupling
 from .dpd import DPDBank, predistort_drives, train
@@ -85,7 +85,7 @@ class ArraySim:
         self.last_load_pull: dict[str, Any] | None = None
         #: banks trained jointly over dpd.train_angles_deg do not depend on the
         #: beam angle: one per scheme for the life of this ArraySim
-        self._joint_banks: dict[str, DPDBank] = {}
+        self._joint_banks: dict[tuple, DPDBank] = {}
 
     # ------------------------------------------------------------- pieces
     @property
@@ -104,8 +104,9 @@ class ArraySim:
     @property
     def load_pull_active(self) -> bool:
         """Load modulation runs when it is switched on, at least one element
-        has a load-pulled DPA, and there is coupling to pull with (S = 0
-        leaves Gamma = 0, and the plain path, bit for bit)."""
+        has something for the load to act on (a polar DPA with a knee, or an
+        outphasing combiner with a source impedance), and there is coupling to
+        pull with (S = 0 leaves Gamma = 0, and the plain path, bit for bit)."""
         return (self.cfg.element.pa.load_pull.enabled and not self.coupling.is_zero
                 and any(getattr(e, "load_pull_effective", False) for e in self.elements))
 
@@ -139,9 +140,11 @@ class ArraySim:
             deltas.append(float(np.linalg.norm(ys_new - ys) / max(np.linalg.norm(ys), 1e-300)))
             ys = ys_new
         rs = apply_coupling(ys, self.coupling, self.fs, self.f0)
-        ga = np.abs(1.0 + lp.kappa_amam * gamma)
+        ga = np.abs(1.0 + gamma)
+        lg = np.stack([el.load_gain(g) for el, g in zip(self.elements, gamma)])
         self.last_load_pull = {"iterations": int(lp.iterations), "deltas": deltas,
                                "abs_1pg_mean": ga.mean(axis=1).tolist(), "abs_1pg_std": ga.std(axis=1).tolist(),
+                               "load_gain_mean": lg.mean(axis=1).tolist(), "load_gain_std": lg.std(axis=1).tolist(),
                                "abs_gamma_max": np.abs(gamma).max(axis=1).tolist()}
         return res, ys, rs
 
@@ -160,22 +163,16 @@ class ArraySim:
         theta0 = float(cfg.beam.scan_deg[0] if theta0_deg is None else theta0_deg)
         scheme = scheme or cfg.dpd.scheme
         self.last_load_pull = None
-        joint = bool(cfg.dpd.train_angles_deg) and scheme != "none"
-        if self.load_pull_active and scheme == "per_element" and cfg.dpd.per_element_observe == "pa_output" and not joint:
-            # the operating point: every PA under the load the undistorted,
-            # steered drives put on it, before the per-element DPDs train
-            # against their own PA.  The other schemes radiate these drives
-            # themselves (antenna_port in train(), array in every ILA pass,
-            # none right below), and radiate() starts from the matched load
-            # each time, so for them this pass would only repeat work.
-            self.radiate(steer(self.x, self.geom, theta0, self.fs, cfg.beam.steering))
-        if joint and scheme in self._joint_banks:
-            bank = self._joint_banks[scheme]
+        # a bank trained jointly over dpd.train_angles_deg does not depend on the
+        # beam angle: train once, keyed on everything training reads from the config
+        joint_key = (scheme, repr(cfg.dpd), cfg.beam.steering, cfg.sim.noise) if cfg.dpd.train_angles_deg and scheme != "none" else None
+        if joint_key is not None and joint_key in self._joint_banks:
+            bank = self._joint_banks[joint_key]
         else:
             bank = train(cfg, scheme, elements=self.elements, x=self.x, wf=self.wf, geom=self.geom,
                          coupling=self.coupling, theta0_deg=theta0, radiate=self.radiate)
-            if joint:
-                self._joint_banks[scheme] = bank
+            if joint_key is not None:
+                self._joint_banks[joint_key] = bank
         drives = predistort_drives(bank, self.x, self.geom, theta0, self.fs, cfg.beam.steering)
         res, ys, rs = self.radiate(drives)
         sl = self.sidelobe_direction(theta0)
@@ -193,7 +190,13 @@ class ArraySim:
             cond = [conducted_metrics(ys[k], self.wf, k, offsets=offsets, equalize=cfg.metrics.evm_equalize)
                     for k in range(self.geom.n)]
         modes = [r.phasemod_mode for r in res]
-        effs = [r.info["element"]["efficiency"] for r in res if "efficiency" in r.info["element"]]
+        # efficiency once, here: every element still holds the load of this final run
+        effs = []
+        for el, r in zip(self.elements, res):
+            e = el.efficiency(r)
+            if e is not None:
+                r.info["element"]["efficiency"] = e
+                effs.append(e)
         efficiency = None
         if effs:
             etas = [e["eta_avg"] for e in effs]

@@ -44,4 +44,4 @@ authoring_mode: ai_generated
 
 `android/` 照 polar_tx（AGP 8.1.4 / Kotlin 1.9.24 / Chaquopy 15.0.1 / Python 3.10），assets 直接指向 `src/arraytx/webui`，
 `MainActivity.kt` 约 80 行 + WebChromeClient 把 prompt 按默认值确认。APK 工作流手动触发；首次构建记录见 LOG。
-- 研究横轴可选"平均漏极效率"（`#sweep-x`，`?sweepx=eta`）：x 取报告里的 `info.eta_avg_pct`（阵列 loaded 效率：辐射功率 / 直流功率，含 Γ），每组按研究顺序连线，页面不算效率；卡片同时给匹配负载的对照值。
+- 研究横轴可选"平均漏极效率"（`#sweep-x`，`?sweepx=eta`）：x 取报告里的 `info.eta_array_pct`（阵列 loaded 效率：辐射功率 / 直流功率，含 Γ），每组按研究顺序连线，页面不算效率；卡片同时给匹配负载的对照值。所有点效率相同（LO 杂散、EVM 均衡这类研究）或旧报告没有这个键时退回取值轴。键名在 2026-11-04 从 `eta_avg_pct` 改来：旧名在一版里换过含义，存下的基线会错比。

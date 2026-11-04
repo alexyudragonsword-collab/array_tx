@@ -194,10 +194,27 @@ def test_a_backoff_study_draws_against_drain_efficiency(server, browser):
     page.wait_for_function("document.querySelector('#pt-grid').textContent.includes('4/4')", timeout=60000)
     assert not errors, errors
     assert page.input_value("#sweep-x") == "eta"
-    assert "平均漏极效率" in page.text_content("#plot-grid") and page.evaluate("document.querySelectorAll('#plot-grid svg circle').length") >= 4
-    assert "平均漏极效率" in page.text_content("#cards")
+    assert "阵列漏极效率" in page.text_content("#plot-grid") and page.evaluate("document.querySelectorAll('#plot-grid svg circle').length") >= 4
+    assert "阵列漏极效率" in page.text_content("#cards")
     page.select_option("#sweep-x", "value")
     assert "element.pa.backoff_db" in page.text_content("#plot-grid")
+    ctx.close()
+
+
+def test_the_efficiency_axis_falls_back_when_every_point_has_the_same_efficiency(server, browser):
+    """The EVM equaliser does not touch the codes: both points have the same
+    efficiency, so there is nothing to spread along x.  The study keeps its
+    cell grid (two cells) instead of a zero-width line chart."""
+    ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = ctx.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(server + "?smoke=1&theta=30&sweepx=eta&sweep=metrics.evm_equalize,scalar,per_tone")
+    page.wait_for_function("[...document.querySelectorAll('#table tbody tr')].filter(tr => tr.textContent.includes('evm_equalize=per_tone')).length >= 1", timeout=300000)
+    page.wait_for_function("document.querySelector('#pt-grid').textContent.includes('2/2')", timeout=60000)
+    assert not errors, errors
+    assert page.evaluate("document.querySelectorAll('#plot-grid svg rect').length") >= 2
+    assert "NaN" not in page.inner_html("#plot-grid")
     ctx.close()
 
 

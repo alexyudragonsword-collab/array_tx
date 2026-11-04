@@ -74,7 +74,9 @@ def test_rho_zero_and_isolated_mode():
     y1, y2 = np.exp(1j * THETA), np.exp(-1j * THETA)
     for mode in ("chireix", "isolated"):
         ref = OutphasingCombiner(mode=mode).combine(y1, y2)
-        assert np.array_equal(SourceImpedanceCombiner(mode=mode).combine(y1, y2), ref)
+        assert np.array_equal(SourceImpedanceCombiner(mode=mode, source_impedance_rel=0.0).combine(y1, y2), ref)
+    with pytest.raises(TypeError):
+        SourceImpedanceCombiner(mode="chireix")                              # no default of its own (AGENTS rule 1)
     iso = SourceImpedanceCombiner(mode="isolated", source_impedance_rel=0.1)
     assert np.allclose(iso.combine(y1, y2), OutphasingCombiner(mode="isolated").combine(y1, y2))   # B = 0: no distortion
 
@@ -100,3 +102,17 @@ def test_load_pull_reaches_outphasing_only_through_rho():
     assert on.load_pull_active
     r = on.run(30.0, "none", conducted_diagnostics=False)
     assert r.info["load_pull"]["iterations"] == 2 and r.element_results[0].info["element"]["load_pull_effective"] is True
+
+
+def test_the_combiner_is_the_presets_own_with_rho_added_and_reports_its_own_load_gain():
+    cfg = {**OUT, "element": {"topology": "outphasing", "outphasing": {"source_impedance_rel": 0.05},
+                              "pa": {"load_pull": {"enabled": True}}}}
+    sim = ArraySim(config_from_dict(cfg))
+    c = sim.elements[0].tx.combiner
+    ref = ArraySim(config_from_dict(OUT)).elements[0].tx.combiner
+    assert isinstance(c, SourceImpedanceCombiner) and type(ref) is OutphasingCombiner
+    assert (c.mode, c.chireix_theta_c_deg, c.combiner_loss_db) == (ref.mode, ref.chireix_theta_c_deg, ref.combiner_loss_db)
+    lp = sim.run(60.0, "none", conducted_diagnostics=False).info["load_pull"]
+    # what acts is |F(Gamma)| ~ 1 +- rho |Gamma|, not the polar DPA's |1 + Gamma|
+    assert all(abs(g - 1.0) < 0.05 * 0.6 for g in lp["load_gain_mean"])
+    assert max(abs(m - 1.0) for m in lp["abs_1pg_mean"]) > 3 * max(abs(g - 1.0) for g in lp["load_gain_mean"])

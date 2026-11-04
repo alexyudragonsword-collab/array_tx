@@ -12,8 +12,9 @@ from arraytx.guiutil import config_sha, pins, run_report, scan_report, yaml_text
 
 def test_report_carries_the_efficiency_number_from_the_sim():
     rep = run_report(load_config("configs/fr2_4el_survey.yaml"), 0.0, "none", n_symbols=2, with_plots=False)
-    assert 20.0 < rep["info"]["eta_avg_pct"] < 80.0 and rep["info"]["backoff_db"] == 0.0
-    assert "eta_avg_pct" in spec()["metrics"] and spec()["metrics"]["eta_avg_pct"]["domain"] == "info"
+    assert 20.0 < rep["info"]["eta_array_pct"] < 80.0 and rep["info"]["backoff_db"] == 0.0
+    assert "eta_array_pct" in spec()["metrics"] and spec()["metrics"]["eta_array_pct"]["domain"] == "info"
+    assert rep["info"]["eta_array_matched_pct"] == rep["info"]["eta_array_pct"]          # no load pull: one number
 
 
 def test_run_report_equals_the_arraysim_result_item_for_item(fr2_sim):

@@ -73,7 +73,10 @@ def _run_all(elements: list[ElementChain], drives: list[np.ndarray], wf: Wavefor
 def train(cfg: ArrayConfig, scheme: str, *, elements: list[ElementChain], x: np.ndarray,
           wf: Waveform, geom: ArrayGeometry, coupling: CouplingMatrix, theta0_deg: float,
           radiate=None) -> DPDBank:
-    """Train the scheme's predistorter(s) for the beam at theta0.
+    """Train the scheme's predistorter(s) for the beam at theta0, or jointly
+    over ``dpd.train_angles_deg`` when that is set (one path: a single angle
+    is the joint fit over one pair, the same least-squares problem as
+    ``ILAPredistorter.fit``, bit for bit -- tests/test_loadpull.py).
 
     ``radiate(drives) -> (results, ys, rs)`` is the simulator's own path
     (``ArraySim.radiate``); with load modulation on it iterates the PAs'
@@ -92,42 +95,10 @@ def train(cfg: ArrayConfig, scheme: str, *, elements: list[ElementChain], x: np.
     bank = DPDBank(scheme)
     if scheme == "none":
         return bank
-    if cfg.dpd.train_angles_deg:
-        return _train_joint(cfg, scheme, elements=elements, x=x, wf=wf, geom=geom, coupling=coupling,
-                            angles=cfg.dpd.train_angles_deg, _radiate=_radiate)
-    drives = steer(x, geom, theta0_deg, fs, cfg.beam.steering)
-
-    if scheme == "per_element":
-        observe = cfg.dpd.per_element_observe
-        ys_fixed = None
-        if observe == "antenna_port":
-            # the neighbours' drives do not change while element k trains:
-            # run them once and substitute row k inside the loop (O(n), not O(n^2))
-            ys_fixed = _radiate(drives)[1]
-        for k, el in enumerate(elements):
-            if observe == "pa_output":
-                pa: Callable[[np.ndarray], np.ndarray] = lambda u, el=el: el.run(u, wf, noise=noise).y
-            else:   # antenna_port: own PA plus the leakage from the neighbours' steered drives
-                def pa(u, k=k, el=el):
-                    ys = ys_fixed.copy()
-                    ys[k] = el.run(u, wf, noise=noise).y
-                    return apply_coupling(ys, coupling, fs, f0)[k]
-            ila = make_ila(cfg)
-            ila.fit(pa, drives[k])
-            bank.per_element.append(ila)
-        bank.info = {"observe": observe, "target_gain": [complex(d.target_gain) for d in bank.per_element]}
-        return bank
-
-    # array: one DPD, trained on the far field at the beam
-    def pa_array(u):
-        ds = steer(u, geom, theta0_deg, fs, cfg.beam.steering)
-        rs = _radiate(ds)[2]
-        return far_field(rs, geom, theta0_deg, fs)
-    ila = make_ila(cfg)
-    ila.fit(pa_array, x)
-    bank.array = ila
-    bank.info = {"observe": f"far field {theta0_deg:+.1f} deg", "target_gain": complex(ila.target_gain)}
-    return bank
+    joint = bool(cfg.dpd.train_angles_deg)
+    angles = list(cfg.dpd.train_angles_deg) if joint else [theta0_deg]
+    return _train_joint(cfg, scheme, elements=elements, x=x, wf=wf, geom=geom, coupling=coupling,
+                        angles=angles, joint=joint, _radiate=_radiate)
 
 
 def _joint_ila(cfg: ArrayConfig, pas: list[Callable[[np.ndarray], np.ndarray]], xs: list[np.ndarray]) -> ILAPredistorter:
@@ -151,27 +122,38 @@ def _joint_ila(cfg: ArrayConfig, pas: list[Callable[[np.ndarray], np.ndarray]], 
         model.coeffs = lstsq_fit(phi, np.concatenate(us), **ila.fit_kwargs)
         ila.dpd_model = model
         if it < ila.n_iterations - 1:
-            us = [model(x) for x in xs]
+            # the array scheme hands the SAME x for every angle: evaluate it once
+            done: dict[int, np.ndarray] = {}
+            for xi in xs:
+                if id(xi) not in done:
+                    done[id(xi)] = model(xi)
+            us = [done[id(xi)] for xi in xs]
     ila.target_gain = gains[0]
     return ila
 
 
-def _train_joint(cfg: ArrayConfig, scheme: str, *, elements, x, wf, geom, coupling, angles, _radiate) -> DPDBank:
-    """One predistorter (per element, or for the array) fitted jointly over
-    ``angles``.  With load modulation each angle has its own operating point:
-    the loads the undistorted steered drives put on the PAs at that angle
-    are captured once and set again before every PA call made for it."""
+def _train_joint(cfg: ArrayConfig, scheme: str, *, elements, x, wf, geom, coupling, angles, joint, _radiate) -> DPDBank:
+    """One predistorter (per element, or for the array) fitted over ``angles``
+    (one angle: the beam).  The per-element PAs need an operating point per
+    angle when load modulation is on, and the antenna-port observation needs
+    the neighbours' outputs: for those, the undistorted steered drives are
+    radiated once per angle and the loads it leaves are set again before
+    every PA call made for that angle.  The array scheme radiates inside
+    every ILA pass and needs neither."""
     noise = cfg.sim.noise
     fs, f0 = wf.fs, geom.f0_hz
     bank = DPDBank(scheme)
     angles = [float(a) for a in angles]
     drives = {th: steer(x, geom, th, fs, cfg.beam.steering) for th in angles}
-    loads, ys_fixed = {}, {}
-    for th in angles:
-        ys_fixed[th] = _radiate(drives[th])[1]
-        loads[th] = [el.load for el in elements]
+    tag = {"train_angles_deg": angles} if joint else {}
     if scheme == "per_element":
         observe = cfg.dpd.per_element_observe
+        need = observe == "antenna_port" or any(getattr(el, "load_pull_effective", False) for el in elements)
+        loads, ys_fixed = {}, {}
+        for th in angles:
+            if need:
+                ys_fixed[th] = _radiate(drives[th])[1]
+            loads[th] = [el.load for el in elements]
         for k, el in enumerate(elements):
             def make_pa(th, k=k, el=el):
                 def pa(u):
@@ -179,13 +161,12 @@ def _train_joint(cfg: ArrayConfig, scheme: str, *, elements, x, wf, geom, coupli
                     y = el.run(u, wf, noise=noise).y
                     if observe == "pa_output":
                         return y
-                    ys = ys_fixed[th].copy()
+                    ys = ys_fixed[th].copy()      # neighbours fixed while element k trains: O(n), not O(n^2)
                     ys[k] = y
                     return apply_coupling(ys, coupling, fs, f0)[k]
                 return pa
             bank.per_element.append(_joint_ila(cfg, [make_pa(th) for th in angles], [drives[th][k] for th in angles]))
-        bank.info = {"observe": observe, "train_angles_deg": angles,
-                     "target_gain": [complex(d.target_gain) for d in bank.per_element]}
+        bank.info = {"observe": observe, **tag, "target_gain": [complex(d.target_gain) for d in bank.per_element]}
         return bank
 
     def make_pa_array(th):
@@ -194,8 +175,8 @@ def _train_joint(cfg: ArrayConfig, scheme: str, *, elements, x, wf, geom, coupli
             return far_field(rs, geom, th, fs)
         return pa
     bank.array = _joint_ila(cfg, [make_pa_array(th) for th in angles], [x for _ in angles])
-    bank.info = {"observe": "far field, jointly at " + ", ".join(f"{a:+.1f}" for a in angles) + " deg",
-                 "train_angles_deg": angles, "target_gain": complex(bank.array.target_gain)}
+    observe = ("far field, jointly at " + ", ".join(f"{a:+.1f}" for a in angles) + " deg") if joint else f"far field {angles[0]:+.1f} deg"
+    bank.info = {"observe": observe, **tag, "target_gain": complex(bank.array.target_gain)}
     return bank
 
 

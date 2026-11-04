@@ -152,7 +152,7 @@ METRICS: dict[str, dict[str, Any]] = {
     "evm_per_tone_db": {"zh": "EVM（per-tone 均衡）", "en": "EVM (per-tone EQ)", "unit": "dB", "better": "lower", "domain": "ota", "digits": 2},
     "squint_deg": {"zh": "带边斜视", "en": "band-edge squint", "unit": "°", "better": None, "domain": "info", "digits": 2},
     "beamwidth_deg": {"zh": "3 dB 波束宽", "en": "3 dB beamwidth", "unit": "°", "better": None, "domain": "info", "digits": 2},
-    "eta_avg_pct": {"zh": "平均漏极效率", "en": "average drain efficiency", "unit": "%", "better": "higher", "domain": "info", "digits": 1,
+    "eta_array_pct": {"zh": "阵列漏极效率（含 Γ）", "en": "array drain efficiency (Gamma in)", "unit": "%", "better": "higher", "domain": "info", "digits": 1,
                     "note_zh": "阵列：辐射功率 / 直流功率；端口净功率 |a|²(1−|Γ|²)，开关损耗按码（polar_tx 的 SCPA 律）", "note_en": "array: radiated / DC power; net port power |a|^2 (1-|Gamma|^2), switching loss set by the code (polar_tx's SCPA law)"},
     "conducted_evm_db": {"zh": "导通 EVM", "en": "conducted EVM", "unit": "dB", "better": "lower", "domain": "diagnostic", "digits": 2},
     "conducted_aclr1_dbc": {"zh": "导通 ACLR1", "en": "conducted ACLR1", "unit": "dBc", "better": "lower", "domain": "diagnostic", "digits": 1},

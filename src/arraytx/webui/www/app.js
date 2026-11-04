@@ -307,7 +307,7 @@ function renderCards() {
     ["sem_margin_db", beam.sem_margin_db, bb && bb.sem_margin_db, (beam.sem_passes ? `<span class='ok'>${t("pass")}</span>` : `<span class='fail'>${t("fail")}</span>`) + " · " + M().sem_margin_db["note_" + LANG]],
     ["evm_per_tone_db", beam.evm_per_tone_db, bb && bb.evm_per_tone_db, t("pertone_note")],
     ["squint_deg", rep.info.squint_deg, null, `${t("bw3")} ${f(rep.info.beamwidth_deg, 2)}° · ${t(rep.steering)}`],
-    ["eta_avg_pct", rep.info.eta_avg_pct, bb && b.rep.info.eta_avg_pct, `${t("backoff")} ${f(rep.info.backoff_db, 1)} dB · ${t("matched")} ${f(rep.info.eta_matched_pct, 1)} % · ${M().eta_avg_pct["note_" + LANG]}`]];
+    ["eta_array_pct", rep.info.eta_array_pct, bb && b.rep.info.eta_array_pct, `${t("backoff")} ${f(rep.info.backoff_db, 1)} dB · ${t("matched")} ${f(rep.info.eta_array_matched_pct, 1)} % · ${M().eta_array_pct["note_" + LANG]}`]];
   items.forEach(([id, v, bv, sub]) => { const m = M()[id]; const c = document.createElement("div"); c.className = "card";
     c.innerHTML = `<div class="t"><span>${m[LANG]}${id === "squint_deg" ? " (+BW/2)" : ""}</span><span class="dom ${m.domain}">${m.domain === "ota" ? "OTA" : t("info")}</span></div>` +
       `<div class="v">${f(v, m.digits)}<small>${m.unit}</small></div><div class="d">${deltaHtml(id, v, bv) || `<span class="muted">${sub}</span>`}</div>` + (deltaHtml(id, v, bv) && sub ? `<div class="d muted">${sub}</div>` : "");
@@ -362,16 +362,19 @@ function renderSweep(r, box) {
   const b = get(S.baseline), bv = b && b.rep.ota.beam[mid];
   // x = the swept value, or (sweep-x = eta) each point's average drain efficiency, the points of a
   // group joined in study order: the efficiency-vs-ACLR trade of a backoff / CFR study (ex10)
-  const byEta = $("sweep-x").value === "eta" && same.every(x => typeof x.rep.info.eta_avg_pct === "number" && isFinite(x.rep.info.eta_avg_pct));
+  // (reports kept from before the key existed have no eta_array_pct; a study where every point has the
+  // same efficiency -- LO spurs, the EVM equaliser -- has nothing to spread along x: both fall back)
+  const etas = same.map(x => x.rep.info.eta_array_pct);
+  const byEta = $("sweep-x").value === "eta" && etas.every(v => typeof v === "number" && isFinite(v)) && Math.max(...etas) - Math.min(...etas) > 1e-6;
   if ((numeric || byEta) && allVals.length > 1) {
     const span = numeric ? Math.max(...allVals) / Math.max(1e-9, Math.min(...allVals.filter(v => v > 0))) : 1;
     const useLog = !byEta && Math.min(...allVals) > 0 && span >= 8;
-    const X = x => (byEta ? x.rep.info.eta_avg_pct : (useLog ? Math.log2(x.rep.sweep.value) : x.rep.sweep.value));
+    const X = x => (byEta ? x.rep.info.eta_array_pct : (useLog ? Math.log2(x.rep.sweep.value) : x.rep.sweep.value));
     const series = groups.map((g, gi) => { const rows = of(g); return { x: rows.map(X), y: rows.map(x => x.rep.ota.beam[mid]),
       color: g === null ? COLORS[r.rep.scheme] : PALETTE[gi % PALETTE.length], marker: true, label: g === null ? LABELS[r.rep.scheme] : `${gpath.split(".").pop()}=${g}`, rows }; });
     const xs = series.flatMap(q => q.x);
     if (bv !== undefined && bv !== null) series.push({ x: [Math.min(...xs), Math.max(...xs)], y: [bv, bv], color: "#8a8a85", dash: "5 3", label: t("baseline") });
-    Charts.lines(box, { series, xlab: byEta ? `${M().eta_avg_pct[LANG]} [%] · ${t("eta_x_note")}` : (useLog ? `${path} (log2)` : path), ylab: `${m[LANG]} [${m.unit}] · ${m.better === "lower" ? t("low_good") : t("high_good")}`, legend: true,
+    Charts.lines(box, { series, xlab: byEta ? `${M().eta_array_pct[LANG]} [%] · ${t("eta_x_note")}` : (useLog ? `${path} (log2)` : path), ylab: `${m[LANG]} [${m.unit}] · ${m.better === "lower" ? t("low_good") : t("high_good")}`, legend: true,
       tooltip: i => series.filter(q => q.rows).map(q => `${q.label}: ${q.y[i] === undefined ? "—" : Charts.fmt(q.y[i]) + " " + m.unit}` + (byEta && q.rows[i] ? ` @ ${q.x[i].toFixed(1)} %` : "")).join("\n") + `\n${path} = ${series[0].rows[i] ? series[0].rows[i].rep.sweep.value : ""}` });
     box.querySelector("svg").addEventListener("click", ev => { const rc = box.querySelector("svg").getBoundingClientRect(); const fx = (ev.clientX - rc.left) / rc.width;
       const first = series[0]; let best = 0, bd = 2; first.x.forEach((x, i) => { const px = 42 / 560 + (x - Math.min(...xs)) / (Math.max(...xs) - Math.min(...xs) || 1) * (1 - 52 / 560); const d = Math.abs(px - fx); if (d < bd) { bd = d; best = i; } });

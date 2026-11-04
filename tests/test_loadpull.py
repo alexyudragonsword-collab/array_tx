@@ -171,3 +171,13 @@ def test_loaded_efficiency_is_polar_tx_number_without_load_and_drops_with_it():
     on = ArraySim(config_from_dict(ON)).run(60.0, "none", conducted_diagnostics=False).info["efficiency"]
     assert on["eta_array_loaded"] < on["eta_array_matched"] - 0.01          # |Gamma|^2 ~ 0.08 at 60 deg on 4 x 1
     assert on["eta_avg_mean"] == pytest.approx(e["eta_avg_mean"])           # no DPD: same codes, same matched law
+
+
+
+def test_joint_bank_cache_follows_the_dpd_config():
+    sim = ArraySim(config_from_dict({"dpd": {"train_angles_deg": [0.0, 60.0]}}))
+    a = sim.run(30.0, "array", conducted_diagnostics=False).dpd
+    sim.cfg.dpd.train_angles_deg = [0.0, 30.0, 60.0]
+    b = sim.run(30.0, "array", conducted_diagnostics=False).dpd
+    assert b is not a and b.info["train_angles_deg"] == [0.0, 30.0, 60.0]
+    assert sim.run(0.0, "array", conducted_diagnostics=False).dpd is b
