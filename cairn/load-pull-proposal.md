@@ -5,7 +5,7 @@ summary: ROADMAP A2 的模型（已实现，2026-11-03）——电压模 DPA 的
 tags: [load-pull, coupling, dpd, proposal]
 contains: [decision, prediction]
 created: 2026-11-03
-updated: 2026-11-03
+updated: 2026-11-04
 related: [architecture-invariants.md, coupling-model.md, ROADMAP.md]
 authoring_mode: ai_generated
 ---
@@ -79,3 +79,12 @@ ex02：互耦 0 → −10 dB 三方案只动 0.02–0.08 dB）。要让互耦进
 - **把 CFR 加深可以换回效率**：CFR 6.5 dB + 回退 2 dB 给 −48.46 dBc、η 47.5 %，代价是 EVM 掉 3 dB（−25.29 dB，仍在 64-QAM 8 % 限值内）。
   这是 EVM 余量换 ACLR 余量的取舍，模型给不出唯一答案。
 - 坑：`info["efficiency"]` 不含 Γ。|1+Γ| = 1.3 时实际电流和效率会变，这里的效率差只算了回退本身的代价。
+
+## 更正（2026-11-04，ex13）：|Γ| 护栏在 8 × 8 上不是护栏
+
+- 上面"数值护栏"一条把 |Γ_k| 截到 0.5，理由是泄漏增益 0.82。泄漏增益约束的是向量范数，不是逐样本的比值。
+  实测 8 × 8 广播向平均 40.0 % 的样本被截断，最严重的单元 98.9 %；4 × 1 全尺寸 0.00 %。
+- 默认值改为 1.0（全反射）。`info["load_pull"]["clip_fraction"]` 报截断比例，0.8 与 1.0 下 8 × 8 已经不再截断，结果相同。
+- 对结论的影响（8 × 8，4 符号，0.5 → 1.0）：每单元 DPD ACLR1 0° −52.14 → −52.21、60° −36.13 → −36.02 dBc；
+  阵列 − 每单元 +0.17 / −0.01 / −0.10 → +0.13 / −0.02 / −0.20 dB；0° 训练用到 60° 的损失 2.76 / 2.84 → 2.72 / 2.89 dB。
+  预期 2c 的"推翻"不变，只是效率数字动了（见 `loaded-efficiency-proposal.md` 的更正）。4 × 1 的全部数字逐位不变。

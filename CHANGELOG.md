@@ -4,6 +4,12 @@
 
 ## 未发布 / Unreleased
 
+### |Γ| 护栏敏感度（ex13）：`gamma_max` 默认 0.5 → 1.0（2026-11-04）
+
+- `info["load_pull"]["clip_fraction"]`：每单元 |Γ| 碰到 `gamma_max` 的样本比例。
+- 默认 `element.pa.load_pull.gamma_max` 改为 1.0：0.5 在 8 × 8 广播向截掉 40 % 的样本，把阵列效率高估 1.1 个点、内部单元 2.2 个点；ACLR 与 DPD 结论变化 ≤ 0.3 dB。
+- ex13 与 ex10 重跑；4 × 1 与指纹逐位不变。
+
 ### 代码评审一轮：页面效率轴回退、报告键改名、联合 bank 缓存键、训练合并为一条路径（2026-11-04）
 
 - 报告 `info.eta_avg_pct` / `eta_matched_pct` 改名为 `eta_array_pct` / `eta_array_matched_pct`（含义上一版已变，旧名会让存下的基线错比）。

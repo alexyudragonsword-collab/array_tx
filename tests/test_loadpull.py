@@ -72,6 +72,7 @@ def test_load_pull_moves_the_knee_and_converges_in_two_rounds():
     off = ArraySim(load_config("configs/fr2_4el_survey.yaml")).run(30.0, "none")
     lp = r.info["load_pull"]
     assert lp["iterations"] == 2 and lp["deltas"][1] < 0.1 * lp["deltas"][0] < 0.1         # contraction
+    assert max(lp["clip_fraction"]) == 0.0                                 # the |Gamma| guard does not act on 4 x 1 (ex13)
     assert all(0.5 <= m <= 1.5 for m in lp["abs_1pg_mean"]) and all(s < 0.05 for s in lp["abs_1pg_std"])
     # adjacent coupling at 180 deg opposes the forward wave: less swing, a later knee, better conducted ACLR
     assert abs(r.conducted[1].aclr1_db - off.conducted[1].aclr1_db) > 0.3

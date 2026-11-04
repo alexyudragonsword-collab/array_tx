@@ -145,7 +145,10 @@ class ArraySim:
         self.last_load_pull = {"iterations": int(lp.iterations), "deltas": deltas,
                                "abs_1pg_mean": ga.mean(axis=1).tolist(), "abs_1pg_std": ga.std(axis=1).tolist(),
                                "load_gain_mean": lg.mean(axis=1).tolist(), "load_gain_std": lg.std(axis=1).tolist(),
-                               "abs_gamma_max": np.abs(gamma).max(axis=1).tolist()}
+                               "abs_gamma_max": np.abs(gamma).max(axis=1).tolist(),
+                               # how often the |Gamma| guard acted (a guard, not physics: if this is not
+                               # ~0 the numbers depend on gamma_max -- cairn/load-pull-proposal.md)
+                               "clip_fraction": (np.abs(gamma) >= lp.gamma_max * (1 - 1e-12)).mean(axis=1).tolist()}
         return res, ys, rs
 
     def far_field(self, rs: np.ndarray, theta_deg: float) -> np.ndarray:

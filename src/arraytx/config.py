@@ -83,7 +83,7 @@ class LoadPullCfg:
     kappa_amam: float = _f(1.0, "", "how much of Gamma reaches the AM-AM knee (1 = ideal voltage source)", source="assumed", ref=LOADPULL_REF)
     kappa_ampm: float = _f(1.0, "", "how much of Gamma reaches the AM-PM (1 = read at the total swing)", source="assumed", ref=LOADPULL_REF)
     iterations: int = _f(2, "", "fixed-point rounds Gamma -> PA -> Gamma per radiate (|S| <= -16 dB converges in 2)")
-    gamma_max: float = _f(0.5, "", "clip on |Gamma_k| (a passive matrix keeps it below the leakage gain; the clip is a guard, not physics)")
+    gamma_max: float = _f(1.0, "", "clip on |Gamma_k| per sample: total reflection, a guard against envelope dips, not physics. 0.5 (the first default) acted on 40 % of the 8 x 8 broadside samples and moved its efficiency by 1-2 points (ex13); info['load_pull']['clip_fraction'] says how often it acts")
     floor: float = _f(0.05, "", "Gamma_k = 0 where |y_k| < floor x full scale (the ratio means nothing near an envelope zero)")
 
 
