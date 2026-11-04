@@ -5,7 +5,7 @@ summary: GUI 的分层与决定——一份页面三个宿主（桌面应用窗�
 tags: [gui, web, android, playwright]
 contains: [decision, lesson, pitfall]
 created: 2026-11-03
-updated: 2026-11-03
+updated: 2026-11-04
 related: [architecture-invariants.md]
 authoring_mode: ai_generated
 ---
@@ -38,7 +38,7 @@ authoring_mode: ai_generated
 
 ## 性能
 
-报告里"ACLR 随方向"用单元信号的 Welch 分段按方向合成（`direction_scan`），每份报告的绘图数据全尺寸 10.9 s → 0.8 s，与精确路径 ACLR 差 < 1e-4 dB。
+报告里"ACLR 随方向"用单元信号的 Welch 分段按方向合成（`direction_scan`），每份报告的绘图数据全尺寸约快 8 倍（首测 10.9 → 0.8 s；2026-11-04 复核 8.8 → 1.1 s，耗时随机器负载变），与精确路径 ACLR 差 < 1e-4 dB（复核 2.6e-6）。
 
 ## Android
 

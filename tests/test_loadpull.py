@@ -182,3 +182,20 @@ def test_joint_bank_cache_follows_the_dpd_config():
     b = sim.run(30.0, "array", conducted_diagnostics=False).dpd
     assert b is not a and b.info["train_angles_deg"] == [0.0, 30.0, 60.0]
     assert sim.run(0.0, "array", conducted_diagnostics=False).dpd is b
+
+
+def test_blend_banks_is_linear_in_the_coefficients_and_refuses_mismatches():
+    from arraytx.dpd import blend_banks
+    sim = ArraySim(config_from_dict(ON))
+    a, b = sim.run(0.0, "per_element", conducted_diagnostics=False).dpd, sim.run(60.0, "per_element", conducted_diagnostics=False).dpd
+    assert all(np.array_equal(x.dpd_model.coeffs, y.dpd_model.coeffs) for x, y in zip(blend_banks(a, b, 0.0).per_element, a.per_element))
+    assert all(np.array_equal(x.dpd_model.coeffs, y.dpd_model.coeffs) for x, y in zip(blend_banks(a, b, 1.0).per_element, b.per_element))
+    mid = blend_banks(a, b, 0.25)
+    for m, x, y in zip(mid.per_element, a.per_element, b.per_element):
+        assert np.allclose(m.dpd_model.coeffs, 0.75 * x.dpd_model.coeffs + 0.25 * y.dpd_model.coeffs)
+    assert a.per_element[0].dpd_model.coeffs is not mid.per_element[0].dpd_model.coeffs      # a copy, a untouched
+    arr = sim.run(0.0, "array", conducted_diagnostics=False).dpd
+    with pytest.raises(ValueError):
+        blend_banks(a, arr, 0.5)
+    with pytest.raises(ValueError):
+        blend_banks(a, b, 1.5)

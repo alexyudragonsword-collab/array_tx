@@ -5,7 +5,7 @@ summary: 互耦模型的当前真值——三来源一条路径、邻域类与�
 tags: [coupling, touchstone, dpd, passivity]
 contains: [decision, lesson, pitfall]
 created: 2026-11-03
-updated: 2026-11-03
+updated: 2026-11-04
 related: [architecture-invariants.md, load-pull-proposal.md]
 authoring_mode: ai_generated
 ---
@@ -26,7 +26,7 @@ authoring_mode: ai_generated
 ## 为什么线性泄漏分不开每单元 DPD 与阵列 DPD（里程碑 1 被推翻的预期）
 
 DPA 的 AM-AM / AM-PM 只看幅度码，对输入相位旋转协变；单波束下各单元驱动只差复权重 w_k，所以 y_j = w_j·NL(x)，泄漏 Σ S_kj y_j 是各单元非线性的
-线性组合。每单元 DPD 把 y_k 线性化成 G w_k x 后，辐射信号是线性信号的线性组合，波束方向的 ACLR 与互耦无关（ex02：0 → −10 dB 只动 0.02–0.08 dB）。
+线性组合。每单元 DPD 把 y_k 线性化成 G w_k x 后，辐射信号是线性信号的线性组合，波束方向的 ACLR 与互耦无关（ex02：0 → −10 dB 只动 0.03–0.06 dB）。
 阵列 DPD 只在旁瓣方向比每单元差约 1 dB（a_k(θ) 变了，PA 偏差的残余往旁瓣走）。要让互耦进非线性必须让耦合波改 PA 的工作点：`load-pull-proposal.md`。
 
 ## 坑
@@ -38,3 +38,5 @@ DPA 的 AM-AM / AM-PM 只看幅度码，对输入相位旋转协变；单波束�
 - **方向扫描的 ACLR**：页面用单元信号的 Welch 分段按方向合成（`guiutil.direction_scan`），与逐方向合成远场的精确路径（ex04）ACLR 差 < 1e-4 dB、
   方向图差 ≤ 0.01 dB；分段应用的延时是 ~0.01 样本的边缘效应。
 - **零点里的 ACLR**：方向图零点主载波被抵消、邻道失真没有，ACLR 可到 −14…−20 dBc；真实但没人往那儿发，ex04 / 页面只在 ≥ −15 dB 的方向上报。
+
+> 复核（2026-11-04，ex01 / ex02 / ex04 全尺寸重跑）：ex02 的变化量原写 0.02–0.08 dB（里程碑 1，远邻相位按电长度之前），现为 0.03–0.06 dB；泄漏增益 1.129 / 0.822、页面方向扫描与精确路径 ACLR 差 2.6e-6 dB、方向图差 0.006 dB 均复现。

@@ -18,12 +18,10 @@ Evaluated at 0 / 15 / 30 / 45 / 60 deg, so 15 and 45 are angles no strategy
 trained on.  4 x 1 full burst, then 8 x 8 at the grid angles.  Load pull on,
 element errors on; OTA ACLR1 at the beam.
 """
-import copy
-
 
 from _common import SCHEME_COLORS, SCHEME_LABELS, banner, done, plt, smoke
 from arraytx import ArraySim, load_config
-from arraytx.dpd import predistort_drives
+from arraytx.dpd import blend_banks, predistort_drives
 from arraytx.metrics import ota_metrics
 from arraytx.report import table
 
@@ -48,15 +46,6 @@ def apply(sim, bank, theta):
     return ota_metrics(sim.far_field(rs, theta), sim.wf, theta, "beam", offsets=(1,), with_sem=False)
 
 
-def blend(bank_a, bank_b, w):
-    """A bank whose GMP coefficients are (1 - w) a + w b (same structure)."""
-    out = copy.deepcopy(bank_a)
-    pairs = zip(out.per_element, bank_b.per_element) if out.scheme == "per_element" else [(out.array, bank_b.array)]
-    for d, e in pairs:
-        d.dpd_model.coeffs = (1.0 - w) * d.dpd_model.coeffs + w * e.dpd_model.coeffs
-    return out
-
-
 def table_bank(banks, theta, mode):
     lo = max(g for g in GRID if g <= theta)
     hi = min(g for g in GRID if g >= theta)
@@ -64,7 +53,7 @@ def table_bank(banks, theta, mode):
         return banks[lo]
     if mode == "nearest":
         return banks[hi]
-    return blend(banks[lo], banks[hi], (theta - lo) / (hi - lo))
+    return blend_banks(banks[lo], banks[hi], (theta - lo) / (hi - lo))
 
 
 def study(cfg_path, evals, n_symbols=None):

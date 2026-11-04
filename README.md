@@ -86,14 +86,14 @@ print(r.info["engine_line"]); print(r.beam.row()); print(r.sidelobe.row())
 | `ex03_scan_angle_x_dpd` | 0 / 30 / 60° × 三方案，波束与旁瓣方向；带边斜视 vs 解析；导通诊断 |
 | `ex04_aclr_vs_direction` | ACLR 随方向：非线性互调往哪辐射（方向图零点已标出） |
 | `ex05_lo_profiles` | 共用 LO 换成 pll_simulator 导出的 18 个时钟剖面之一（随包提供，`bundled:<preset>`），EVM / ACLR 随 LO |
-| `ex13_gamma_guard_sensitivity` | 负载牵引的 |Γ| 护栏会不会决定结论：截断比例，8 × 8 关键点在 gamma_max 0.5 / 0.8 / 1.0 下的 ACLR、效率与扫描角失配 |
-| `ex12_outphasing_source_impedance` | outphasing 分支源阻抗 ρ × Chireix 电纳：单链 AM-AM 与 DPD 追回量；阵列负载只是复增益（戴维南），两种 DPD 与扫描角失配都不受影响 |
-| `ex11_multi_angle_dpd` | 负载调制下一个 DPD 怎么服务多个扫描角：重训 / 0° 训练 / 多角度联合拟合 / 30° 网格查表（取近邻、系数插值），在没训练过的 15°、45° 上比 |
-| `ex10_grid_load_pull_backoff` | 8 × 8 上负载调制下的三方案与扫描角失配；60° 用输出回退 / CFR 深度追回 ACLR，按含 Γ 的阵列漏极效率标代价；8 × 8 每单元效率热图 |
-| `ex09_load_pull` | 负载调制：|1+Γ_k| 随扫描角与位置，三方案在训练角度上的差，0° 训练的 DPD 用到 60° 的损失，单元偏差带来的残余 |
-| `ex08_planar_array` | 8 × 8 面阵 vs 同单元数的 64 × 1 行阵：两个主平面与对角切面的波束宽、斜视代价、旁瓣，阵列 DPD 后失真往哪辐射，二维互耦矩阵 |
-| `ex07_lo_spurs` | 时钟剖面的离散杂散（参考 / 小数杂散）按载频换算后注入共用 LO：9 个带杂散剖面的 EVM / ACLR 关 / 开，小角度估计 vs 实测 |
 | `ex06_element_count_squint` | 单元数 4…128 × 0/30/60° × 相移 / 真延时：斜视从指向效应变成波束 EVM 的 n（闭式预测 vs 实测，per-tone 均衡抹平） |
+| `ex07_lo_spurs` | 时钟剖面的离散杂散（参考 / 小数杂散）按载频换算后注入共用 LO：9 个带杂散剖面的 EVM / ACLR 关 / 开，小角度估计 vs 实测 |
+| `ex08_planar_array` | 8 × 8 面阵 vs 同单元数的 64 × 1 行阵：两个主平面与对角切面的波束宽、斜视代价、旁瓣，阵列 DPD 后失真往哪辐射，二维互耦矩阵 |
+| `ex09_load_pull` | 负载调制：|1+Γ_k| 随扫描角与位置，三方案在训练角度上的差，0° 训练的 DPD 用到 60° 的损失，单元偏差带来的残余 |
+| `ex10_grid_load_pull_backoff` | 8 × 8 上负载调制下的三方案与扫描角失配；60° 用输出回退 / CFR 深度追回 ACLR，按含 Γ 的阵列漏极效率标代价；8 × 8 每单元效率热图 |
+| `ex11_multi_angle_dpd` | 负载调制下一个 DPD 怎么服务多个扫描角：重训 / 0° 训练 / 多角度联合拟合 / 30° 网格查表（取近邻、系数插值），在没训练过的 15°、45° 上比 |
+| `ex12_outphasing_source_impedance` | outphasing 分支源阻抗 ρ × Chireix 电纳：单链 AM-AM 与 DPD 追回量；阵列负载只是复增益（戴维南），两种 DPD 与扫描角失配都不受影响 |
+| `ex13_gamma_guard_sensitivity` | 负载牵引的 |Γ| 护栏会不会决定结论：截断比例，8 × 8 关键点在 gamma_max 0.5 / 0.8 / 1.0 下的 ACLR、效率与扫描角失配 |
 
 ## 模块
 

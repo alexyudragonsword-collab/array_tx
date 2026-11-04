@@ -180,6 +180,25 @@ def _train_joint(cfg: ArrayConfig, scheme: str, *, elements, x, wf, geom, coupli
     return bank
 
 
+def blend_banks(a: DPDBank, b: DPDBank, w: float) -> DPDBank:
+    """A bank whose GMP coefficients are (1 - w) a + w b -- the in-between
+    entry of a predistorter table (GMP is linear in its parameters).  Both
+    banks must be the same scheme and model structure; w in [0, 1]."""
+    import copy
+    if a.scheme != b.scheme or a.scheme == "none":
+        raise ValueError(f"blend needs two trained banks of one scheme, got {a.scheme!r} and {b.scheme!r}")
+    if not 0.0 <= w <= 1.0:
+        raise ValueError(f"blend weight must be in [0, 1], got {w}")
+    out = copy.deepcopy(a)
+    pairs = list(zip(out.per_element, b.per_element)) if a.scheme == "per_element" else [(out.array, b.array)]
+    for d, e in pairs:
+        if d.dpd_model.coeffs.shape != e.dpd_model.coeffs.shape:
+            raise ValueError("blend needs the same model structure in both banks")
+        d.dpd_model.coeffs = (1.0 - w) * d.dpd_model.coeffs + w * e.dpd_model.coeffs
+    out.info = {**a.info, "blend": float(w)}
+    return out
+
+
 def predistort_drives(bank: DPDBank, x: np.ndarray, geom: ArrayGeometry, theta0_deg: float,
                       fs: float, steering: str) -> list[np.ndarray]:
     """The element drives for the common signal ``x`` under the bank's scheme."""

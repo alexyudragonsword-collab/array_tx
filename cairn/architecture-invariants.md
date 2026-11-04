@@ -5,7 +5,7 @@ summary: 六条铁律各自落在哪个模块、由哪些测试守着
 tags: [invariants, tests, architecture]
 contains: [decision]
 created: 2026-10-13
-updated: 2026-11-03
+updated: 2026-11-04
 related: [AGENTS.md, coupling-model.md, squint-and-evm.md, fr2-floor-lo.md, gui.md, load-pull-proposal.md]
 authoring_mode: ai_generated
 ---
@@ -48,7 +48,7 @@ authoring_mode: ai_generated
   阵列以相位中心为原点，带边各单元的相位误差 ±0.03 rad 对称抵消，只剩二阶幅度损失
   （`tests/test_sim_dpd.py::test_squint_is_a_pointing_effect_not_a_beam_evm_effect`）。
   2026-11-02 更正（ex06）：这个二阶损失 ∝ n²，波束方向看到的是线性频响 H(f) = (1/n) Σ_k exp(j2πf τ_k)（`beam.beam_response`）；
-  scalar 均衡下它在 60° 从 n=64 起可测（+0.5 dB）、n=128 达 +4.9 dB，闭式 `squint_evm_closed_form_db` 预测到 0.01 dB；
+  scalar 均衡下它在 60° 从 n=64 起可测（+0.53 dB）、n=128 达 +4.89 dB，闭式 `squint_evm_closed_form_db` 预测到 0.03 dB（2026-11-04 复核，原写 0.01）；
   per-tone 均衡全部抹平（`tests/test_scaling.py`）。
 - **线性泄漏不伤每单元 DPD**：DPA 对输入相位旋转协变，单波束下各单元只差一个复权重，泄漏是各单元非线性函数的线性组合；
   每单元 DPD 把各自输出线性化后，波束方向的 ACLR 与互耦无关。数字见 `cairn/LOG.md` 里程碑 1 条目。
