@@ -1,4 +1,4 @@
-"""ex14 — how many predistorters does a scanning array need? (ROADMAP B8)
+"""ex14 — how many predistorters does a scanning array need? (the former ROADMAP B8, closed by ex15)
 
 ex11: under load modulation one GMP cannot serve 0-60 deg (joint fit: worst
 +7.2 dB), and a table on a 30 deg grid still loses 2.3 dB at 45 deg after
@@ -145,7 +145,7 @@ def study(path, scheme, grids, evals, n_symbols=None, label="", curvature=(), mo
 
 
 s0 = sim_for("configs/fr2_4el_survey.yaml")
-t0 = banner("ex14  how many predistorters does a scanning array need? (ROADMAP B8)", s0)
+t0 = banner("ex14  how many predistorters does a scanning array need? (the former ROADMAP B8, closed by ex15)", s0)
 
 print(f"\nPart 1 — 4 x 1, {SCHEME_LABELS['per_element']}, worst ACLR1 loss vs retraining over {EVAL[0]:.0f}-{EVAL[-1]:.0f} deg ({len(EVAL)} angles):")
 rows1, ret1, GRIDS = study("configs/fr2_4el_survey.yaml", "per_element", GRIDS, EVAL, label="4 x 1",

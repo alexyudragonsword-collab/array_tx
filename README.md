@@ -35,7 +35,7 @@ FR2 28 GHz / 400 MHz、survey 互耦（相邻 −16 dB，assumed 以外的出处
 | 负载调制 | 扫描角改变 \|1+Γ_k\|（4 × 1 边缘 0.84 → 1.26，0° → 60°）；0° 训练的 DPD 用到 60° 损失 2.5–2.9 dB；两种 DPD 在训练角度上仍只差 ≤ 0.33 dB | ex09 / ex10，`load-pull-proposal.md` |
 | 效率（含 Γ） | 8 × 8 广播向 ACLR 变好，却多付 5.3 个效率点；内部单元比边缘低 2.5–6 点 | ex10 / ex13，`loaded-efficiency-proposal.md` |
 | outphasing | 阵列负载只是每单元复增益（戴维南），动 ACLR ≤ 0.07 dB；分支源阻抗 ρ = 0.1 时 DPD 追回 9 dB | ex12，`outphasing-load-proposal.md` |
-| DPD 表 | 一个 DPD 联合拟合多角度不行（+7.2 dB）；≤ 0.5 dB 最少 9 张（4 × 1，7.5°）/ 13 张（8 × 8，5°），系数按角度插值 | ex11 / ex14 / ex15，`scan-design.md` |
+| DPD 表 | 一个 DPD 联合拟合多角度不行（+7.2 dB）；≤ 0.5 dB 最少 9 张（4 × 1，7.5°）/ 10 张（8 × 8，30° 以下 10°、以上 5°），系数按角度插值 | ex11 / ex14 / ex15，`scan-design.md` |
 | 设计表 | 0–30° 不回退、45° 回退 1 dB、60° 回退 2 dB（CFR 6.5 dB）；按角度切换比全程用 60° 的设置多约 9 个效率点 | ex16，`scan-design.md` |
 
 ## 工作台（GUI）
@@ -111,7 +111,7 @@ print(r.info["engine_line"]); print(r.beam.row()); print(r.sidelobe.row())
 | `ex11_multi_angle_dpd` | 负载调制下一个 DPD 怎么服务多个扫描角：重训 / 0° 训练 / 多角度联合拟合 / 30° 网格查表（取近邻、系数插值），在没训练过的 15°、45° 上比 |
 | `ex12_outphasing_source_impedance` | outphasing 分支源阻抗 ρ × Chireix 电纳：单链 AM-AM 与 DPD 追回量；阵列负载只是复增益（戴维南），两种 DPD 与扫描角失配都不受影响 |
 | `ex13_gamma_guard_sensitivity` | 负载牵引的 |Γ| 护栏会不会决定结论：截断比例，8 × 8 关键点在 gamma_max 0.5 / 0.8 / 1.0 下的 ACLR、效率与扫描角失配 |
-| `ex14_dpd_table_step` | 扫描阵列要几张 DPD 表（ROADMAP B8）：均匀 / 大角度加密网格 × 取近邻 / 按角度 / 按 sinθ / 按 |1+Γ| 插值，0–60° 每 2.5° 的最坏 ACLR 损失 |
+| `ex14_dpd_table_step` | 扫描阵列要几张 DPD 表（原 ROADMAP B8，已结）：均匀 / 大角度加密网格 × 取近邻 / 按角度 / 按 sinθ / 按 |1+Γ| 插值，0–60° 每 2.5° 的最坏 ACLR 损失 |
 | `ex15_grid_dpd_table` | 8 × 8 的 DPD 表步长：均匀 / 分段加密网格 × 按角度 / 阵列平均 |1+Γ| / 每单元 |1+Γ_k| 插值，0–60° 每 2.5° 的最坏 ACLR 损失 |
 | `ex16_scan_design` | 扫描设计表：每个扫描角在 CFR × 输出回退上的 ACLR1-效率帕累托与设计选择，按角度切换对比全程用 60° 设置 |
 

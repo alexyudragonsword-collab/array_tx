@@ -1,4 +1,4 @@
-"""ex15 — the DPD table on the 8 x 8 grid (ROADMAP B8, second half).
+"""ex15 — the DPD table on the 8 x 8 grid (the former ROADMAP B8, second half; closed).
 
 ex14 answered B8 for 4 x 1 (nine predistorters on a 7.5 deg grid keep the
 worst scan-angle ACLR1 loss <= 0.5 dB) and found the same table 0.87 dB short
@@ -83,7 +83,7 @@ cfg.element.pa.load_pull.enabled = True
 if smoke():
     cfg.array.n_elements, cfg.array.n_rows = 4, 4         # CI time: the 8 x 8 answer comes from the full run
 sim = ArraySim(cfg, n_symbols=N_SYMBOLS)
-t0 = banner("ex15  the DPD table on the 8 x 8 grid: step and interpolation rule (ROADMAP B8)", sim)
+t0 = banner("ex15  the DPD table on the 8 x 8 grid: step and interpolation rule (the former ROADMAP B8, closed by ex15)", sim)
 
 angles = sorted({a for g in GRIDS.values() for a in g} | set(EVAL))
 mk, retrained = {}, {}
