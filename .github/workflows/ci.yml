@@ -35,12 +35,20 @@ jobs:
       - name: Install
         run: pip install -e .[test]
       - name: Test
-        run: pytest tests/ -q
+        # the example smoke runs are the examples job's (same three Pythons, in parallel)
+        run: pytest tests/ -q -m "not examples"
 
   # The examples are the library's worked documentation; nothing else
   # exercises them end to end.  ARRAYTX_SMOKE=1 shortens the bursts so the
   # whole set fits a CI job; the full-size numbers live in cairn/LOG.md.
+  # Each example runs once per Python, beside the unit tests rather than inside
+  # them (it used to run four times: here and in each test job).  The pytest
+  # wrapper also checks that every example prints its engine line and plots.
   examples:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
     runs-on: ubuntu-latest
     env:
       MPLBACKEND: Agg
@@ -49,19 +57,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install
-        run: pip install -e .
+        run: pip install -e .[test]
       - name: Run every example (smoke size)
-        run: |
-          fail=0
-          for f in examples/ex*.py; do
-            echo "::group::$f"
-            if python "$f"; then echo "OK $f"; else echo "FAILED $f"; fail=1; fi
-            echo "::endgroup::"
-          done
-          exit $fail
+        run: pytest tests/test_examples.py -q -m examples --durations=5
 
   # Vendor drift: src/arraytx/vendor must still match the pinned upstreams.
   # Siblings are checked out at the pinned FULL SHA with full history, so a

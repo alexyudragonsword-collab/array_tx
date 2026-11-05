@@ -35,7 +35,7 @@ from arraytx.dpd import blend_banks, predistort_drives
 from arraytx.metrics import ota_metrics
 from arraytx.report import table
 
-EVAL = list(np.arange(0.0, 60.0 + 1e-9, 7.5 if smoke() else 2.5))
+EVAL = [0.0, 15.0, 30.0, 45.0, 60.0] if smoke() else list(np.arange(0.0, 60.0 + 1e-9, 2.5))
 GRIDS = {
     "uniform 30": [0, 30, 60],
     "uniform 20": [0, 20, 40, 60],

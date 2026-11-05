@@ -30,6 +30,8 @@ def sim_for(path, gmax, *, topology="polar", rho=0.0, n_symbols=None):
     cfg.element.outphasing.source_impedance_rel = rho
     cfg.element.pa.load_pull.enabled = True
     cfg.element.pa.load_pull.gamma_max = gmax
+    if smoke() and cfg.array.n_rows > 1:
+        cfg.array.n_elements, cfg.array.n_rows = 4, 4      # CI time: the 8 x 8 numbers come from the full run
     return ArraySim(cfg, n_symbols=n_symbols)
 
 

@@ -14,6 +14,7 @@ def test_the_examples_are_numbered_without_gaps():
     assert len(EXAMPLES) >= 6
 
 
+@pytest.mark.examples
 @pytest.mark.parametrize("path", EXAMPLES, ids=[os.path.basename(p) for p in EXAMPLES])
 def test_example_runs_in_smoke_mode(path):
     env = dict(os.environ, ARRAYTX_SMOKE="1", MPLBACKEND="Agg")

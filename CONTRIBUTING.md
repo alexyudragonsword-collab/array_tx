@@ -9,7 +9,11 @@ polar_tx 的 `CONTRIBUTING.md` 全部适用（断言物理而非快照；vendor 
 pip install -e ".[test,dev]"
 # vendor 漂移检查需要三个上游在本地（默认 /home/user/<repo>，或 --siblings repo=path，或 ARRAYTX_SIBLING_<repo>）
 python tools/vendor_check.py --strict --siblings polar_tx=... PA_DPD=... pll_simulator=...
+pytest -m "not examples"          # 单元测试，本机约 1.5 分钟（CI 的 test 任务就是这条）
+pytest -m examples                # 每个示例跑一次冒烟尺寸（CI 的 examples 任务，三个 Python 并行）
 ```
+
+新示例的冒烟分支要短：用最小能走通流程的阵列和角度，答案留给全尺寸（ex13 / ex15 冒烟用 4 × 4 而非 8 × 8）。
 
 ## 1. 六条铁律
 

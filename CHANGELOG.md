@@ -4,6 +4,11 @@
 
 ## 未发布 / Unreleased
 
+### CI 提速与 README 结果速览（2026-11-05）
+
+- pytest 标记 `examples`；CI 的 test 任务跳过示例冒烟，examples 任务在三个 Python 上并行跑它们（带引擎行与出图检查）。
+- ex13 / ex14 的冒烟分支缩小（4 × 4、5 个角度），全尺寸不变。README 新增"结果速览"；CONTRIBUTING 写明两条测试命令。
+
 ### 扫描设计表（ex16）与 8 × 8 的 DPD 表步长（ex15）（2026-11-05）
 
 - ex16：每个扫描角在 CFR × 回退上的 ACLR1-效率帕累托与设计选择（目标为 assumed 设计取值），对比全程用 60° 设置的效率代价。

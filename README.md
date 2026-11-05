@@ -6,8 +6,9 @@ polar_tx 的姊妹库（polar_tx ROADMAP D：GUI 里不再加架构、不做接�
 
 状态：里程碑 1 完成——4 单元 λ/2 线阵、FR2 28 GHz / 400 MHz / 120 kHz、三种互耦来源、三种 DPD 方案、OTA 指标；
 里程碑 2a——矩形面阵（`array.n_rows`，row-major 单元序）、任意方位切面扫描（`beam.plane_phi_deg`）、二维互耦邻域（x1 / x2 / y1 / y2 / d1）与无源性检查。
-里程碑 2b——负载调制 PA（`element.pa.load_pull`，默认关）：每单元 DPA 在自己的总端口摆幅 |1+Γ_k| 上压缩，Γ_k 由互耦泄漏算出，定点迭代两轮。
-数字见 `cairn/LOG.md`，没做的见 `ROADMAP.md`。
+里程碑 2b——负载调制 PA（`element.pa.load_pull`，默认关）：每单元 DPA 在自己的总端口摆幅 |1+Γ_k| 上压缩，Γ_k 由互耦泄漏算出，定点迭代两轮；
+含 Γ 的漏极效率、outphasing 分支源阻抗、输出回退、多扫描角 DPD 表，以及按扫描角的设计表。
+当前结论见下面"结果速览"与 `cairn/` 主题笔记，过程与原始数字见 `cairn/LOG.md`，没做的见 `ROADMAP.md`。
 
 ## 快速开始
 
@@ -20,6 +21,22 @@ ARRAYTX_SMOKE=1 python examples/ex04_aclr_vs_direction.py   # 短突发（CI 用
 ```
 
 每个示例先打印它用的相位调制引擎；response / dtc_openloop 引擎出的杂散与互调结论一律标"线性化引擎，不能背书"。
+
+## 结果速览
+
+FR2 28 GHz / 400 MHz、survey 互耦（相邻 −16 dB，assumed 以外的出处见 config）、单元误差开、全尺寸。数字是主题笔记里的当前值，
+每条可由括号里的示例复现。DTC 开环引擎是线性化的，杂散 / 互调只作趋势。
+
+| 主题 | 结论 | 来源 |
+|---|---|---|
+| 互耦（线性泄漏） | 两种 DPD 分不开：互耦 0 → −10 dB，波束方向 ACLR 只动 0.03–0.06 dB | ex02，`coupling-model.md` |
+| FR2 的底 | DPD 后 ACLR1 约 −45 dBc = DPD 残余与噪声底的功率和；EVM 约 −28 dB 全部来自 LO 相噪与抖动 | ex03 / ex05，`fr2-floor-lo.md` |
+| 斜视 | 相移器导向的 EVM 代价在 60° 从 n = 64 起可测：n = 64 / 128 为 +0.53 / +4.89 dB，闭式预测差 0.03 dB；per-tone 均衡抹平 | ex06 / ex08，`squint-and-evm.md` |
+| 负载调制 | 扫描角改变 \|1+Γ_k\|（4 × 1 边缘 0.84 → 1.26，0° → 60°）；0° 训练的 DPD 用到 60° 损失 2.5–2.9 dB；两种 DPD 在训练角度上仍只差 ≤ 0.33 dB | ex09 / ex10，`load-pull-proposal.md` |
+| 效率（含 Γ） | 8 × 8 广播向 ACLR 变好，却多付 5.3 个效率点；内部单元比边缘低 2.5–6 点 | ex10 / ex13，`loaded-efficiency-proposal.md` |
+| outphasing | 阵列负载只是每单元复增益（戴维南），动 ACLR ≤ 0.07 dB；分支源阻抗 ρ = 0.1 时 DPD 追回 9 dB | ex12，`outphasing-load-proposal.md` |
+| DPD 表 | 一个 DPD 联合拟合多角度不行（+7.2 dB）；≤ 0.5 dB 最少 9 张（4 × 1，7.5°）/ 13 张（8 × 8，5°），系数按角度插值 | ex11 / ex14 / ex15，`scan-design.md` |
+| 设计表 | 0–30° 不回退、45° 回退 1 dB、60° 回退 2 dB（CFR 6.5 dB）；按角度切换比全程用 60° 的设置多约 9 个效率点 | ex16，`scan-design.md` |
 
 ## 工作台（GUI）
 

@@ -52,6 +52,7 @@ arraytx = ["data/clock_profiles/*.yaml", "data/clock_profiles/README.md", "webui
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = ["examples: runs an example script at smoke size (CI runs these in the examples job, the test job deselects them)"]
 
 [tool.ruff]
 # src/arraytx/vendor/ is a verifiable adapted copy of polar_tx (which itself
