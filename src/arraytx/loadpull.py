@@ -35,10 +35,14 @@ from __future__ import annotations
 
 import numpy as np
 
+
 from .vendor.polartx.dpa.characteristics import ampm_curve, efficiency_curve
 from .vendor.polartx.dpa.combiner import OutphasingCombiner
 from .vendor.polartx.dpa.dpa import DPA, DPAConfig
 from .vendor.polartx.dpa.mismatch import code_amplitude_table
+
+#: smallest |1 + kappa Gamma| / |1 - Gamma| the load model divides by (Gamma = -1 / +1 exactly)
+G_FLOOR = 1e-12
 
 
 def amam_loaded(amam, r: np.ndarray, g: np.ndarray) -> np.ndarray:
@@ -47,7 +51,11 @@ def amam_loaded(amam, r: np.ndarray, g: np.ndarray) -> np.ndarray:
     the forward wave is that output divided by g.  g = 1 reproduces
     ``characteristics.amam_curve`` (same expression, same order)."""
     r = np.asarray(r, dtype=float)
-    g = np.asarray(g, dtype=float)
+    # g = 0 is Gamma = -1 exactly (reachable at the total-reflection clip): the
+    # forward wave's limit there is finite (the small-signal gain), but the
+    # expression below would be 0 / 0.  A floor far below any physical g keeps
+    # every other sample bit for bit.
+    g = np.maximum(np.asarray(g, dtype=float), G_FLOOR)
     if amam == "ideal":
         return r
     kind = amam[0]
@@ -126,8 +134,9 @@ def loaded_power_terms(amp_matched: np.ndarray, amp_fwd: np.ndarray, gamma, eff_
       the Yoo & Walling derivation's premise);
     * net power out of the port, P_net = |a|^2 (1 - |Gamma|^2), a the forward
       wave the loaded DPA produces: port voltage a (1 + Gamma), current
-      a (1 - Gamma), real part of their product.  Samples with |Gamma| > 1
-      (power flowing INTO the PA) count 0 and are reported.
+      a (1 - Gamma), real part of their product.  Samples at |Gamma| >= 1
+      (total reflection, or power flowing INTO the PA, clipped to 1 upstream)
+      count 0 and are reported as ``n_backflow``.
 
     Returns the sums, so an element and the whole array combine the same
     way: eta = sum P_net / sum (P_net + P_loss)."""
@@ -139,7 +148,10 @@ def loaded_power_terms(amp_matched: np.ndarray, amp_fwd: np.ndarray, gamma, eff_
     on = eta > 0
     loss[on] = p_m[on] / eta[on] - p_m[on]
     g2 = np.zeros_like(a) if gamma is None else np.abs(np.asarray(gamma)) ** 2
-    back = g2 > 1.0
+    # |Gamma| >= 1: as much (or more) power comes back as goes out.  active_reflection
+    # clips at gamma_max <= 1, so a true |Gamma| > 1 arrives here AT the clip; these
+    # samples deliver nothing (net 0) and are what n_backflow counts
+    back = g2 >= 1.0 - 1e-12
     net = np.where(back, 0.0, a * a * (1.0 - g2))
     return {"p_net": float(net.sum()), "p_loss": float(loss.sum()), "p_matched": float(p_m.sum()),
             "n_backflow": int(back.sum()), "n": int(a.size)}
@@ -208,7 +220,11 @@ class SourceImpedanceCombiner(OutphasingCombiner):
         b1, b2 = self.susceptances
         S = 1.0 / (1.0 + 1j * self.rho * b1) + 1.0 / (1.0 + 1j * self.rho * b2)
         g = np.asarray(gamma, dtype=complex)
-        zl = 2.0 * (1.0 + g) / (1.0 - g)
+        den = 1.0 - g
+        # Gamma = +1 exactly (an open, reachable at the total-reflection clip): Z_L
+        # would be inf and F = inf / inf; F's limit there is 1 / [Z_0 / (Z_0 + rho S)]
+        den = np.where(np.abs(den) < G_FLOOR, G_FLOOR, den)
+        zl = 2.0 * (1.0 + g) / den
         return (zl / (zl + self.rho * S)) / (2.0 / (2.0 + self.rho * S))
 
     def combine(self, y1: np.ndarray, y2: np.ndarray) -> np.ndarray:

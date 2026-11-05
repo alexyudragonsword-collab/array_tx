@@ -131,9 +131,16 @@ class ArraySim:
         res, ys = self._run_all(drives)
         floors = [lp.floor * (el.fs_scale if el.fs_scale else float(np.abs(y).max())) for el, y in zip(self.elements, ys)]
         deltas = []
+        clip = np.zeros(len(self.elements))
         for _ in range(int(lp.iterations)):
             rs = apply_coupling(ys, self.coupling, self.fs, self.f0)
             gamma = active_reflection(ys, rs, floors, lp.gamma_max)
+            # how often the guard acted, among the samples it can act on (above the
+            # floor), in the round where it acted most: a clip in round 1 moves ys
+            # even if round 2 sits just under the limit
+            live = np.abs(ys) > np.asarray(floors).reshape(-1, 1)
+            hit = (np.abs(gamma) >= lp.gamma_max * (1 - 1e-12)) & live
+            clip = np.maximum(clip, hit.sum(axis=1) / np.maximum(live.sum(axis=1), 1))
             for el, g in zip(self.elements, gamma):
                 el.set_load(g)
             res, ys_new = self._run_all(drives)
@@ -148,7 +155,7 @@ class ArraySim:
                                "abs_gamma_max": np.abs(gamma).max(axis=1).tolist(),
                                # how often the |Gamma| guard acted (a guard, not physics: if this is not
                                # ~0 the numbers depend on gamma_max -- cairn/load-pull-proposal.md)
-                               "clip_fraction": (np.abs(gamma) >= lp.gamma_max * (1 - 1e-12)).mean(axis=1).tolist()}
+                               "clip_fraction": clip.tolist()}
         return res, ys, rs
 
     def far_field(self, rs: np.ndarray, theta_deg: float) -> np.ndarray:

@@ -30,6 +30,7 @@ import numpy as np
 
 from _common import SCHEME_LABELS, banner, done, plt, smoke
 from arraytx import ArraySim, load_config
+from arraytx.beam import steer
 from arraytx.dpd import blend_banks, predistort_drives
 from arraytx.metrics import ota_metrics
 from arraytx.report import table
@@ -45,7 +46,8 @@ GRIDS = {
     "dense top 4": [0, 30, 45, 60],
     "dense top 5": [0, 30, 40, 50, 60],
     "dense top 6": [0, 25, 40, 50, 55, 60],
-    "uniform sin 5": [float(np.degrees(np.arcsin(u))) for u in np.linspace(0, np.sin(np.radians(60)), 5)],
+    # rounded: arcsin(sin 60) is 59.99999999999999, which would be retrained as an angle of its own
+    "uniform sin 5": [round(float(np.degrees(np.arcsin(u))), 6) for u in np.linspace(0, np.sin(np.radians(60)), 5)],
 }
 if smoke():
     GRIDS = {k: GRIDS[k] for k in ("uniform 30", "uniform 15", "dense top 4")}
@@ -82,6 +84,13 @@ def table_bank(banks, grid, theta, mode, m):
     return blend_banks(banks[lo], banks[hi], float(np.clip(w, 0.0, 1.0)))
 
 
+def m_of(sim, theta):
+    """m(theta): the mean |1 + Gamma_k| the undistorted steered drives put on the
+    PAs -- one radiate, no metrics."""
+    sim.radiate(steer(sim.x, sim.geom, theta, sim.fs, sim.cfg.beam.steering))
+    return float(np.mean(sim.last_load_pull["abs_1pg_mean"]))
+
+
 def curvature_grid(mload, n):
     """n grid angles placed where m(theta) BENDS: piecewise-linear interpolation
     error goes with the second derivative, so the knots follow the density
@@ -103,7 +112,7 @@ def study(path, scheme, grids, evals, n_symbols=None, label="", curvature=(), mo
     sim = sim_for(path, n_symbols)
     mload = {}
     for th in sorted({float(a) for a in evals}):
-        mload[th] = float(np.mean(sim.run(th, "none", conducted_diagnostics=False).info["load_pull"]["abs_1pg_mean"]))
+        mload[th] = m_of(sim, th)
     grids = dict(grids)
     for n in curvature:
         grids[f"curvature {n}"] = curvature_grid(mload, n)
@@ -111,19 +120,21 @@ def study(path, scheme, grids, evals, n_symbols=None, label="", curvature=(), mo
     angles = sorted({float(a) for g in grids.values() for a in g} | {float(a) for a in evals})
     retrained = {}
     for th in angles:
-        retrained[th] = sim.run(th, scheme, conducted_diagnostics=False)
+        r = sim.run(th, scheme, conducted_diagnostics=False)
+        retrained[th] = (r.dpd, r.beam.aclr1_db)            # only what the tables use: not the 64-element results
         if th not in mload:
-            mload[th] = float(np.mean(sim.run(th, "none", conducted_diagnostics=False).info["load_pull"]["abs_1pg_mean"]))
+            mload[th] = m_of(sim, th)
     print(f"  {label}: m(theta) = mean |1+Gamma|: " + "  ".join(f"{t:.1f}:{mload[t]:.3f}" for t in angles if t in evals[::2]), flush=True)
-    m = lambda t: mload[float(t)] if float(t) in mload else float(np.interp(t, list(mload), list(mload.values())))  # noqa: E731
+    xs = sorted(mload)
+    m = lambda t: mload[float(t)] if float(t) in mload else float(np.interp(t, xs, [mload[x] for x in xs]))  # noqa: E731
     rows = []
     for name, grid in grids.items():
         grid = [float(g) for g in grid]
-        banks = {g: retrained[g].dpd for g in grid}
+        banks = {g: retrained[g][0] for g in grid}
         for mode in modes:
             losses = []
             for th in evals:
-                ref = retrained[float(th)].beam.aclr1_db
+                ref = retrained[float(th)][1]
                 losses.append(aclr_at(sim, table_bank(banks, grid, float(th), mode, m), float(th)) - ref)
             worst = int(np.argmax(losses))
             rows.append({"table": name, "banks": len(grid), "rule": mode, "worst loss dB": losses[worst], "at deg": evals[worst],

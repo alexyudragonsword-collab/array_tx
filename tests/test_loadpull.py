@@ -190,12 +190,46 @@ def test_blend_banks_is_linear_in_the_coefficients_and_refuses_mismatches():
     a, b = sim.run(0.0, "per_element", conducted_diagnostics=False).dpd, sim.run(60.0, "per_element", conducted_diagnostics=False).dpd
     assert all(np.array_equal(x.dpd_model.coeffs, y.dpd_model.coeffs) for x, y in zip(blend_banks(a, b, 0.0).per_element, a.per_element))
     assert all(np.array_equal(x.dpd_model.coeffs, y.dpd_model.coeffs) for x, y in zip(blend_banks(a, b, 1.0).per_element, b.per_element))
+    a_before = [x.dpd_model.coeffs.copy() for x in a.per_element]
     mid = blend_banks(a, b, 0.25)
+    assert all(np.array_equal(x.dpd_model.coeffs, c) for x, c in zip(a.per_element, a_before))       # a untouched
+    assert mid.info["blend"] == 0.25 and mid.info["a"] == a.info and mid.info["b"] == b.info
     for m, x, y in zip(mid.per_element, a.per_element, b.per_element):
         assert np.allclose(m.dpd_model.coeffs, 0.75 * x.dpd_model.coeffs + 0.25 * y.dpd_model.coeffs)
-    assert a.per_element[0].dpd_model.coeffs is not mid.per_element[0].dpd_model.coeffs      # a copy, a untouched
+    assert a.per_element[0].dpd_model.coeffs is not mid.per_element[0].dpd_model.coeffs
     arr = sim.run(0.0, "array", conducted_diagnostics=False).dpd
     with pytest.raises(ValueError):
         blend_banks(a, arr, 0.5)
     with pytest.raises(ValueError):
         blend_banks(a, b, 1.5)
+    import copy
+    short = copy.deepcopy(b)
+    short.per_element = short.per_element[:2]
+    with pytest.raises(ValueError, match="element count"):
+        blend_banks(a, short, 0.5)
+    other = ArraySim(config_from_dict({**ON, "dpd": {"gmp": {"order": 3, "memory_depth": 5}}})).run(60.0, "per_element", conducted_diagnostics=False).dpd
+    with pytest.raises(ValueError, match="structure"):
+        blend_banks(a, other, 0.5)
+
+
+
+def test_total_reflection_is_finite_and_counted():
+    """gamma_max = 1 makes Gamma = -1 (polar knee factor 0) and Gamma = +1
+    (outphasing Z_L infinite) reachable: no NaN, and those samples deliver no
+    net power and are counted as backflow."""
+    r = np.linspace(0.0, 1.0, 64)
+    for amam in (("rapp", 2.0, 1.0), ("lut", np.linspace(0, 1, 5), np.array([0, 0.3, 0.55, 0.75, 0.85]))):
+        y = amam_loaded(amam, r, np.zeros_like(r))
+        assert np.all(np.isfinite(y))
+    from arraytx.loadpull import SourceImpedanceCombiner
+    c = SourceImpedanceCombiner(mode="chireix", source_impedance_rel=0.05)
+    f = c.load_factor(np.array([1.0 + 0j, -1.0 + 0j, 0.3j]))
+    assert np.all(np.isfinite(f))
+    t = loaded_power_terms(r, r, np.r_[np.zeros(62), -1.0, 1.0j], ("scpa", 0.67, 0.85))
+    assert t["n_backflow"] == 2 and t["p_net"] == pytest.approx((r[:62] ** 2).sum())
+
+
+def test_clip_fraction_reports_the_guard_when_it_acts():
+    tight = ArraySim(config_from_dict({"element": {"pa": {"load_pull": {"enabled": True, "gamma_max": 0.05}}}}))
+    lp = tight.run(0.0, "none", conducted_diagnostics=False).info["load_pull"]
+    assert min(lp["clip_fraction"]) > 0.5 and max(lp["clip_fraction"]) <= 1.0
