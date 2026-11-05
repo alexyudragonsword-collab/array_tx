@@ -37,6 +37,7 @@ FR2 28 GHz / 400 MHz、survey 互耦（相邻 −16 dB，assumed 以外的出处
 | outphasing | 阵列负载只是每单元复增益（戴维南），动 ACLR ≤ 0.07 dB；分支源阻抗 ρ = 0.1 时 DPD 追回 9 dB | ex12，`outphasing-load-proposal.md` |
 | DPD 表 | 一个 DPD 联合拟合多角度不行（+7.2 dB）；≤ 0.5 dB 在测过的网格里最少 9 张（4 × 1，7.5°）/ 10 张（8 × 8，30° 以下 10°、以上 5°；更稀的只测了两种 9 张网格），系数按角度插值 | ex11 / ex14 / ex15，`scan-design.md` |
 | 设计表 | 0–30° 不回退、45° 回退 1 dB、60° 回退 2 dB（CFR 6.5 dB）；按角度切换比全程用 60° 的设置多约 9 个效率点 | ex16，`scan-design.md` |
+| 设计表的敏感度 | 互耦幅度影响最大（相邻 −13 dB 时 60° 要退 3 dB、效率再掉 6.3 点），κ 其次，设计目标几乎不改回退安排 | ex17，`scan-design.md` |
 
 ## 工作台（GUI）
 
