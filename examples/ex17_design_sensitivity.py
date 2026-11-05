@@ -13,7 +13,9 @@ the per-angle choice (CFR, backoff) and its efficiency with the baseline.
 The targets need no new runs: the baseline sweep is re-picked under each.
 The answer this example gives: which assumption is worth measuring first --
 the one that changes the backoff schedule, not just the numbers.  Part 3
-repeats the physical cases on 8 x 8 (0 / 30 / 60 deg, ~20 min per case).
+repeats the physical cases on 8 x 8 (0 / 30 / 60 deg, ~20 min per case); there
+-13 dB adjacent coupling is not passive for the twelve-neighbour shape (leakage
+gain 1.16), so -14.5 dB (0.98) is the stronger case.
 """
 import numpy as np
 
@@ -94,9 +96,18 @@ designs8 = {}
 if not smoke():
     A8, B8, C8 = [0.0, 30.0, 60.0], [0.0, 1.0, 2.0, 3.0, 4.0], [8.5, 6.5]
     print(f"\nPart 3 — 8 x 8 (4 symbols), the same physical cases on a coarser grid (table margin {TABLE_MARGIN_DB['8 x 8']} dB):")
-    for name, tweak in CASES.items():
+    # On the grid the twelve-neighbour leakage scales with c1: 0.823 at -16 dB, so the
+    # matrix stops being passive near -14.3 dB (build_coupling refuses it).  -13 dB is
+    # reported as impossible for this coupling shape, -14.5 dB stands in as "stronger".
+    cases8 = {base_name: None, "coupling -13 dB": coupling(3.0), "coupling -14.5 dB (8 x 8 limit)": coupling(1.5),
+              "coupling -20 dB": coupling(-4.0), "kappa 0.5": kappa(0.5)}
+    for name, tweak in cases8.items():
         print(f"\n  case: {name}")
-        rows = design_sweep("configs/fr2_8x8_survey.yaml", A8, B8, C8, n_symbols=4, label="8 x 8", tweak=tweak)
+        try:
+            rows = design_sweep("configs/fr2_8x8_survey.yaml", A8, B8, C8, n_symbols=4, label="8 x 8", tweak=tweak)
+        except ValueError as exc:                          # the passivity check, not a crash
+            print(f"  not a passive 8 x 8 coupling matrix: {exc}".split("; lower")[0])
+            continue
         designs8[name], _ = design_table(rows, A8, "8 x 8", TABLE_MARGIN_DB["8 x 8"])
     base8 = {d["beam deg"]: d for d in designs8[base_name]}
     s3 = []
