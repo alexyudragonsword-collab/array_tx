@@ -7,6 +7,9 @@
 ### A1. 互耦 survey 典型值等全文核对 / 等实测 S 参数
 `configs/*.yaml` 里 `coupling.survey` 的相邻耦合 −16 dB 只有摘要级出处（见 config 里 `ref`），本环境网络策略打不开 arXiv / PMC 全文。
 拿到实测 `.sNp` 就切 `coupling.source: touchstone`，不改任何别的抽取（铁律 5）。
+2026-11-05 再试：arxiv.org、www.jees.kr、www.mdpi.com 在会话网络策略下都解析不到（要在环境的 Network access 里放行这些域名才能读全文）。
+搜索摘要里没有"28 GHz、λ/2、无去耦、实测"的相邻互耦；能看到的只有去耦前参考阵列 −10.75 dB（0.43 λ，仿真）和一对双单元 −18.5 dB（间距不明），
+都不够格进 config。ex17 表明这是设计表最敏感的假设（−13 dB 时 60° 多退 1 dB、效率再掉 6.3 点），所以仍是最该补的出处。
 
 ### A2. 负载调制：只有一阶电压模，没有实测 load-pull 表
 `element.pa.load_pull` 已实现（`cairn/load-pull-proposal.md`），κ = 1 是 assumed。真实 PA 的压缩等高线在 Smith 圆图上不是圆（Γ 相位相关），
