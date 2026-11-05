@@ -15,7 +15,7 @@ polar_tx 的姊妹库（polar_tx ROADMAP D：GUI 里不再加架构、不做接�
 pip install -e ".[test,dev]"
 python examples/ex00_single_element_equals_polartx.py   # sub-6、S=0、1 单元：与 polar_tx 逐位相同
 python examples/ex03_scan_angle_x_dpd.py                # 扫描角 × DPD 方案的 OTA EVM / ACLR 表
-pytest -q                                               # 187 项（页面测试无 Chromium 时跳过）
+pytest -q                                               # 189 项（页面测试无 Chromium 时跳过）
 ARRAYTX_SMOKE=1 python examples/ex04_aclr_vs_direction.py   # 短突发（CI 用的尺寸）
 ```
 
@@ -95,6 +95,8 @@ print(r.info["engine_line"]); print(r.beam.row()); print(r.sidelobe.row())
 | `ex12_outphasing_source_impedance` | outphasing 分支源阻抗 ρ × Chireix 电纳：单链 AM-AM 与 DPD 追回量；阵列负载只是复增益（戴维南），两种 DPD 与扫描角失配都不受影响 |
 | `ex13_gamma_guard_sensitivity` | 负载牵引的 |Γ| 护栏会不会决定结论：截断比例，8 × 8 关键点在 gamma_max 0.5 / 0.8 / 1.0 下的 ACLR、效率与扫描角失配 |
 | `ex14_dpd_table_step` | 扫描阵列要几张 DPD 表（ROADMAP B8）：均匀 / 大角度加密网格 × 取近邻 / 按角度 / 按 sinθ / 按 |1+Γ| 插值，0–60° 每 2.5° 的最坏 ACLR 损失 |
+| `ex15_grid_dpd_table` | 8 × 8 的 DPD 表步长：均匀 / 分段加密网格 × 按角度 / 阵列平均 |1+Γ| / 每单元 |1+Γ_k| 插值，0–60° 每 2.5° 的最坏 ACLR 损失 |
+| `ex16_scan_design` | 扫描设计表：每个扫描角在 CFR × 输出回退上的 ACLR1-效率帕累托与设计选择，按角度切换对比全程用 60° 设置 |
 
 ## 模块
 

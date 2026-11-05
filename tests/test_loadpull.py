@@ -202,6 +202,11 @@ def test_blend_banks_is_linear_in_the_coefficients_and_refuses_mismatches():
         blend_banks(a, arr, 0.5)
     with pytest.raises(ValueError):
         blend_banks(a, b, 1.5)
+    per = blend_banks(a, b, [0.0, 1.0, 0.5, 0.25])                        # one weight per element
+    assert np.array_equal(per.per_element[0].dpd_model.coeffs, a.per_element[0].dpd_model.coeffs)
+    assert np.array_equal(per.per_element[1].dpd_model.coeffs, b.per_element[1].dpd_model.coeffs)
+    with pytest.raises(ValueError):
+        blend_banks(a, b, [0.5, 0.5])
     import copy
     short = copy.deepcopy(b)
     short.per_element = short.per_element[:2]
