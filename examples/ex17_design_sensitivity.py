@@ -12,8 +12,8 @@ at each angle, CFR x output backoff) with ONE assumption moved, and compares
 the per-angle choice (CFR, backoff) and its efficiency with the baseline.
 The targets need no new runs: the baseline sweep is re-picked under each.
 The answer this example gives: which assumption is worth measuring first --
-the one that changes the backoff schedule, not just the numbers.
-8 x 8 is not covered (each case would cost ~30 min there).
+the one that changes the backoff schedule, not just the numbers.  Part 3
+repeats the physical cases on 8 x 8 (0 / 30 / 60 deg, ~20 min per case).
 """
 import numpy as np
 
@@ -88,6 +88,25 @@ print(table(s2))
 
 for name, d in designs.items():
     print(f"  {name:32}: " + "  ".join(f"{x['beam deg']:.0f}deg CFR {x['CFR dB']} BO {x['backoff dB']} -> {x['eta %']:.1f}%" for x in d))
+
+# ------------------------------------------------------------------ 8 x 8
+designs8 = {}
+if not smoke():
+    A8, B8, C8 = [0.0, 30.0, 60.0], [0.0, 1.0, 2.0, 3.0, 4.0], [8.5, 6.5]
+    print(f"\nPart 3 — 8 x 8 (4 symbols), the same physical cases on a coarser grid (table margin {TABLE_MARGIN_DB['8 x 8']} dB):")
+    for name, tweak in CASES.items():
+        print(f"\n  case: {name}")
+        rows = design_sweep("configs/fr2_8x8_survey.yaml", A8, B8, C8, n_symbols=4, label="8 x 8", tweak=tweak)
+        designs8[name], _ = design_table(rows, A8, "8 x 8", TABLE_MARGIN_DB["8 x 8"])
+    base8 = {d["beam deg"]: d for d in designs8[base_name]}
+    s3 = []
+    for name, d in designs8.items():
+        by = {x["beam deg"]: x for x in d}
+        s3.append({"case": name, "schedule (backoff dB @ 0/30/60)": " / ".join(
+                       "-" if not np.isfinite(by[t]["backoff dB"]) else f"{by[t]['backoff dB']:.0f}" for t in A8),
+                   "CFR @ 60": by[60.0]["CFR dB"], "eta @ 0 %": by[0.0]["eta %"], "eta @ 60 %": by[60.0]["eta %"],
+                   "angles changed": sum((by[t]["CFR dB"], by[t]["backoff dB"]) != (base8[t]["CFR dB"], base8[t]["backoff dB"]) for t in A8)})
+    print(table(s3))
 
 fig, ax = plt.subplots(1, 2, figsize=(10.5, 3.8))
 for (name, d), mk in zip(designs.items(), ("o-", "s--", "^--", "d:")):
