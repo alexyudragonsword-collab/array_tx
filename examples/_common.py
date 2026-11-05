@@ -62,3 +62,98 @@ def diagnostic_table(result) -> str:
     from arraytx.report import table
     rows = [c.row() for c in result.conducted]
     return "conducted PA-output metrics — DIAGNOSTIC ONLY (invariant 2: not acceptance numbers)\n" + table(rows)
+
+
+# ---- DPD-table helpers shared by ex13 / ex14 / ex15 (one definition, so the 4 x 1
+# and 8 x 8 table answers are scored the same way)
+
+def aclr_at(sim, bank, theta):
+    """OTA ACLR1 at the beam when ``bank`` predistorts the drives for ``theta``."""
+    from arraytx.dpd import predistort_drives
+    from arraytx.metrics import ota_metrics
+    drives = predistort_drives(bank, sim.x, sim.geom, theta, sim.fs, sim.cfg.beam.steering)
+    _, _, rs = sim.radiate(drives)
+    return ota_metrics(sim.far_field(rs, theta), sim.wf, theta, "beam", offsets=(1,), with_sem=False).aclr1_db
+
+
+def bracket(grid, theta):
+    """The grid angles just below and just above ``theta`` (equal on a grid angle)."""
+    lo = max(g for g in grid if g <= theta + 1e-9)
+    hi = min(g for g in grid if g >= theta - 1e-9)
+    return lo, hi
+
+
+def element_loads(sim, theta):
+    """|1 + Gamma_k| per element under the undistorted steered drives (one radiate)."""
+    import numpy as np
+    from arraytx.beam import steer
+    sim.radiate(steer(sim.x, sim.geom, theta, sim.fs, sim.cfg.beam.steering))
+    return np.array(sim.last_load_pull["abs_1pg_mean"])
+
+
+def edge_mask(geom):
+    """True for the elements on the grid's border."""
+    return (geom.ix == 0) | (geom.ix == geom.n_x - 1) | (geom.iy == 0) | (geom.iy == geom.n_y - 1)
+
+
+# ---- scan-design helpers shared by ex16 / ex17
+
+#: design targets (source: assumed -- design choices, not specification limits)
+ACLR_TARGET_DBC = -45.0
+EVM_TARGET_DB = -25.0
+#: the DPD table's worst interpolation loss, per array (ex14: 4 x 1 nine banks;
+#: ex15: 8 x 8 ten banks) -- carried as an ACLR margin
+TABLE_MARGIN_DB = {"4 x 1": 0.30, "8 x 8": 0.35}
+
+
+def design_sweep(cfg_path, angles, backoffs, cfrs, *, n_symbols=None, label="", tweak=None):
+    """Per-element DPD retrained at each angle (the table entry), load pull on,
+    over CFR x output backoff.  ``tweak(cfg)`` adjusts the config (a sensitivity
+    case).  Rows: beam deg, CFR, backoff, ACLR1, EVM, loaded array efficiency."""
+    from arraytx import ArraySim, load_config
+    rows = []
+    for cfr in cfrs:
+        for bo in backoffs:
+            cfg = load_config(cfg_path)
+            cfg.element.pa.load_pull.enabled = True
+            cfg.element.pa.backoff_db = bo
+            cfg.sim.cfr_papr_db = cfr
+            if tweak is not None:
+                tweak(cfg)
+            sim = ArraySim(cfg, n_symbols=n_symbols)
+            for th in angles:
+                r = sim.run(th, "per_element", conducted_diagnostics=False)
+                rows.append({"array": label, "beam deg": th, "CFR dB": cfr, "backoff dB": bo, "ACLR1": r.beam.aclr1_db,
+                             "EVM": r.beam.evm_db, "eta %": 100 * r.info["efficiency"]["eta_array_loaded"]})
+            print(f"  {label} CFR {cfr:.1f} backoff {bo:.0f}: " + "  ".join(
+                f"{x['beam deg']:.0f}deg {x['ACLR1']:.1f}/{x['eta %']:.1f}%" for x in rows[-len(angles):]), flush=True)
+    return rows
+
+
+def meets(x, margin, aclr_target=ACLR_TARGET_DBC, evm_target=EVM_TARGET_DB):
+    return x["ACLR1"] + margin <= aclr_target and x["EVM"] <= evm_target
+
+
+def design_table(rows, angles, label, margin, aclr_target=ACLR_TARGET_DBC, evm_target=EVM_TARGET_DB):
+    """Per angle the most efficient setting that meets the targets, and what the
+    60 deg (largest-angle) setting would give there.  The fixed setting is checked
+    against the targets at every angle: where it fails, its efficiency is not a
+    fair baseline and the gain is left out (NaN) and flagged."""
+    nan = float("nan")
+    ok_ = lambda x: meets(x, margin, aclr_target, evm_target)  # noqa: E731
+    pick = {}
+    for th in angles:
+        ok = [x for x in rows if x["beam deg"] == th and ok_(x)]
+        pick[th] = max(ok, key=lambda x: x["eta %"]) if ok else None
+    fixed = pick[max(angles)]
+    out = []
+    for th in angles:
+        p = pick[th]
+        same = None if fixed is None else next(x for x in rows if x["beam deg"] == th and x["CFR dB"] == fixed["CFR dB"]
+                                               and x["backoff dB"] == fixed["backoff dB"])
+        same_ok = same is not None and ok_(same)
+        out.append({"array": label, "beam deg": th, "CFR dB": p["CFR dB"] if p else nan, "backoff dB": p["backoff dB"] if p else nan,
+                    "ACLR1": p["ACLR1"] if p else nan, "EVM": p["EVM"] if p else nan, "eta %": p["eta %"] if p else nan,
+                    "eta fixed %": same["eta %"] if same else nan, "fixed meets": bool(same_ok),
+                    "adaptive gain pts": (p["eta %"] - same["eta %"]) if (p and same_ok) else nan})
+    return out, pick

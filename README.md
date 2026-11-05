@@ -16,7 +16,7 @@ polar_tx 的姊妹库（polar_tx ROADMAP D：GUI 里不再加架构、不做接�
 pip install -e ".[test,dev]"
 python examples/ex00_single_element_equals_polartx.py   # sub-6、S=0、1 单元：与 polar_tx 逐位相同
 python examples/ex03_scan_angle_x_dpd.py                # 扫描角 × DPD 方案的 OTA EVM / ACLR 表
-pytest -q                                               # 189 项（页面测试无 Chromium 时跳过）
+pytest -q                                               # 190 项（页面测试无 Chromium 时跳过）
 ARRAYTX_SMOKE=1 python examples/ex04_aclr_vs_direction.py   # 短突发（CI 用的尺寸）
 ```
 
@@ -35,7 +35,7 @@ FR2 28 GHz / 400 MHz、survey 互耦（相邻 −16 dB，assumed 以外的出处
 | 负载调制 | 扫描角改变 \|1+Γ_k\|（4 × 1 边缘 0.84 → 1.26，0° → 60°）；0° 训练的 DPD 用到 60° 损失 2.5–2.9 dB；两种 DPD 在训练角度上仍只差 ≤ 0.33 dB | ex09 / ex10，`load-pull-proposal.md` |
 | 效率（含 Γ） | 8 × 8 广播向 ACLR 变好，却多付 5.3 个效率点；内部单元比边缘低 2.5–6 点 | ex10 / ex13，`loaded-efficiency-proposal.md` |
 | outphasing | 阵列负载只是每单元复增益（戴维南），动 ACLR ≤ 0.07 dB；分支源阻抗 ρ = 0.1 时 DPD 追回 9 dB | ex12，`outphasing-load-proposal.md` |
-| DPD 表 | 一个 DPD 联合拟合多角度不行（+7.2 dB）；≤ 0.5 dB 最少 9 张（4 × 1，7.5°）/ 10 张（8 × 8，30° 以下 10°、以上 5°），系数按角度插值 | ex11 / ex14 / ex15，`scan-design.md` |
+| DPD 表 | 一个 DPD 联合拟合多角度不行（+7.2 dB）；≤ 0.5 dB 在测过的网格里最少 9 张（4 × 1，7.5°）/ 10 张（8 × 8，30° 以下 10°、以上 5°；更稀的只测了两种 9 张网格），系数按角度插值 | ex11 / ex14 / ex15，`scan-design.md` |
 | 设计表 | 0–30° 不回退、45° 回退 1 dB、60° 回退 2 dB（CFR 6.5 dB）；按角度切换比全程用 60° 的设置多约 9 个效率点 | ex16，`scan-design.md` |
 
 ## 工作台（GUI）
@@ -114,6 +114,7 @@ print(r.info["engine_line"]); print(r.beam.row()); print(r.sidelobe.row())
 | `ex14_dpd_table_step` | 扫描阵列要几张 DPD 表（原 ROADMAP B8，已结）：均匀 / 大角度加密网格 × 取近邻 / 按角度 / 按 sinθ / 按 |1+Γ| 插值，0–60° 每 2.5° 的最坏 ACLR 损失 |
 | `ex15_grid_dpd_table` | 8 × 8 的 DPD 表步长：均匀 / 分段加密网格 × 按角度 / 阵列平均 |1+Γ| / 每单元 |1+Γ_k| 插值，0–60° 每 2.5° 的最坏 ACLR 损失 |
 | `ex16_scan_design` | 扫描设计表：每个扫描角在 CFR × 输出回退上的 ACLR1-效率帕累托与设计选择，按角度切换对比全程用 60° 设置 |
+| `ex17_design_sensitivity` | 设计表对假设的敏感度：相邻互耦 −13 / −16 / −20 dB、κ 0.5 / 1、设计目标各动一个，看每个扫描角的回退与效率怎么变 |
 
 ## 模块
 

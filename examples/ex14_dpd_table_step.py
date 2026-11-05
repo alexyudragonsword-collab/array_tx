@@ -28,11 +28,9 @@ with the array DPD and on 8 x 8.
 """
 import numpy as np
 
-from _common import SCHEME_LABELS, banner, done, plt, smoke
+from _common import aclr_at, bracket, element_loads, SCHEME_LABELS, banner, done, plt, smoke
 from arraytx import ArraySim, load_config
-from arraytx.beam import steer
-from arraytx.dpd import blend_banks, predistort_drives
-from arraytx.metrics import ota_metrics
+from arraytx.dpd import blend_banks
 from arraytx.report import table
 
 EVAL = [0.0, 15.0, 30.0, 45.0, 60.0] if smoke() else list(np.arange(0.0, 60.0 + 1e-9, 2.5))
@@ -61,15 +59,8 @@ def sim_for(path, n_symbols=None):
     return ArraySim(cfg, n_symbols=n_symbols)
 
 
-def aclr_at(sim, bank, theta):
-    drives = predistort_drives(bank, sim.x, sim.geom, theta, sim.fs, sim.cfg.beam.steering)
-    _, _, rs = sim.radiate(drives)
-    return ota_metrics(sim.far_field(rs, theta), sim.wf, theta, "beam", offsets=(1,), with_sem=False).aclr1_db
-
-
 def table_bank(banks, grid, theta, mode, m):
-    lo = max(g for g in grid if g <= theta + 1e-9)
-    hi = min(g for g in grid if g >= theta - 1e-9)
+    lo, hi = bracket(grid, theta)
     if abs(hi - lo) < 1e-9:
         return banks[lo]
     if mode == "nearest":
@@ -87,8 +78,7 @@ def table_bank(banks, grid, theta, mode, m):
 def m_of(sim, theta):
     """m(theta): the mean |1 + Gamma_k| the undistorted steered drives put on the
     PAs -- one radiate, no metrics."""
-    sim.radiate(steer(sim.x, sim.geom, theta, sim.fs, sim.cfg.beam.steering))
-    return float(np.mean(sim.last_load_pull["abs_1pg_mean"]))
+    return float(np.mean(element_loads(sim, theta)))
 
 
 def curvature_grid(mload, n):

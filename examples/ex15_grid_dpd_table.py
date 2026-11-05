@@ -4,7 +4,7 @@ ex14 answered B8 for 4 x 1 (nine predistorters on a 7.5 deg grid keep the
 worst scan-angle ACLR1 loss <= 0.5 dB) and found the same table 0.87 dB short
 on 8 x 8, at 56.25 deg: the grid compresses harder at large angles, and its
 interior and edge elements see different active impedances (|1 + Gamma_k|
-0.63 / 0.73 at broadside, 1.30 / 1.20 at 60 deg).  ex14 also refuted using
+0.635 / 0.73 at broadside, 1.30 / 1.20 at 60 deg).  ex14 also refuted using
 the ARRAY-mean |1 + Gamma| to place grid angles.
 
 This example asks the 8 x 8 question with one more interpolation rule:
@@ -15,17 +15,18 @@ This example asks the 8 x 8 question with one more interpolation rule:
             (``dpd.blend_banks`` with one weight per element): edge and
             interior elements interpolate on their own operating points.
 
-Grids: the 7.5 deg table, 5 deg, and 7.5 deg refined to 5 / 2.5 deg above 45
-deg.  Every angle 0-60 deg in 2.5 deg steps is evaluated against retraining
-there (4 symbols per run; one 8 x 8 per-element training is ~35 s).
+Grids (nine): 7.5 deg and 5 deg uniform; 7.5 deg refined to 5 / 2.5 deg above
+45 deg; refined to 5 / 2.5 deg in 30-45 deg; 10 deg with 5 deg in 30-50 deg;
+and 5 deg everywhere above 30 deg with 7.5 or 10 deg below (the answer: 10
+banks).  Every angle 0-60 deg in 2.5 deg steps is evaluated against
+retraining there (4 symbols per run; one 8 x 8 per-element training is
+~35 s).  A table entry scored at an angle once is not scored again.
 """
 import numpy as np
 
-from _common import banner, done, plt, smoke
+from _common import aclr_at, bracket, edge_mask, element_loads, banner, done, plt, smoke
 from arraytx import ArraySim, load_config
-from arraytx.beam import steer
-from arraytx.dpd import blend_banks, predistort_drives
-from arraytx.metrics import ota_metrics
+from arraytx.dpd import blend_banks
 from arraytx.report import table
 
 CFG = "configs/fr2_8x8_survey.yaml"
@@ -55,18 +56,6 @@ RULES = ("angle", "load", "element")
 TARGET_DB = 0.5
 
 
-def m_elements(sim, theta):
-    """|1 + Gamma_k| per element under the undistorted steered drives."""
-    sim.radiate(steer(sim.x, sim.geom, theta, sim.fs, sim.cfg.beam.steering))
-    return np.array(sim.last_load_pull["abs_1pg_mean"])
-
-
-def aclr_at(sim, bank, theta):
-    drives = predistort_drives(bank, sim.x, sim.geom, theta, sim.fs, sim.cfg.beam.steering)
-    _, _, rs = sim.radiate(drives)
-    return ota_metrics(sim.far_field(rs, theta), sim.wf, theta, "beam", offsets=(1,), with_sem=False).aclr1_db
-
-
 def weight(mk, lo, hi, theta, rule):
     if rule == "angle":
         return (theta - lo) / (hi - lo)
@@ -86,24 +75,36 @@ sim = ArraySim(cfg, n_symbols=N_SYMBOLS)
 t0 = banner("ex15  the DPD table on the 8 x 8 grid: step and interpolation rule (the former ROADMAP B8, closed by ex15)", sim)
 
 angles = sorted({a for g in GRIDS.values() for a in g} | set(EVAL))
+edge = edge_mask(sim.geom)
 mk, retrained = {}, {}
 for th in angles:
-    mk[th] = m_elements(sim, th)
+    mk[th] = element_loads(sim, th)
     r = sim.run(th, "per_element", conducted_diagnostics=False)
     retrained[th] = (r.dpd, r.beam.aclr1_db)
-    edge = (sim.geom.ix == 0) | (sim.geom.ix == sim.geom.n_x - 1) | (sim.geom.iy == 0) | (sim.geom.iy == sim.geom.n_y - 1)
     print(f"  {th:5.1f} deg: retrained ACLR1 {r.beam.aclr1_db:7.2f} dBc   |1+G| edge {mk[th][edge].mean():.3f}  inner {mk[th][~edge].mean():.3f}"
           f"   [{r.seconds:.0f} s]", flush=True)
 
 rows = []
+# the same table entry at the same angle is the same radiate: a grid angle under any rule,
+# or a bracket two grids share -- score it once (an 8 x 8 radiate is ~15 s)
+scored: dict = {}
+
+
+def score(lo, hi, th, w):
+    key = (lo, hi, th) if w is None else (lo, hi, th, tuple(np.round(np.atleast_1d(w), 12)))
+    if key not in scored:
+        bank = retrained[lo][0] if w is None else blend_banks(retrained[lo][0], retrained[hi][0], w)
+        scored[key] = aclr_at(sim, bank, th)
+    return scored[key]
+
+
 for name, grid in GRIDS.items():
     for rule in (("angle",) if name in ANGLE_ONLY else RULES):
         losses = []
         for th in EVAL:
-            lo = max(g for g in grid if g <= th + 1e-9)
-            hi = min(g for g in grid if g >= th - 1e-9)
-            bank = retrained[lo][0] if hi == lo else blend_banks(retrained[lo][0], retrained[hi][0], weight(mk, lo, hi, th, rule))
-            losses.append(aclr_at(sim, bank, th) - retrained[th][1])
+            lo, hi = bracket(grid, th)
+            w = None if hi == lo else weight(mk, lo, hi, th, rule)
+            losses.append(score(lo, hi, th, w) - retrained[th][1])
         i = int(np.argmax(losses))
         rows.append({"table": name, "banks": len(grid), "rule": rule, "worst loss dB": losses[i], "at deg": EVAL[i],
                      "mean loss dB": float(np.mean(losses)), "losses": losses})

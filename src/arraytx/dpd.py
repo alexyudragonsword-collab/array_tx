@@ -192,8 +192,9 @@ def blend_banks(a: DPDBank, b: DPDBank, w) -> DPDBank:
     ws = np.atleast_1d(np.asarray(w, dtype=float))
     if ws.size > 1 and (a.scheme != "per_element" or ws.size != len(a.per_element)):
         raise ValueError(f"per-element weights need the per_element scheme and one weight per element, got {ws.size}")
-    if np.any(ws < 0.0) or np.any(ws > 1.0):
-        raise ValueError(f"blend weight must be in [0, 1], got {w}")
+    # written so NaN fails it too (a NaN weight would put NaN coefficients into the drives)
+    if ws.size == 0 or not np.all((ws >= 0.0) & (ws <= 1.0)):
+        raise ValueError(f"blend weight must be in [0, 1] (finite, at least one), got {w}")
     if a.scheme == "per_element" and len(a.per_element) != len(b.per_element):
         raise ValueError(f"blend needs the same element count, got {len(a.per_element)} and {len(b.per_element)}")
     out = copy.deepcopy(a)

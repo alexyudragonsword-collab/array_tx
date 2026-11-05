@@ -9,8 +9,10 @@ Design targets (source: assumed -- design choices, not specification
 limits): ACLR1 <= -45 dBc at the beam (about what the array reaches without
 load modulation), EVM <= -25 dB (3 dB inside the 64-QAM 8 % limit, -21.9 dB,
 TS 38.101-2).  The per-element DPD is retrained at each angle (the table
-entry); the table's interpolation loss between entries (ex14: +0.30 dB worst
-on 4 x 1 with nine banks) is carried as an ACLR margin.
+entry); the table's interpolation loss between entries is carried as an ACLR
+margin per array (ex14: +0.30 dB on 4 x 1 with nine banks; ex15: +0.35 dB on
+8 x 8 with ten).  The 60 deg setting used as the fixed baseline is checked
+against the targets at every angle; where it fails, no gain is claimed.
 
 For each angle: the Pareto front of ACLR1 vs array efficiency over
 backoff x CFR, the most efficient point that meets both targets, and the
@@ -18,42 +20,14 @@ efficiency a FIXED setting (the one 60 deg needs) would cost at that angle.
 """
 import numpy as np
 
-from _common import banner, done, plt, smoke
+from _common import (ACLR_TARGET_DBC, EVM_TARGET_DB, TABLE_MARGIN_DB, banner, design_sweep,
+                     design_table, done, plt, smoke)
 from arraytx import ArraySim, load_config
 from arraytx.report import table
 
-ACLR_TARGET_DBC = -45.0
-EVM_TARGET_DB = -25.0
-TABLE_MARGIN_DB = 0.30          # ex14: worst interpolation loss of the nine-bank 7.5 deg table (4 x 1)
 ANGLES = [0.0, 60.0] if smoke() else [0.0, 15.0, 30.0, 45.0, 60.0]
 BACKOFFS = [0.0, 2.0] if smoke() else [0.0, 1.0, 2.0, 3.0]
 CFRS = [8.5] if smoke() else [8.5, 7.5, 6.5]
-
-
-def sim_for(path, backoff, cfr, n_symbols=None):
-    cfg = load_config(path)
-    cfg.element.pa.load_pull.enabled = True
-    cfg.element.pa.backoff_db = backoff
-    cfg.sim.cfr_papr_db = cfr
-    return ArraySim(cfg, n_symbols=n_symbols)
-
-
-def sweep(path, angles, backoffs, cfrs, n_symbols=None, label=""):
-    rows = []
-    for cfr in cfrs:
-        for bo in backoffs:
-            sim = sim_for(path, bo, cfr, n_symbols)
-            for th in angles:
-                r = sim.run(th, "per_element", conducted_diagnostics=False)
-                rows.append({"array": label, "beam deg": th, "CFR dB": cfr, "backoff dB": bo, "ACLR1": r.beam.aclr1_db,
-                             "EVM": r.beam.evm_db, "eta %": 100 * r.info["efficiency"]["eta_array_loaded"]})
-            print(f"  {label} CFR {cfr:.1f} backoff {bo:.0f}: " + "  ".join(
-                f"{x['beam deg']:.0f}deg {x['ACLR1']:.1f}/{x['eta %']:.1f}%" for x in rows[-len(angles):]), flush=True)
-    return rows
-
-
-def meets(x, margin=TABLE_MARGIN_DB):
-    return x["ACLR1"] + margin <= ACLR_TARGET_DBC and x["EVM"] <= EVM_TARGET_DB
 
 
 def pareto(pts):
@@ -63,40 +37,22 @@ def pareto(pts):
                   key=lambda p: p["eta %"])
 
 
-def design(rows, angles, label):
-    out = []
-    worst = max(angles)
-    pick = {}
-    for th in angles:
-        ok = [x for x in rows if x["beam deg"] == th and meets(x)]
-        pick[th] = max(ok, key=lambda x: x["eta %"]) if ok else None
-    fixed = pick[worst]
-    for th in angles:
-        p = pick[th]
-        same = None if fixed is None else next(x for x in rows if x["beam deg"] == th and x["CFR dB"] == fixed["CFR dB"]
-                                               and x["backoff dB"] == fixed["backoff dB"])
-        out.append({"array": label, "beam deg": th, "CFR dB": p["CFR dB"] if p else float("nan"), "backoff dB": p["backoff dB"] if p else float("nan"),
-                    "ACLR1": p["ACLR1"] if p else float("nan"), "EVM": p["EVM"] if p else float("nan"), "eta %": p["eta %"] if p else float("nan"),
-                    "eta fixed %": same["eta %"] if same else float("nan"),
-                    "adaptive gain pts": (p["eta %"] - same["eta %"]) if (p and same) else float("nan")})
-    return out, pick
-
-
-s0 = sim_for("configs/fr2_4el_survey.yaml", 0.0, 8.5)
+s0 = ArraySim(load_config("configs/fr2_4el_survey.yaml"))
 t0 = banner("ex16  scan design table: backoff / CFR / DPD table per scan angle, priced in drain efficiency", s0)
-print(f"  targets (assumed design choices): ACLR1 <= {ACLR_TARGET_DBC} dBc with a {TABLE_MARGIN_DB} dB table margin, EVM <= {EVM_TARGET_DB} dB")
+print(f"  targets (assumed design choices): ACLR1 <= {ACLR_TARGET_DBC} dBc with the DPD table margin "
+      f"({', '.join(f'{k} {v} dB' for k, v in TABLE_MARGIN_DB.items())}: ex14 / ex15), EVM <= {EVM_TARGET_DB} dB")
 
 print("\nPart 1 — 4 x 1 full burst, per-element DPD retrained per angle, load pull on (ACLR1 dBc / array efficiency, Gamma in):")
-rows1 = sweep("configs/fr2_4el_survey.yaml", ANGLES, BACKOFFS, CFRS, label="4 x 1")
-d1, pick1 = design(rows1, ANGLES, "4 x 1")
+rows1 = design_sweep("configs/fr2_4el_survey.yaml", ANGLES, BACKOFFS, CFRS, label="4 x 1")
+d1, pick1 = design_table(rows1, ANGLES, "4 x 1", TABLE_MARGIN_DB["4 x 1"])
 print(table(d1))
 
 rows2, d2 = [], []
 if not smoke():
     a8, b8, c8 = [0.0, 30.0, 60.0], [0.0, 2.0, 3.0], [8.5, 6.5]
     print("\nPart 2 — 8 x 8 (4 symbols), the same question on a coarser grid:")
-    rows2 = sweep("configs/fr2_8x8_survey.yaml", a8, b8, c8, n_symbols=4, label="8 x 8")
-    d2, _ = design(rows2, a8, "8 x 8")
+    rows2 = design_sweep("configs/fr2_8x8_survey.yaml", a8, b8, c8, n_symbols=4, label="8 x 8")
+    d2, _ = design_table(rows2, a8, "8 x 8", TABLE_MARGIN_DB["8 x 8"])
     print(table(d2))
 
 for d in (d1, d2):
@@ -114,7 +70,7 @@ for th, col in zip(ANGLES, cols):
     ax[0].plot([p["eta %"] for p in fr], [p["ACLR1"] for p in fr], "o-", color=col, ms=4, label=f"{th:.0f} deg")
     if pick1.get(th):
         ax[0].plot(pick1[th]["eta %"], pick1[th]["ACLR1"], "*", color=col, ms=13, mec="k", mew=0.6)
-ax[0].axhline(ACLR_TARGET_DBC - TABLE_MARGIN_DB, color="#8a8a85", lw=0.8, ls="--")
+ax[0].axhline(ACLR_TARGET_DBC - TABLE_MARGIN_DB["4 x 1"], color="#8a8a85", lw=0.8, ls="--")
 ax[0].set(xlabel="array drain efficiency [%]  (Gamma in)", ylabel="OTA ACLR1 at the beam [dBc]",
           title="4 x 1: Pareto front per scan angle (star = design pick)" + (" (smoke)" if smoke() else ""))
 ax[0].legend(fontsize=7)

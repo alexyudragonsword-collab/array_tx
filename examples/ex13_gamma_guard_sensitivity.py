@@ -14,7 +14,7 @@ so this example re-runs the decisive points at gamma_max = 0.5 / 0.8 / 1.0:
 """
 import numpy as np
 
-from _common import SCHEME_COLORS, SCHEME_LABELS, banner, done, plt, smoke
+from _common import edge_mask, SCHEME_COLORS, SCHEME_LABELS, banner, done, plt, smoke
 from arraytx import ArraySim, load_config
 from arraytx.dpd import predistort_drives
 from arraytx.metrics import ota_metrics
@@ -55,7 +55,7 @@ print(table(rows1))
 
 print(f"\nPart 2 — 8 x 8 ({N_SYMBOLS_GRID} symbols), polar, load pull on, vs gamma_max:")
 g = s0.geom
-edge = (g.ix == 0) | (g.ix == g.n_x - 1) | (g.iy == 0) | (g.iy == g.n_y - 1)
+edge = edge_mask(g)
 rows2, rows3 = [], []
 for gm in GMAX:
     sim = sim_for("configs/fr2_8x8_survey.yaml", gm, n_symbols=N_SYMBOLS_GRID)
