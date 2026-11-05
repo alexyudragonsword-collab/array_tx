@@ -42,9 +42,12 @@ GRIDS = {
     "7.5, 5 in 30-45": [0.0, 7.5, 15.0, 22.5, 30.0, 35.0, 40.0, 45.0, 52.5, 60.0],
     "7.5, 2.5 in 30-45": [0.0, 7.5, 15.0, 22.5, 30.0, 32.5, 35.0, 37.5, 40.0, 42.5, 45.0, 52.5, 60.0],
     "10, 5 in 30-50": [0.0, 10.0, 20.0, 30.0, 35.0, 40.0, 45.0, 50.0, 60.0],
+    # run 2: refining 30-45 moved the worst to 55 deg (52.5-60), so both bands need 5 deg
+    "7.5, 5 above 30": [0.0, 7.5, 15.0, 22.5, 30.0, 35.0, 40.0, 45.0, 50.0, 55.0, 60.0],
+    "10, 5 above 30": [0.0, 10.0, 20.0, 30.0, 35.0, 40.0, 45.0, 50.0, 55.0, 60.0],
 }
 #: the mid-band grids only with the angle rule: on the first four, load / element never beat it (ex15 run 1)
-ANGLE_ONLY = {"7.5, 5 in 30-45", "7.5, 2.5 in 30-45", "10, 5 in 30-50"}
+ANGLE_ONLY = {"7.5, 5 in 30-45", "7.5, 2.5 in 30-45", "10, 5 in 30-50", "7.5, 5 above 30", "10, 5 above 30"}
 if smoke():
     GRIDS = {"uniform 45": [0.0, 45.0]}                     # smoke: the flow, not the answer
     ANGLE_ONLY = set()
