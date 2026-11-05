@@ -130,6 +130,14 @@ def design_sweep(cfg_path, angles, backoffs, cfrs, *, n_symbols=None, label="", 
     return rows
 
 
+def same_setting(a, b):
+    """True when two design-table rows picked the same (CFR, backoff); two
+    angles where nothing met the targets (NaN) count as the same."""
+    import math
+    key = lambda x: tuple("none" if math.isnan(x[k]) else x[k] for k in ("CFR dB", "backoff dB"))  # noqa: E731
+    return key(a) == key(b)
+
+
 def meets(x, margin, aclr_target=ACLR_TARGET_DBC, evm_target=EVM_TARGET_DB):
     return x["ACLR1"] + margin <= aclr_target and x["EVM"] <= evm_target
 

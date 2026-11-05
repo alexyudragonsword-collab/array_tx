@@ -19,7 +19,7 @@ gain 1.16), so -14.5 dB (0.98) is the stronger case.
 """
 import numpy as np
 
-from _common import (ACLR_TARGET_DBC, EVM_TARGET_DB, TABLE_MARGIN_DB, banner, design_sweep, design_table, done, plt,
+from _common import (ACLR_TARGET_DBC, EVM_TARGET_DB, TABLE_MARGIN_DB, banner, design_sweep, design_table, done, plt, same_setting,
                      smoke)
 from arraytx import ArraySim, load_config
 from arraytx.report import table
@@ -67,7 +67,7 @@ base = {d["beam deg"]: d for d in designs[base_name]}
 
 def summary(name, d):
     by = {x["beam deg"]: x for x in d}
-    changed = [th for th in ANGLES if (by[th]["CFR dB"], by[th]["backoff dB"]) != (base[th]["CFR dB"], base[th]["backoff dB"])]
+    changed = [th for th in ANGLES if not same_setting(by[th], base[th])]
     gains = [x["adaptive gain pts"] for x in d if np.isfinite(x["adaptive gain pts"])]
     return {"case": name, "schedule (backoff dB @ " + "/".join(f"{a:.0f}" for a in ANGLES) + ")": " / ".join(
                 "-" if not np.isfinite(by[th]["backoff dB"]) else f"{by[th]['backoff dB']:.0f}" for th in ANGLES),
@@ -106,6 +106,8 @@ if not smoke():
         try:
             rows = design_sweep("configs/fr2_8x8_survey.yaml", A8, B8, C8, n_symbols=4, label="8 x 8", tweak=tweak)
         except ValueError as exc:                          # the passivity check, not a crash
+            if "not passive" not in str(exc):
+                raise                                      # any other ValueError is a real failure
             print(f"  not a passive 8 x 8 coupling matrix: {exc}".split("; lower")[0])
             continue
         designs8[name], _ = design_table(rows, A8, "8 x 8", TABLE_MARGIN_DB["8 x 8"])
@@ -116,10 +118,10 @@ if not smoke():
         s3.append({"case": name, "schedule (backoff dB @ 0/30/60)": " / ".join(
                        "-" if not np.isfinite(by[t]["backoff dB"]) else f"{by[t]['backoff dB']:.0f}" for t in A8),
                    "CFR @ 60": by[60.0]["CFR dB"], "eta @ 0 %": by[0.0]["eta %"], "eta @ 60 %": by[60.0]["eta %"],
-                   "angles changed": sum((by[t]["CFR dB"], by[t]["backoff dB"]) != (base8[t]["CFR dB"], base8[t]["backoff dB"]) for t in A8)})
+                   "angles changed": sum(not same_setting(by[t], base8[t]) for t in A8)})
     print(table(s3))
 
-fig, ax = plt.subplots(1, 2, figsize=(10.5, 3.8))
+fig, ax = plt.subplots(1, 3 if designs8 else 2, figsize=(15.5 if designs8 else 10.5, 3.8))
 for (name, d), mk in zip(designs.items(), ("o-", "s--", "^--", "d:")):
     ax[0].step([x["beam deg"] for x in d], [x["backoff dB"] for x in d], where="mid", label=name)
     ax[1].plot([x["beam deg"] for x in d], [x["eta %"] for x in d], mk, ms=5, label=name)
@@ -127,4 +129,14 @@ ax[0].set(xlabel="beam [deg]", ylabel="output backoff picked [dB]", title="4 x 1
 ax[1].set(xlabel="beam [deg]", ylabel="array drain efficiency at the pick [%]", title="what each assumption does to efficiency")
 ax[0].legend(fontsize=7)
 ax[1].legend(fontsize=7)
+if designs8:
+    # 8 x 8: efficiency at the pick, the backoff written next to each point (-13 dB is not passive there)
+    for (name, d), mk in zip(designs8.items(), ("o-", "s--", "^--", "d:")):
+        ax[2].plot([x["beam deg"] for x in d], [x["eta %"] for x in d], mk, ms=5, label=name)
+        for x in d:
+            if np.isfinite(x["backoff dB"]):
+                ax[2].annotate(f"{x['backoff dB']:.0f}", (x["beam deg"], x["eta %"]), textcoords="offset points", xytext=(4, 2), fontsize=6)
+    ax[2].set(xlabel="beam [deg]", ylabel="array drain efficiency at the pick [%]",
+              title="8 x 8: efficiency at the pick (label = backoff dB)")
+    ax[2].legend(fontsize=7)
 done(t0, fig, "ex17_design_sensitivity.png")
