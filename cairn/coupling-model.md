@@ -24,6 +24,8 @@ authoring_mode: ai_generated
 - **相位决定哪个扫描角难**：相邻相位 180° 时 |1+Γ| 随扫描角上升（8 × 8 0.678 → 1.252），0° 时下降（1.397 → 0.807）。负载牵引打开时，设计表跟着翻转（`scan-design.md`）。
 - **touchstone**：v1、Hz / RI、2 端口块是列序 S11 S21 S12 S22（读写都按行序会把 S21/S12 读反）；端口序 = 单元 row-major 序；
   analytic → .sNp → touchstone 回读逐位相同（等值端点 `np.interp` 精确）。
+  面阵同样：4 × 4 survey（复数、257 个频点、行间 −3 dB）写成 .s16p 再作 touchstone 读回，矩阵、辐射波、负载牵引下的 |1+Γ_k| 都逐位相同；
+  8 × 8 的 .s64p 往返逐位相同（`tests/test_coupling.py`）。拿到实测面阵文件只改 `coupling.source` 与 `touchstone.path` 两个键。
 
 ## 为什么线性泄漏分不开每单元 DPD 与阵列 DPD（里程碑 1 被推翻的预期）
 

@@ -22,7 +22,7 @@ outphasing 的效率仍是 polar_tx 的 Chireix 律，没接 Γ。
 
 ### B7. 面阵的互耦只有邻域类，没有单元方向图 / 极化
 8 × 8 的 x1 / x2 / y1 / y2 / d1 五类邻居加上按电长度的相位，无源性只是"不违反"（泄漏增益 0.82），不是实测；E 面 / H 面耦合差异
-（`c1y_rel_db`）、对角（`c_diag_rel_db`）都是 assumed。单元方向图仍是 isotropic / cos θ，没有极化。拿到面阵 .sNp 就切 touchstone。
+（`c1y_rel_db`）、对角（`c_diag_rel_db`）都是 assumed。单元方向图仍是 isotropic / cos θ，没有极化。拿到面阵 .sNp 就切 touchstone（面阵往返已有逐位测试：端口按单元 row-major 序，k = ix + n_x·iy）。
 
 ### B2. 事件引擎在 FR2 不可用
 polar_tx ROADMAP B1：event 引擎 LTE-20 带宽已 29 % 相位推进不可用。FR2 400 MHz 只能用 response / dtc_openloop，

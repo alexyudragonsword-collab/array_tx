@@ -185,3 +185,48 @@ def test_pair_sparse_leak_equals_the_dense_einsum_bit_for_bit():
     ref = np.fft.ifft(Y + np.einsum("fkj,jf->kf", dense, Y), axis=1)
     assert np.array_equal(got, ref)
     assert (1, 3) not in m.nonzero_pairs() and len(m.nonzero_pairs()) == n * n - 1
+
+
+def test_planar_touchstone_replaces_the_survey_bit_for_bit(tmp_path):
+    """A measured planar .sNp drops in by changing one config key: the 4 x 4
+    survey matrix (complex, frequency-dependent, 257 points) written as .s16p
+    and read back as the touchstone source gives the same matrix and the same
+    radiated waves and active loads with load pull on -- ports in row-major
+    element order (port k = ix + n_x * iy)."""
+    from arraytx import ArraySim
+    from arraytx.beam import steer
+
+    def cfg_for(source, path=None):
+        cfg = load_config("configs/fr2_8x8_survey.yaml")
+        cfg.array.n_elements, cfg.array.n_rows = 4, 4
+        cfg.element.pa.load_pull.enabled = True
+        cfg.coupling.survey.c1y_rel_db = -3.0             # rows and columns differ, so a port swap would show
+        cfg.coupling.source = source
+        cfg.coupling.touchstone.path = path
+        return cfg
+
+    a = ArraySim(cfg_for("survey"), n_symbols=2)
+    p = tmp_path / "survey_4x4.s16p"
+    write_matrix_touchstone(str(p), a.coupling)
+    b = ArraySim(cfg_for("touchstone", str(p)), n_symbols=2)
+    assert np.array_equal(a.coupling.freqs_hz, b.coupling.freqs_hz) and np.array_equal(a.coupling.s, b.coupling.s)
+    # row-major ports: element 1 is the x-neighbour of 0, element 4 (= n_x) its y-neighbour, 3 dB weaker
+    s0 = b.coupling.at(np.array([a.f0]))[0]
+    assert abs(20 * np.log10(abs(s0[0, 4]) / abs(s0[0, 1])) + 3.0) < 1e-9
+    drives = steer(a.x, a.geom, 30.0, a.fs, a.cfg.beam.steering)
+    _, ya, ra = a.radiate(drives)
+    la = list(a.last_load_pull["abs_1pg_mean"])
+    _, yb, rb = b.radiate(drives)
+    assert np.array_equal(ya, yb) and np.array_equal(ra, rb)
+    assert la == list(b.last_load_pull["abs_1pg_mean"])
+
+
+def test_grid_touchstone_8x8_roundtrip_is_bitwise(tmp_path):
+    """The 64-port file format: an 8 x 8 analytic matrix written as .s64p comes back identical."""
+    from arraytx.geometry import ArrayGeometry
+    g = ArrayGeometry(8, 8, 0.5, 0.5, F0)
+    m = analytic_matrix(g, -16.0, 180.0, -6.0, F0 - FS / 2, F0 + FS / 2, c1y_rel_db=-3.0, phase_from_distance=True)
+    p = tmp_path / "a.s64p"
+    write_matrix_touchstone(str(p), m)
+    back = touchstone_matrix(str(p))
+    assert back.n == 64 and np.array_equal(back.s, m.s) and np.array_equal(back.freqs_hz, m.freqs_hz)
