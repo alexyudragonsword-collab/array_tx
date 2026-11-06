@@ -24,7 +24,7 @@ ARRAYTX_SMOKE=1 python examples/ex04_aclr_vs_direction.py   # 短突发（CI 用
 
 ## 结果速览
 
-FR2 28 GHz / 400 MHz、survey 互耦（相邻 −16 dB，assumed 以外的出处见 config）、单元误差开、全尺寸。数字是主题笔记里的当前值，
+FR2 28 GHz / 400 MHz、survey 形状的互耦（相邻 −16 dB，source: assumed——全文里没有够格的实测值，已读到的上界见 config 的 ref）、单元误差开、全尺寸。数字是主题笔记里的当前值，
 每条可由括号里的示例复现。DTC 开环引擎是线性化的，杂散 / 互调只作趋势。
 
 | 主题 | 结论 | 来源 |

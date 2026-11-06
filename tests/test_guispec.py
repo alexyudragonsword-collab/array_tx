@@ -33,7 +33,7 @@ def test_choices_come_from_the_library():
     assert set(by["dpd.scheme"].choices) == {"none", "per_element", "array"}
     assert by["element.lo.clock_profile"].kind == "choice" and None in by["element.lo.clock_profile"].choices
     assert any(str(x).startswith("bundled:") for x in by["element.lo.clock_profile"].choices)
-    assert by["coupling.survey.c1_db"].source == "survey" and "arXiv" in (by["coupling.survey.c1_db"].ref or "")
+    assert by["coupling.survey.c1_db"].source == "assumed" and "arXiv" in (by["coupling.survey.c1_db"].ref or "")
     assert by["coupling.survey.c1_db"].visible_when == ("coupling.source", ("survey",))
 
 
@@ -72,6 +72,6 @@ def test_yaml_written_by_the_page_loads_back_the_same(tmp_path):
            {k: (v.source, v.ref) for k, v in cfg.provenance.items()}
     data = yaml.safe_load(text)
     assert isinstance(data["coupling"]["survey"]["c1_db"], dict)       # written in {value, source, ref} form
-    assert data["coupling"]["survey"]["c1_db"]["source"] == "survey"
+    assert data["coupling"]["survey"]["c1_db"]["source"] == "assumed"
     assert not isinstance(data["array"]["n_elements"], dict)           # a design choice stays a bare scalar
     assert diff(config_from_dict(data), cfg) == []

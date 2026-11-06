@@ -136,13 +136,14 @@ class CouplingAnalyticCfg:
     phase_from_distance: bool = _f(True, "", "phase of the farther classes = c1_deg + the free-space electrical length beyond one pitch (x2 at lambda/2 pitch: +180 deg); off = every class at c1_deg (the milestone-1 reading, not passive on a 2-D grid)")
 
 
-SURVEY_REF_C1 = ('abstract-level (ROADMAP A1): US patent 10910732 — 28 GHz array, measured mutual coupling better than '
-                 '-16 dB; Int. J. Electron. Commun. (ScienceDirect S1434841126001263) — lambda/2 (5.4 mm) SIW endfire '
-                 'array, adjacent coupling below -15 dB in the lower band. Full texts read 2026-11-05: '
-                 'arXiv:2407.09944 (28 GHz linear patch array, lambda0/2 = 5.34 mm, CATR OTA) states no coupling '
-                 'number; simulated, no decoupling: JEES 26(3) 2026, doi:10.26866/jees.2026.3.r.363, adjacent below '
-                 '-20 dB at 5 mm (~0.47 lambda), arXiv:2010.16049 -24 dB at 28 GHz (circular array). -16 dB is the '
-                 'strong end of these')
+SURVEY_REF_C1 = ('assumed (ROADMAP A1): no full text read gives a measured adjacent coupling for a 28 GHz lambda/2 '
+                 'patch array without decoupling. Abstract-level only: US patent 10910732 — 28 GHz array, measured '
+                 'mutual coupling better than -16 dB; Int. J. Electron. Commun. (ScienceDirect S1434841126001263) — '
+                 'lambda/2 (5.4 mm) SIW endfire array, adjacent coupling below -15 dB in the lower band. Full texts '
+                 'read 2026-11-05: arXiv:2407.09944 (28 GHz linear patch array, lambda0/2 = 5.34 mm, CATR OTA) states '
+                 'no coupling number; simulated, no decoupling: JEES 26(3) 2026, doi:10.26866/jees.2026.3.r.363, '
+                 'adjacent below -20 dB at 5 mm (~0.47 lambda), arXiv:2010.16049 -24 dB at 28 GHz (circular array). '
+                 '-16 dB is kept as the pessimistic end of these')
 SURVEY_REF_PHASE = ("assumed: sign convention only -- the adjacent coupled wave arrives half a wavelength (pi) later "
                     "at f0 for lambda/2 pitch; the papers above do not publish the phase")
 SURVEY_REF_C2 = ("assumed: next-adjacent coupling 6 dB below adjacent is the common reading of published S-parameter "
@@ -155,8 +156,8 @@ SURVEY_REF_DIAG = ("assumed: a diagonal neighbour at sqrt(2) pitch 6 dB below ad
 
 @dataclass
 class CouplingSurveyCfg:
-    c1_db: float = _f(-16.0, "dB", "adjacent-element coupling magnitude at f0 from published lambda/2 patch arrays at 28 GHz",
-                      source="survey", ref=SURVEY_REF_C1)
+    c1_db: float = _f(-16.0, "dB", "adjacent-element coupling magnitude at f0 (28 GHz lambda/2 patch row; published bounds in the ref)",
+                      source="assumed", ref=SURVEY_REF_C1)
     c1_deg_at_f0: float = _f(180.0, "deg", "adjacent coupling phase at f0", source="assumed", ref=SURVEY_REF_PHASE)
     c2_rel_db: float = _f(-6.0, "dB", "next-adjacent coupling relative to c1", source="assumed", ref=SURVEY_REF_C2)
     c1y_rel_db: float = _f(0.0, "dB", "adjacent coupling along y (next row) relative to c1 (planar arrays only)",

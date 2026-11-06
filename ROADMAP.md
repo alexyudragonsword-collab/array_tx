@@ -5,10 +5,10 @@
 ## A. 被外部阻塞
 
 ### A1. 互耦 survey 典型值等全文核对 / 等实测 S 参数
-`configs/*.yaml` 里 `coupling.survey` 的相邻耦合 −16 dB 只有摘要级出处（见 config 里 `ref`），全文核对见下（arXiv / JEES 已放行，PMC / MDPI 仍读不到）。
+`configs/*.yaml` 里 `coupling.survey` 的相邻耦合 −16 dB 现标 source: assumed（见 config 里 `ref`），全文核对见下（arXiv / JEES 已放行，PMC / MDPI 仍读不到）。
 拿到实测 `.sNp` 就切 `coupling.source: touchstone`，不改任何别的抽取（铁律 5）。
 2026-11-05 放行 arxiv.org / www.jees.kr 后读了全文：arXiv:2407.09944 与 JKIEES 2017 都没有互耦数字；全文里只有仿真、无去耦的上界
-（JEES 2026 < −20 dB @ 0.47 λ，arXiv:2010.16049 −24 dB），www.mdpi.com 站点拒绝（403）。−16 dB 仍是摘要级，config 的出处说明已改正。
+（JEES 2026 < −20 dB @ 0.47 λ，arXiv:2010.16049 −24 dB），www.mdpi.com 站点拒绝（403）。−16 dB 自 2026-11-06 起标 assumed（值不变，偏悲观）。
 要的不只是幅度：ex18 表明相邻互耦**相位**决定哪一头难（180° 时 60° 要回退，0° 时广播向要退 3 dB），E / H 面之比决定 8 × 8 的无源上限
 （0 dB −14.3 dB，−3 dB −13.0 dB）。所以要的是面阵的复数 S 参数（.sNp），至少相邻行内 / 行间各一个复数。
 

@@ -65,7 +65,9 @@ def test_version_spec_and_config(server):
     assert s["ok"] and len(s["controls"]) >= 50 and s["schemes"] == ["none", "per_element", "array"]
     c = _get(server + "api/config")
     assert c["source_path"].endswith("fr2_4el_survey.yaml") and c["values"]["coupling.source"] == "survey"
-    assert c["provenance"]["coupling.survey.c1_db"]["source"] == "survey" and "arraytx_config" in c["yaml"]
+    want = load_config("configs/fr2_4el_survey.yaml").provenance["coupling.survey.c1_db"]          # the config's own label
+    got = c["provenance"]["coupling.survey.c1_db"]
+    assert (got["source"], got["ref"]) == (want.source, want.ref) and "arraytx_config" in c["yaml"]
 
 
 def test_validate_reports_the_diff_and_refuses_bad_values(server):

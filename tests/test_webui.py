@@ -90,8 +90,9 @@ def test_form_is_the_spec_and_a_run_lands_everywhere(server, browser):
     n_rows = page.evaluate("document.querySelectorAll('#form .row').length")
     n_spec = page.evaluate("fetch('api/spec').then(r => r.json()).then(s => s.controls.length)")
     assert n_rows == n_spec >= 50
-    # provenance pills come from the config: the survey number says survey
-    assert page.evaluate("document.querySelector('.row[data-path=\"coupling.survey.c1_db\"] .pill').textContent") == "survey"
+    # provenance pills come from the config: the pill says what the config says
+    want = load_config("configs/fr2_4el_survey.yaml").provenance["coupling.survey.c1_db"].source
+    assert page.evaluate("document.querySelector('.row[data-path=\"coupling.survey.c1_db\"] .pill').textContent") == want
     # analytic rows are hidden while the source is survey
     assert page.evaluate("document.querySelector('.row[data-path=\"coupling.analytic.c1_db\"]').hidden") is True
     page.wait_for_function("document.querySelectorAll('#table tbody tr').length >= 1", timeout=180000)

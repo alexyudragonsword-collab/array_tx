@@ -16,7 +16,7 @@ authoring_mode: ai_generated
 - **一条路径**：analytic / survey / touchstone 都产出 `CouplingMatrix(freqs, S[F,n,n])`，只经 `apply_coupling` 进链路：
   R_k(f) = Y_k(f) + Σ_j S_kj(f) Y_j(f)，对角永远不用（单元自身的反射不在这里建）。S 恰为全零时原样返回输入对象（1 单元 = polar_tx 逐位相同的前提）。
 - **邻域类**（analytic / survey）：x1 相邻、x2 隔一个、y1 隔一行、y2 隔两行、d1 对角；一行上只出现 x1 / x2，即里程碑 1 的形状。
-  幅度：c1（survey −16 dB，摘要级出处见 config）、c2_rel −6 dB、c1y_rel 0 dB、c_diag_rel −6 dB（后三者 assumed，理由在 `config.py` 的 ref）。
+  幅度：c1 −16 dB、c2_rel −6 dB、c1y_rel 0 dB、c_diag_rel −6 dB，全部 assumed（c1 自 2026-11-06 起：全文核对没有够格的实测值，仿真上界 −20 / −24 dB，−16 dB 是偏悲观的取法；理由在 `config.py` 的 ref）。
 - **相位**：x1 在 f0 为 c1_deg（180°，符号约定）；远邻 = c1_deg + 超出一个间距的自由空间电长度（`phase_from_distance`，默认开）：
   λ/2 间距 x2 +180°（即 0°），对角 +74.5°（即 −105.4°）。survey 的频率依赖是纯延时 φ(f) = φ0 − 2π(f−f0) d/c（`path_delay_from_spacing`）。
 - **无源性**：`build_coupling` 算泄漏矩阵的最大奇异值，> 1 抛错。4 单元 survey 0.33；8 × 8 survey 0.82。

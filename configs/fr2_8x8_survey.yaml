@@ -43,8 +43,8 @@ coupling:
   survey:
     c1_db:
       value: -16.0
-      source: survey
-      ref: "abstract-level (ROADMAP A1): US patent 10910732 — 28 GHz array, measured mutual coupling better than -16 dB; Int. J. Electron. Commun. (ScienceDirect S1434841126001263) — lambda/2 (5.4 mm) SIW endfire array, adjacent coupling below -15 dB in the lower band. Full texts read 2026-11-05: arXiv:2407.09944 (28 GHz linear patch array, lambda0/2 = 5.34 mm, CATR OTA) states no coupling number; simulated, no decoupling: JEES 26(3) 2026, doi:10.26866/jees.2026.3.r.363, adjacent below -20 dB at 5 mm (~0.47 lambda), arXiv:2010.16049 -24 dB at 28 GHz (circular array). -16 dB is the strong end of these"
+      source: assumed
+      ref: "assumed (ROADMAP A1): no full text read gives a measured adjacent coupling for a 28 GHz lambda/2 patch array without decoupling. Abstract-level only: US patent 10910732 — 28 GHz array, measured mutual coupling better than -16 dB; Int. J. Electron. Commun. (ScienceDirect S1434841126001263) — lambda/2 (5.4 mm) SIW endfire array, adjacent coupling below -15 dB in the lower band. Full texts read 2026-11-05: arXiv:2407.09944 (28 GHz linear patch array, lambda0/2 = 5.34 mm, CATR OTA) states no coupling number; simulated, no decoupling: JEES 26(3) 2026, doi:10.26866/jees.2026.3.r.363, adjacent below -20 dB at 5 mm (~0.47 lambda), arXiv:2010.16049 -24 dB at 28 GHz (circular array). -16 dB is kept as the pessimistic end of these"
     c1_deg_at_f0:
       value: 180.0
       source: assumed
