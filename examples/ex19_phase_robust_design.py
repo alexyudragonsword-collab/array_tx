@@ -21,6 +21,8 @@ instead of against the angle.
             oracle        the least backoff that meets the targets there.
           Reported: whether each meets the targets, and its efficiency.
 Targets as ex16 (assumed design choices).  4 x 1 full burst; 8 x 8 4 symbols.
+m is measured with undistorted drives at the config's CFR 8.5 dB and no
+backoff (within 0.002 of the CFR 6.5 dB operating points on 4 x 1).
 """
 import math
 

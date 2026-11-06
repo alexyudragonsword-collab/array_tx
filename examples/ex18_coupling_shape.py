@@ -14,7 +14,9 @@ Part 1  the passive ceiling on 8 x 8: the adjacent coupling at which the
         leakage alone reaches gain 1, against each shape parameter (no runs;
         a global phase cannot change it -- singular values ignore it).
 Part 2  what the PAs see: the mean |1 + Gamma| (undistorted steered drives,
-        one radiate each) against scan angle for c1 phase 0 / 90 / 180 / 270.
+        one radiate each, at the config's CFR 8.5 dB and no backoff -- within
+        0.002 of CFR 6.5 / 2 dB backoff on 4 x 1) against scan angle for c1
+        phase 0 / 90 / 180 / 270; 8 x 8 here with 2 symbols.
 Part 3  4 x 1 design table (ex16 grid) for the four c1 phases.
 Part 4  8 x 8 design table (0 / 30 / 60 deg) for c1 phase 0 / 90 deg, the
         E/H difference c1y_rel -3 dB, and -3 dB with c1 -13 dB (passive then).
