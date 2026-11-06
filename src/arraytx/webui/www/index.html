@@ -34,6 +34,10 @@
   <select id="sweep-group" aria-label="group control" title="第二个控件：每个取值画一条线（ex06 的相移 vs 真延时）"></select>
   <input id="sweep-group-values" placeholder="分组取值，如 phase, ttd" aria-label="group values" style="width:150px">
   <button id="btn-sweep" class="btn small" title="一个控件 × 取值列表，其余不变（seed、波形、既有单元的抽取都不动）；ex05 / ex06 / ex07 的通用形式" data-zh="▶ 研究" data-en="▶ Study">▶ 研究</button>
+  <span class="muted" data-zh="回退规则" data-en="Backoff rule">回退规则</span>
+  <input id="rule-backoffs" placeholder="0, 1, 2, 3" aria-label="backoffs dB" style="width:90px" title="回退 [dB]，在表单的 beam.scan_deg 每个角上各跑一次（每单元 DPD）">
+  <input id="rule-targets" placeholder="-45, -25, 0.3" aria-label="targets" style="width:100px" title="ACLR1 目标 dBc, EVM 目标 dB, DPD 表余量 dB —— 设计取值（assumed），不是规范限值">
+  <button id="btn-rule" class="btn small" title="ex19 第一部分：扫描角 × 回退，每个角达标的最少回退对平均 |1+Γ|；表在研究图下方" data-zh="▶ 规则" data-en="▶ Rule">▶ 规则</button>
   <span class="sp"></span>
   <label class="inline"><span data-zh="图上指标" data-en="metric">图上指标</span> <select id="sweep-metric"></select></label>
   <label class="inline"><span data-zh="横轴" data-en="x axis">横轴</span> <select id="sweep-x" title="研究的横轴：控件取值，或该点的阵列漏极效率（含 Γ；每组按研究顺序连线：回退 / CFR 的效率-ACLR 权衡）">
@@ -68,7 +72,8 @@
       <div class="plot"><div class="pt" id="pt-spectrum"><span data-zh="波束方向远场频谱 + 模板" data-en="far-field spectrum at the beam + mask">波束方向远场频谱 + 模板</span> <span id="mask-note" class="muted"></span></div>
         <div id="plot-spectrum" class="svgbox"></div></div>
       <div class="plot"><div class="pt" id="pt-grid">扫描角 × DPD · OTA ACLR1 @ 波束 [dBc] <span class="muted">点击一格切换</span></div>
-        <div id="plot-grid" class="svgbox"></div></div>
+        <div id="plot-grid" class="svgbox"></div>
+        <div id="rule-box" class="tbl-wrap" hidden></div></div>
       <div class="plot"><div class="pt"><span data-zh="星座 @ 波束" data-en="constellation at the beam">星座 @ 波束</span> <span class="muted" id="const-note"></span></div>
         <div id="plot-constellation" class="svgbox"></div></div>
     </div>

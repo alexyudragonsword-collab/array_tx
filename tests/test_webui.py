@@ -243,3 +243,29 @@ def test_the_page_works_through_an_injected_host_bridge(server, browser):
     assert page.evaluate("window.host.calls") >= 4                      # spec, config, validate, run, jobs...
     assert "线性化引擎" in page.text_content("#engine")
     ctx.close()
+
+
+def test_the_backoff_rule_table_comes_from_the_job_summary(server, browser):
+    """ex19 Part 1 on the page: load pull switched on in the form, angles
+    from the form's beam.scan_deg, backoffs and targets typed in; the table
+    under the study plot shows the summary's numbers (one row per angle)."""
+    ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = ctx.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(server + "?smoke=1")
+    page.wait_for_selector("#form .row", timeout=30000)
+    # the element group starts folded; the switch is a button
+    page.evaluate("document.querySelector('.row[data-path=\"element.pa.load_pull.enabled\"]').closest('details').open = true")
+    page.click('.row[data-path="element.pa.load_pull.enabled"] button.sw')
+    page.wait_for_function("document.querySelector('.row[data-path=\"element.pa.load_pull.enabled\"] button.sw').classList.contains('on')")
+    page.fill("#rule-backoffs", "0, 2")
+    page.fill("#rule-targets", "-45, -25, 0.3")
+    page.click("#btn-rule")
+    page.wait_for_function("document.querySelectorAll('#rule-table tbody tr').length === 3", timeout=300000)
+    assert not errors, errors
+    txt = page.text_content("#rule-box")
+    assert "assumed" in txt and "-45 dBc" in txt and "|1+Γ|" in txt
+    first = page.text_content("#rule-table tbody tr:first-child td:nth-child(2)")
+    assert first != "—" and 0.5 < float(first) < 1.5                      # |1+Γ| mean is there because load pull is on
+    ctx.close()

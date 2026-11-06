@@ -16,7 +16,7 @@ polar_tx 的姊妹库（polar_tx ROADMAP D：GUI 里不再加架构、不做接�
 pip install -e ".[test,dev]"
 python examples/ex00_single_element_equals_polartx.py   # sub-6、S=0、1 单元：与 polar_tx 逐位相同
 python examples/ex03_scan_angle_x_dpd.py                # 扫描角 × DPD 方案的 OTA EVM / ACLR 表
-pytest -q                                               # 198 项（页面测试无 Chromium 时跳过）
+pytest -q                                               # 201 项（页面测试无 Chromium 时跳过）
 ARRAYTX_SMOKE=1 python examples/ex04_aclr_vs_direction.py   # 短突发（CI 用的尺寸）
 ```
 
@@ -57,7 +57,9 @@ arraytx-gui --config configs/fr2_4el_survey.yaml   # 本地服务 + 浏览器应
 GUI 里改过的 survey 数字自动降为 `assumed` 并注明。
 "扫描研究"栏是 ex05 / ex06 / ex07 的通用形式：任选一个控件和一个取值列表（如 `array.n_elements` × `4, 8, 16, 32, 64, 128`、
 `element.lo.clock_profile` × 几个 `bundled:` 剖面、`element.lo.spurs` × `false, true`），其余不变，指标随取值的曲线边跑边画；
-"按"第二个控件分组（如 `beam.steering` × `phase, ttd`）就是 ex06 的两条线。最近 12 条结果存在浏览器 localStorage 里，刷新不丢（标 ↺）。
+"按"第二个控件分组（如 `beam.steering` × `phase, ttd`）就是 ex06 的两条线。
+"回退规则"按钮是 ex19 第一部分：表单里的 `beam.scan_deg` 每个角 × 输入的回退（每单元 DPD），每个角达标的最少回退对平均 |1+Γ|
+（负载牵引打开时），规则表在研究图下方；目标是输入的设计取值，标 assumed，数字全在 `guiutil.rule_report` 里算。最近 12 条结果存在浏览器 localStorage 里，刷新不丢（标 ↺）。
 右上角 EN / 中 切换界面语言（控件说明来自配置字段的英文元数据，不翻译）。
 
 **Android**：同一份页面的第三个宿主。`android/` 是 Chaquopy + WebView 的壳（照 polar_tx），`MainActivity.kt` 只做一件事：把页面的请求转给

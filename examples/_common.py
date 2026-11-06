@@ -175,24 +175,4 @@ def least_backoff(rows, theta, margin):
     return ok[0] if ok else float("nan")
 
 
-def backoff_rule(ms, bs, tol=0.0):
-    """backoff(m) from training pairs: monotone (cumulative max in m), the
-    nearest trained point at or above m - tol; above the range, the fitted dB
-    per unit m, rounded up.  ``tol`` reads an m within tol of a trained point
-    as that point (|1 + Gamma| repeats to ~0.002 across operating points; 0 =
-    ex19's rule).  Returns (rule, sorted m, monotone backoffs, slope);
-    rule(m) -> (backoff dB, extrapolated?)."""
-    import math
-
-    import numpy as np
-    order = np.argsort(ms)
-    m_sorted = np.asarray(ms)[order]
-    b_mono = np.maximum.accumulate(np.asarray(bs)[order])
-    slope = float(np.polyfit(m_sorted, b_mono, 1)[0]) if np.ptp(m_sorted) > 0 else 0.0
-
-    def rule(m):
-        i = int(np.searchsorted(m_sorted, m - tol - 1e-9))
-        if i < len(m_sorted):
-            return float(b_mono[i]), False
-        return float(b_mono[-1] + math.ceil(max(slope, 0.0) * (m - tol - m_sorted[-1]) - 1e-9)), True
-    return rule, m_sorted, b_mono, slope
+from arraytx.design import backoff_rule  # noqa: E402,F401  (one definition: the library's, the page uses it too)

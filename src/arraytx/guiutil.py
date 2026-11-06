@@ -195,7 +195,9 @@ def report_from_result(sim: ArraySim, r: ArrayResult, *, with_plots: bool = True
                  "evm_equalize": cfg.metrics.evm_equalize,
                  "eta_array_pct": None if r.info.get("efficiency") is None else 100.0 * r.info["efficiency"]["eta_array_loaded"],
                  "eta_array_matched_pct": None if r.info.get("efficiency") is None else 100.0 * r.info["efficiency"]["eta_array_matched"],
-                 "backoff_db": cfg.element.pa.backoff_db},
+                 "backoff_db": cfg.element.pa.backoff_db,
+                 # what the PAs saw (load pull on): the |1 + Gamma_k| the per-element means span
+                 "load_pull": _load_pull_stats(r)},
         "engine_line": r.info["engine_line"], "engine_modes": sorted(set(r.engine_modes)),
         "seconds": r.seconds,
         "repro": {"seed": cfg.seed, "config_sha256": config_sha(cfg), "pins": pins(),
@@ -206,6 +208,15 @@ def report_from_result(sim: ArraySim, r: ArrayResult, *, with_plots: bool = True
     if with_plots:
         out["plots"] = _plots(sim, r)
     return out
+
+
+def _load_pull_stats(r: ArrayResult) -> dict[str, float] | None:
+    lp = r.info.get("load_pull")
+    if not lp or not lp.get("abs_1pg_mean"):
+        return None
+    m = np.asarray(lp["abs_1pg_mean"], dtype=float)
+    return {"abs_1pg_mean": float(m.mean()), "abs_1pg_min": float(m.min()), "abs_1pg_max": float(m.max()),
+            "clip_fraction_max": float(max(lp.get("clip_fraction") or [0.0]))}
 
 
 def run_report(cfg: ArrayConfig | dict, theta0_deg: float | None = None, scheme: str | None = None,
@@ -277,6 +288,62 @@ def sweep_report(cfg: ArrayConfig | dict, path: str, points, theta0_deg: float |
     return {"rows": rows, "path": path, "points": [_json(v) for v in pts], "group_path": group_path,
             "group_values": [_json(g) for g in groups] if group_path else None, "seconds": time.time() - t0,
             "engine_line": rows[0]["engine_line"] if rows else "", "repro": rows[0]["repro"] if rows else {}}
+
+
+def rule_report(cfg: ArrayConfig | dict, scan_deg, backoffs, *, aclr_target_dbc: float, evm_target_db: float,
+                margin_db: float = 0.0, scheme: str = "per_element", n_symbols: int | None = None,
+                with_plots: bool = True, progress=None) -> dict[str, Any]:
+    """The page's form of ex19 Part 1: every scan angle x output backoff
+    (``element.pa.backoff_db``, one fresh ArraySim per backoff, everything
+    else unchanged), then per angle the least backoff meeting the targets and
+    the mean |1 + Gamma| there, and the rule backoff(|1 + Gamma|) they make
+    (``design.backoff_rule``).  The targets are design choices the caller
+    passes (source: assumed), not config.  Rows are ordinary reports carrying
+    ``sweep`` (path = backoff, group = the angle) so the page draws them as a
+    grouped study; the table is in the summary."""
+    from .design import backoff_rule, meets
+    from .guispec import values_to_config
+    base = _cfg(cfg)
+    flat0 = values_from_config(base)
+    scan = [float(t) for t in scan_deg]
+    bos = sorted(float(b) for b in backoffs)
+    sims: dict[float, ArraySim] = {}
+    rows = []
+    t0 = time.time()
+    n_total = len(scan) * len(bos)
+    for gi, th in enumerate(scan):
+        for i, b in enumerate(bos):
+            if b not in sims:
+                flat = dict(flat0)
+                flat["element.pa.backoff_db"] = b
+                sims[b] = ArraySim(values_to_config(flat, base), n_symbols=n_symbols)
+            sim = sims[b]
+            rep = report_from_result(sim, sim.run(th, scheme), with_plots=with_plots)
+            rep["sweep"] = {"path": "element.pa.backoff_db", "value": b, "index": i, "n": len(bos),
+                            "group_path": "theta0_deg", "group_value": th, "group_index": gi, "n_groups": len(scan)}
+            rows.append(rep)
+            if progress is not None:
+                progress(len(rows), n_total, rep)
+    table = []
+    for th in scan:
+        here = [r for r in rows if r["theta0_deg"] == th]
+        ok = [r["sweep"]["value"] for r in here
+              if meets(r["ota"]["beam"]["aclr1_dbc"], r["ota"]["beam"]["evm_db"], margin_db, aclr_target_dbc, evm_target_db)]
+        lp = here[0]["info"]["load_pull"]                         # at the least backoff swept
+        table.append({"theta_deg": th, "abs_1pg_mean": None if lp is None else lp["abs_1pg_mean"],
+                      "abs_1pg_min": None if lp is None else lp["abs_1pg_min"], "abs_1pg_max": None if lp is None else lp["abs_1pg_max"],
+                      "least_backoff_db": min(ok) if ok else None,
+                      "eta_pct": next((r["info"]["eta_array_pct"] for r in here if ok and r["sweep"]["value"] == min(ok)), None)})
+    pairs = [(t["abs_1pg_mean"], t["least_backoff_db"]) for t in table
+             if t["abs_1pg_mean"] is not None and t["least_backoff_db"] is not None]
+    rule = None
+    if pairs:
+        _, m_sorted, b_mono, slope = backoff_rule([m for m, _ in pairs], [b for _, b in pairs])
+        rule = {"abs_1pg": [float(m) for m in m_sorted], "backoff_db": [float(b) for b in b_mono], "slope_db_per_unit": slope}
+    return {"rows": rows, "table": table, "rule": rule, "scan_deg": scan, "backoffs": bos, "scheme": scheme,
+            "targets": {"aclr1_dbc": aclr_target_dbc, "evm_db": evm_target_db, "margin_db": margin_db, "source": "assumed"},
+            "seconds": time.time() - t0, "engine_line": rows[0]["engine_line"] if rows else "",
+            "repro": rows[0]["repro"] if rows else {}}
 
 
 def yaml_text(cfg: ArrayConfig | dict) -> str:

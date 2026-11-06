@@ -91,3 +91,17 @@ def test_api_dispatch_is_the_one_the_server_uses():
     code, obj = api.call("validate", {"values": {"array.n_elements": -1}})
     assert code == 400 and obj["ok"] is False
     assert set(Api.GET_ROUTES) == {"version", "spec", "config", "jobs"}
+
+
+def test_the_backoff_rule_study_runs_through_the_bridge():
+    cfg = load_config("configs/fr2_4el_survey.yaml")
+    vals = values_from_config(cfg)
+    vals["element.pa.load_pull.enabled"] = True
+    j = _call("rule", {"values": vals, "scan_deg": [0, 60], "backoffs": [0, 2], "aclr_target_dbc": -45, "evm_target_db": -25,
+                       "margin_db": 0.3, "n_symbols": SMOKE_SYMBOLS})["job"]
+    assert j["kind"] == "rule" and j["progress"] == [0, 4]
+    done = _wait(j["id"])
+    assert done["status"] == "done" and len(done["rows"]) == 4 and done["rows"][0]["sweep"]["path"] == "element.pa.backoff_db"
+    s = done["summary"]
+    assert [t["theta_deg"] for t in s["table"]] == [0.0, 60.0] and s["targets"]["source"] == "assumed"
+    assert _call("rule", {"values": vals, "backoffs": [-1]})["ok"] is False

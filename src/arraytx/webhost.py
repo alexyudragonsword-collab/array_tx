@@ -22,6 +22,8 @@ another origin cannot add without a preflight this host does not answer):
     POST /api/scan          {values, scan_deg, schemes, n_symbols}    -> job
     POST /api/sweep         {values, path, points, theta0_deg, scheme, n_symbols,
                              group_path?, group_values?}  -> job (one leaf, many values; optionally per value of a second leaf)
+    POST /api/rule          {values, scan_deg, backoffs, aclr_target_dbc, evm_target_db, margin_db, scheme, n_symbols}
+                             -> job (scan angle x output backoff; the summary holds the |1 + Gamma| backoff rule, ex19)
     GET  /api/jobs                    the queue (no rows)
     GET  /api/jobs/<id>               one job, rows included
     GET  /api/jobs/<id>/rows/<from>   the job with rows[from:] only (the page's poll)
@@ -74,7 +76,7 @@ def execute(kind: str, cfg_yaml: str, source_path: str | None, params: dict, emi
     lock).  ``cancelled()`` is polled between rows on the thread backend,
     where there is no process to terminate."""
     try:
-        from .guiutil import run_report, scan_report, sweep_report
+        from .guiutil import rule_report, run_report, scan_report, sweep_report
         cfg = config_from_dict(yaml.safe_load(cfg_yaml), source_path)
         n_symbols = params.get("n_symbols")
 
@@ -93,6 +95,11 @@ def execute(kind: str, cfg_yaml: str, source_path: str | None, params: dict, emi
             rep = sweep_report(cfg, params["path"], params["points"], params.get("theta0_deg"), params.get("scheme"),
                                n_symbols=n_symbols, progress=progress,
                                group_path=params.get("group_path"), group_values=params.get("group_values"))
+            emit("done", {k: v for k, v in rep.items() if k != "rows"})
+        elif kind == "rule":
+            rep = rule_report(cfg, params["scan_deg"], params["backoffs"], aclr_target_dbc=params["aclr_target_dbc"],
+                              evm_target_db=params["evm_target_db"], margin_db=params["margin_db"], scheme=params["scheme"],
+                              n_symbols=n_symbols, progress=progress)
             emit("done", {k: v for k, v in rep.items() if k != "rows"})
         else:
             emit("error", f"unknown job kind {kind!r}")
@@ -135,7 +142,8 @@ class JobQueue:
     def submit(self, kind: str, cfg: ArrayConfig, params: dict, label: str) -> dict:
         jid = str(next(self._ids))
         n = {"run": 1, "scan": len(params.get("scan_deg", [])) * len(params.get("schemes", [])),
-             "sweep": len(params.get("points", [])) * max(1, len(params.get("group_values") or []))}[kind]
+             "sweep": len(params.get("points", [])) * max(1, len(params.get("group_values") or [])),
+             "rule": len(params.get("scan_deg", [])) * len(params.get("backoffs", []))}[kind]
         job = {"id": jid, "kind": kind, "label": label, "status": "queued", "progress": [0, n],
                "rows": [], "summary": None, "error": None, "created": time.time(), "started": None,
                "finished": None, "params": params, "config_sha256": config_sha(cfg),
@@ -423,6 +431,20 @@ class Api:
                       "n_symbols": None if req.get("n_symbols") in (None, "") else int(req["n_symbols"])}
             label = f"研究 {path.split('.')[-1]} × {len(points)}" + (f" ⊗ {gpath.split('.')[-1]} × {len(gvals)}" if gpath else "") + f" · {params['scheme']}"
             job = st.jobs.submit("sweep", cfg, params, label)
+            return 200, {"ok": True, "job": job}
+        elif route == "rule":
+            # ex19 Part 1 on the page: scan_deg x element.pa.backoff_db, then the least backoff meeting the
+            # targets per angle against the mean |1 + Gamma| there. Targets: design choices, source assumed.
+            cfg = st.build(req.get("values") or {})
+            scan = [float(t) for t in (req.get("scan_deg") or cfg.beam.scan_deg)]
+            bos = [float(b) for b in (req.get("backoffs") or [0, 1, 2, 3])]
+            if any(b < 0 for b in bos):
+                raise ValueError("rule: backoffs must be >= 0 dB")
+            params = {"scan_deg": scan, "backoffs": bos, "scheme": req.get("scheme") or "per_element",
+                      "aclr_target_dbc": float(req.get("aclr_target_dbc", -45.0)), "evm_target_db": float(req.get("evm_target_db", -25.0)),
+                      "margin_db": float(req.get("margin_db", 0.0)),
+                      "n_symbols": None if req.get("n_symbols") in (None, "") else int(req["n_symbols"])}
+            job = st.jobs.submit("rule", cfg, params, f"回退规则 {len(scan)}×{len(bos)} · {params['scheme']}")
             return 200, {"ok": True, "job": job}
         elif route.startswith("jobs/") and route.endswith("/cancel"):
             ok = st.jobs.cancel(route[5:-7])

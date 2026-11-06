@@ -13,6 +13,8 @@ const T = {
         queued: "排队", running: "运行中", done: "完成", error: "失败", cancelled: "已取消", cancel: "取消", idle: "空闲", active: "个在跑 / 排队",
         info: "信息", limit: "64-QAM 限值 8 %", pass: "✓ 通过", fail: "✗ 越限", pertone_note: "逐子载波均衡能抹掉的线性部分",
         bw3: "3 dB 波束宽", backoff: "回退", eta_x_note: "阵列，含 Γ，每组按研究顺序连线", matched: "匹配负载", ttd: "真延时", phase: "相移器", no_sidelobe: "单元数 1：无旁瓣", highest_sl: "最高旁瓣",
+        rule_title: "回退规则：每个角达标的最少回退 vs 平均 |1+Γ|", rule_targets: "目标（assumed）", rule_none: "扫过的回退里没有达标的",
+        rule_steps: "规则", rule_wait: "规则表在任务完成后出现",
         form_changed: "（当前表单已改）", study: "研究", points: "点，边跑边画", low_good: "低 = 好", high_good: "高 = 好",
         grid_title: "扫描角 × DPD · OTA ACLR1 @ 波束 [dBc]", grid_sub: "点击一格切换", mask_note: "stylized 工程模板，非一致性条款",
         element: "单元", errors_hdr: "误差抽取 gain / phase / delay / PA", prev: "上次会话", valid: "合法", differ: "处与文件不同",
@@ -24,6 +26,8 @@ const T = {
         queued: "queued", running: "running", done: "done", error: "failed", cancelled: "cancelled", cancel: "cancel", idle: "idle", active: "running / queued",
         info: "info", limit: "64-QAM limit 8 %", pass: "✓ pass", fail: "✗ fail", pertone_note: "the linear part a per-tone equaliser removes",
         bw3: "3 dB beamwidth", backoff: "backoff", eta_x_note: "array, Gamma included, each group joined in study order", matched: "matched load", ttd: "true time delay", phase: "phase shifters", no_sidelobe: "one element: no sidelobe", highest_sl: "highest sidelobe",
+        rule_title: "Backoff rule: least backoff meeting the targets per angle vs mean |1+Γ|", rule_targets: "targets (assumed)", rule_none: "no backoff swept meets them",
+        rule_steps: "rule", rule_wait: "the rule table appears when the job is done",
         form_changed: "(form edited since)", study: "study", points: "points, drawn as they land", low_good: "lower = better", high_good: "higher = better",
         grid_title: "scan angle × DPD · OTA ACLR1 @ beam [dBc]", grid_sub: "click a cell", mask_note: "stylized template, not a conformance clause",
         element: "element", errors_hdr: "drawn errors gain / phase / delay / PA", prev: "previous session", valid: "valid", differ: "differ from the file",
@@ -248,6 +252,7 @@ async function poll() {
         full.rows.forEach((rep, k) => addReport(j, full.rows_from + k, rep));
         S.seenRows[j.id] = full.rows_from + full.rows.length;
       }
+      if (j.kind === "rule" && (!old || old.status !== j.status) && j.status === "done") renderGrid();    // the summary carries the table
       if (old && old.status !== j.status && j.status === "error") showError(new Error(t("run_failed") + " #" + j.id + "\n" + (j.error || "")));
     }
     renderQueue();
@@ -386,8 +391,23 @@ function renderSweep(r, box) {
       lo: Math.min(...allY), hi: Math.max(...allY), onclick: (i, j) => { if (cells[i][j]) { S.autoFollow = false; select(cells[i][j].key, false); } } });
   }
 }
+// the rule table of a "rule" job: every number from the job's summary (guiutil.rule_report), none computed here
+function renderRule(r) {
+  const rb = $("rule-box"); const job = r && S.jobs[r.jobId];
+  if (!job || job.kind !== "rule") { rb.hidden = true; rb.innerHTML = ""; return; }
+  rb.hidden = false;
+  const s = job.summary;
+  if (!s || !s.table) { rb.innerHTML = `<div class="tbl-h">${t("rule_title")} <span class="muted">${t("rule_wait")}</span></div>`; return; }
+  const tg = s.targets;
+  const rows = s.table.map(x => `<tr><td>${x.theta_deg > 0 ? "+" : ""}${f(x.theta_deg, 1)}°</td><td>${f(x.abs_1pg_mean, 3)}</td><td>${f(x.abs_1pg_min, 3)} – ${f(x.abs_1pg_max, 3)}</td>` +
+    `<td>${x.least_backoff_db === null ? `<span class="muted">${t("rule_none")}</span>` : f(x.least_backoff_db, 1) + " dB"}</td><td>${f(x.eta_pct, 2)}</td></tr>`).join("");
+  const steps = s.rule ? s.rule.abs_1pg.map((m, i) => `${m.toFixed(3)} → ${s.rule.backoff_db[i].toFixed(0)} dB`).join(" · ") + ` · > ${s.rule.abs_1pg[s.rule.abs_1pg.length - 1].toFixed(3)}: +${s.rule.slope_db_per_unit.toFixed(2)} dB / unit` : "—";
+  rb.innerHTML = `<div class="tbl-h">${t("rule_title")} <span class="muted">${t("rule_targets")}: ACLR1 ≤ ${tg.aclr1_dbc} dBc (+${tg.margin_db} dB), EVM ≤ ${tg.evm_db} dB · ${s.scheme}</span></div>` +
+    `<table id="rule-table"><thead><tr><th>θ</th><th>|1+Γ| mean</th><th>|1+Γ_k| min – max</th><th>least backoff</th><th>η [%]</th></tr></thead><tbody>${rows}</tbody></table>` +
+    `<div class="muted small" id="rule-steps">${t("rule_steps")}: ${steps}</div>`;
+}
 function renderGrid() {
-  const box = $("plot-grid"); const r = get(S.selected); if (!r) { box.innerHTML = ""; return; }
+  const box = $("plot-grid"); const r = get(S.selected); renderRule(r); if (!r) { box.innerHTML = ""; return; }
   if (r.rep.sweep) { renderSweep(r, box); return; }
   $("pt-grid").innerHTML = `${t("grid_title")} <span class="muted">${t("grid_sub")}</span>`;
   const same = S.reports.filter(x => x.jobId === r.jobId); const thetas = [...new Set(same.map(x => x.rep.theta0_deg))].sort((a, b) => a - b);
@@ -448,6 +468,10 @@ function showPane(name) { document.querySelectorAll(".pane").forEach(p => p.clas
     $("seed").addEventListener("change", () => { S.values.seed = parseInt($("seed").value, 10) || 0; onChange("seed"); });
     $("btn-run").addEventListener("click", () => submit("run", { theta0_deg: parseFloat($("run-theta").value), scheme: $("run-scheme").value }));
     $("btn-scan").addEventListener("click", () => submit("scan", {}));
+    $("btn-rule").addEventListener("click", () => {
+      const nums = s => s.split(",").map(v => parseFloat(v)).filter(v => isFinite(v));
+      const bos = nums($("rule-backoffs").value || $("rule-backoffs").placeholder), tg = nums($("rule-targets").value || $("rule-targets").placeholder);
+      submit("rule", { backoffs: bos, aclr_target_dbc: tg[0], evm_target_db: tg[1], margin_db: tg[2] || 0, scheme: "per_element" }); });
     $("btn-sweep").addEventListener("click", () => { const path = $("sweep-path").value; const pts = parsePoints(path, $("sweep-points").value || $("sweep-points").placeholder);
       const gp = $("sweep-group").value || null; const gv = gp ? parsePoints(gp, $("sweep-group-values").value || $("sweep-group-values").placeholder) : null;
       submit("sweep", { path, points: pts, group_path: gp, group_values: gv, theta0_deg: parseFloat($("run-theta").value), scheme: $("run-scheme").value }); });

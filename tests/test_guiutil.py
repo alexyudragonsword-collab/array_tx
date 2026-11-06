@@ -114,3 +114,30 @@ def test_sweep_report_groups_by_a_second_leaf(fr2_sim):
     assert [(r["sweep"]["group_value"], r["sweep"]["value"]) for r in rep["rows"]] == [("phase", 2), ("phase", 4), ("ttd", 2), ("ttd", 4)]
     assert rep["rows"][3]["steering"] == "ttd" and rep["rows"][1]["steering"] == "phase"
     assert rep["rows"][0]["sweep"]["n_groups"] == 2
+
+
+def test_rule_report_is_ex19_part_1_from_the_sims_numbers():
+    """The page's backoff-rule study: scan angle x backoff, each angle's least
+    backoff meeting the (caller's, assumed) targets checked against the rows
+    themselves, |1 + Gamma| from the sim's own load-pull record, and the rule
+    the library builds from them (design.backoff_rule)."""
+    from arraytx.design import backoff_rule, meets
+    from arraytx.guiutil import rule_report
+    cfg = load_config("configs/fr2_4el_survey.yaml")
+    cfg.element.pa.load_pull.enabled = True
+    rep = rule_report(cfg, [0.0, 60.0], [2.0, 0.0], aclr_target_dbc=-45.0, evm_target_db=-25.0, margin_db=0.3,
+                      n_symbols=2, with_plots=False)
+    assert rep["backoffs"] == [0.0, 2.0] and rep["targets"]["source"] == "assumed" and len(rep["rows"]) == 4
+    for t in rep["table"]:
+        here = [r for r in rep["rows"] if r["theta0_deg"] == t["theta_deg"]]
+        ok = [r["sweep"]["value"] for r in here if meets(r["ota"]["beam"]["aclr1_dbc"], r["ota"]["beam"]["evm_db"], 0.3, -45.0, -25.0)]
+        assert t["least_backoff_db"] == (min(ok) if ok else None)
+        assert t["abs_1pg_mean"] == here[0]["info"]["load_pull"]["abs_1pg_mean"]
+        assert t["abs_1pg_min"] <= t["abs_1pg_mean"] <= t["abs_1pg_max"]
+    assert rep["table"][1]["abs_1pg_mean"] > rep["table"][0]["abs_1pg_mean"]          # 4 x 1, 180 deg: 60 deg loads harder
+    pairs = [(t["abs_1pg_mean"], t["least_backoff_db"]) for t in rep["table"] if t["least_backoff_db"] is not None]
+    if pairs:
+        _, m_sorted, b_mono, _ = backoff_rule([m for m, _ in pairs], [b for _, b in pairs])
+        assert rep["rule"]["abs_1pg"] == list(m_sorted) and rep["rule"]["backoff_db"] == list(b_mono)
+    off = run_report(load_config("configs/fr2_4el_survey.yaml"), 0.0, "none", n_symbols=2, with_plots=False)
+    assert off["info"]["load_pull"] is None                                          # no load pull: nothing to report
