@@ -5,12 +5,12 @@
 ## A. 被外部阻塞
 
 ### A1. 互耦 survey 典型值等全文核对 / 等实测 S 参数
-`configs/*.yaml` 里 `coupling.survey` 的相邻耦合 −16 dB 只有摘要级出处（见 config 里 `ref`），本环境网络策略打不开 arXiv / PMC 全文。
+`configs/*.yaml` 里 `coupling.survey` 的相邻耦合 −16 dB 只有摘要级出处（见 config 里 `ref`），全文核对见下（arXiv / JEES 已放行，PMC / MDPI 仍读不到）。
 拿到实测 `.sNp` 就切 `coupling.source: touchstone`，不改任何别的抽取（铁律 5）。
-2026-11-05 再试：arxiv.org、www.jees.kr、www.mdpi.com 在会话网络策略下都解析不到（要在环境的 Network access 里放行这些域名才能读全文）。
-搜索摘要里没有"28 GHz、λ/2、无去耦、实测"的相邻互耦；能看到的只有去耦前参考阵列 −10.75 dB（0.43 λ，仿真）和一对双单元 −18.5 dB（间距不明），
-都不够格进 config。ex17 表明这是设计表最敏感的假设（4 × 1 −13 dB 时 60° 多退 1 dB、效率再掉 6.3 点；8 × 8 −14.5 dB 同样），所以仍是最该补的出处。
-8 × 8 上同一邻域形状的相邻互耦上限约 −14.3 dB（再强就不无源），所以实测数据还要给出各邻域的相位，不只是相邻幅度。
+2026-11-05 放行 arxiv.org / www.jees.kr 后读了全文：arXiv:2407.09944 与 JKIEES 2017 都没有互耦数字；全文里只有仿真、无去耦的上界
+（JEES 2026 < −20 dB @ 0.47 λ，arXiv:2010.16049 −24 dB），www.mdpi.com 站点拒绝（403）。−16 dB 仍是摘要级，config 的出处说明已改正。
+要的不只是幅度：ex18 表明相邻互耦**相位**决定哪一头难（180° 时 60° 要回退，0° 时广播向要退 3 dB），E / H 面之比决定 8 × 8 的无源上限
+（0 dB −14.3 dB，−3 dB −13.0 dB）。所以要的是面阵的复数 S 参数（.sNp），至少相邻行内 / 行间各一个复数。
 
 ### A2. 负载调制：只有一阶电压模，没有实测 load-pull 表
 `element.pa.load_pull` 已实现（`cairn/load-pull-proposal.md`），κ = 1 是 assumed。真实 PA 的压缩等高线在 Smith 圆图上不是圆（Γ 相位相关），

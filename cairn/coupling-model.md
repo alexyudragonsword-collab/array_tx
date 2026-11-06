@@ -5,7 +5,7 @@ summary: 互耦模型的当前真值——三来源一条路径、邻域类与�
 tags: [coupling, touchstone, dpd, passivity]
 contains: [decision, lesson, pitfall]
 created: 2026-11-03
-updated: 2026-11-04
+updated: 2026-11-06
 related: [architecture-invariants.md, load-pull-proposal.md]
 authoring_mode: ai_generated
 ---
@@ -20,6 +20,8 @@ authoring_mode: ai_generated
 - **相位**：x1 在 f0 为 c1_deg（180°，符号约定）；远邻 = c1_deg + 超出一个间距的自由空间电长度（`phase_from_distance`，默认开）：
   λ/2 间距 x2 +180°（即 0°），对角 +74.5°（即 −105.4°）。survey 的频率依赖是纯延时 φ(f) = φ0 − 2π(f−f0) d/c（`path_delay_from_spacing`）。
 - **无源性**：`build_coupling` 算泄漏矩阵的最大奇异值，> 1 抛错。4 单元 survey 0.33；8 × 8 survey 0.82。
+  8 × 8 的相邻互耦上限由行间 / 行内之比定：`c1y_rel` 0 / −3 / −6 dB → −14.31 / −12.99 / −11.95 dB；全局相位不动它，对角几乎不动（ex18）。
+- **相位决定哪个扫描角难**：相邻相位 180° 时 |1+Γ| 随扫描角上升（8 × 8 0.678 → 1.252），0° 时下降（1.397 → 0.807）。负载牵引打开时，设计表跟着翻转（`scan-design.md`）。
 - **touchstone**：v1、Hz / RI、2 端口块是列序 S11 S21 S12 S22（读写都按行序会把 S21/S12 读反）；端口序 = 单元 row-major 序；
   analytic → .sNp → touchstone 回读逐位相同（等值端点 `np.interp` 精确）。
 
