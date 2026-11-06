@@ -196,6 +196,7 @@ def report_from_result(sim: ArraySim, r: ArrayResult, *, with_plots: bool = True
                  "eta_array_pct": None if r.info.get("efficiency") is None else 100.0 * r.info["efficiency"]["eta_array_loaded"],
                  "eta_array_matched_pct": None if r.info.get("efficiency") is None else 100.0 * r.info["efficiency"]["eta_array_matched"],
                  "backoff_db": cfg.element.pa.backoff_db,
+                 "backoff_per_element_db": list(cfg.element.pa.backoff_per_element_db) or None,
                  # what the PAs saw (load pull on): the |1 + Gamma_k| the per-element means span
                  "load_pull": _load_pull_stats(r)},
         "engine_line": r.info["engine_line"], "engine_modes": sorted(set(r.engine_modes)),

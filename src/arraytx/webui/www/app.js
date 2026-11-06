@@ -393,7 +393,8 @@ function renderSweep(r, box) {
 }
 // the rule table of a "rule" job: every number from the job's summary (guiutil.rule_report), none computed here
 function renderRule(r) {
-  const rb = $("rule-box"); const job = r && S.jobs[r.jobId];
+  // a restored report's job id may name a different live job on this host: no table for it
+  const rb = $("rule-box"); const job = r && !r.restored && S.jobs[r.jobId];
   if (!job || job.kind !== "rule") { rb.hidden = true; rb.innerHTML = ""; return; }
   rb.hidden = false;
   const s = job.summary;

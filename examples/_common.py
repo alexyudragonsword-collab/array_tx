@@ -139,7 +139,9 @@ def same_setting(a, b):
 
 
 def meets(x, margin, aclr_target=ACLR_TARGET_DBC, evm_target=EVM_TARGET_DB):
-    return x["ACLR1"] + margin <= aclr_target and x["EVM"] <= evm_target
+    """A design-sweep row against the targets (the library's test, arraytx.design.meets)."""
+    from arraytx.design import meets as _meets
+    return _meets(x["ACLR1"], x["EVM"], margin, aclr_target, evm_target)
 
 
 def design_table(rows, angles, label, margin, aclr_target=ACLR_TARGET_DBC, evm_target=EVM_TARGET_DB):
