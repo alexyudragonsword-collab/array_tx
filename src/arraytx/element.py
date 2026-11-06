@@ -126,7 +126,7 @@ class ElementChain:
 
     def __init__(self, cfg: ArrayConfig, standard: Standard, tree: SeedTree, k: int,
                  *, fs_scale: float | None, lo_pn_seed: int | None,
-                 lo_obj: ClockProfileLO | None):
+                 lo_obj: ClockProfileLO | None, out_gain: float = 1.0):
         self.k = k
         self.cfg = cfg
         self.topology = cfg.element.topology
@@ -138,6 +138,9 @@ class ElementChain:
         self.run_seed = tree.int_seed("run", k)
         self.lo_pn_seed = lo_pn_seed
         self.fs_scale = fs_scale
+        # per-element backoff (element.pa.backoff_per_element_db): the power this
+        # element gives up relative to the least-backed-off one; exactly 1.0 otherwise
+        self.out_gain = float(out_gain)
         # clock-profile spurs: (offset_hz, peak_rad, start_phase_rad); the
         # start phases are drawn whether or not the switch is on
         self.spurs: list[tuple[float, float, float]] = []
@@ -296,6 +299,8 @@ class ElementChain:
         if self.spurs and noise:          # LO spurs: gated with the LO phase noise (polar_tx: noise=)
             t = np.arange(y.size) / wf.fs
             y = y * np.exp(1j * spur_phase_rad(t, [(f, a) for f, a, _ in self.spurs], [p for _, _, p in self.spurs]))
+        if self.out_gain != 1.0:
+            y = y * self.out_gain
         e = self.errors
         if e.gain_db != 0.0 or e.phase_deg != 0.0:
             y = y * (10.0 ** (e.gain_db / 20.0) * np.exp(1j * np.deg2rad(e.phase_deg)))
@@ -344,11 +349,21 @@ def build_elements(cfg: ArrayConfig, standard: Standard, tree: SeedTree,
     # full scale: build element 0's chain unpinned just to read its ChainConfig
     probe = ElementChain(cfg, standard, tree, 0, fs_scale=None, lo_pn_seed=None, lo_obj=lo_obj)
     fs_scale = reference_full_scale(probe.tx, cfg.element.topology, x_ref, wf)
+    n_el = cfg.array.n_elements * cfg.array.n_rows
+    bpe = [float(b) for b in cfg.element.pa.backoff_per_element_db]
     if np.isnan(fs_scale):
         fs_scale = None
-    elif cfg.element.pa.backoff_db != 0.0:
+    if bpe:
+        # per element: full scale b_k above the undistorted peak, and the radiated
+        # amplitude 10^(-(b_k - min b)/20) -- backing an element off gives its power up
+        b0 = min(bpe)
+        scales = [None if fs_scale is None else fs_scale * 10.0 ** (b / 20.0) for b in bpe]
+        gains = [10.0 ** (-(b - b0) / 20.0) for b in bpe]
+        return [ElementChain(cfg, standard, tree, k, fs_scale=scales[k], lo_pn_seed=lo_seed, lo_obj=lo_obj,
+                             out_gain=gains[k]) for k in range(n_el)]
+    if fs_scale is not None and cfg.element.pa.backoff_db != 0.0:
         # output power backoff: the pinned full scale sits backoff_db above the
         # undistorted peak, every topology alike (the chains read fs_scale_fixed)
         fs_scale = fs_scale * 10.0 ** (float(cfg.element.pa.backoff_db) / 20.0)
     return [ElementChain(cfg, standard, tree, k, fs_scale=fs_scale, lo_pn_seed=lo_seed, lo_obj=lo_obj)
-            for k in range(cfg.array.n_elements * cfg.array.n_rows)]
+            for k in range(n_el)]

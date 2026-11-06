@@ -129,7 +129,9 @@ class ArraySim:
         for el in self.elements:
             el.set_load(None)
         res, ys = self._run_all(drives)
-        floors = [lp.floor * (el.fs_scale if el.fs_scale else float(np.abs(y).max())) for el, y in zip(self.elements, ys)]
+        # the floor follows each element's own signal scale (full scale x the per-element output gain)
+        floors = [lp.floor * (el.fs_scale * el.out_gain if el.fs_scale else float(np.abs(y).max()))
+                  for el, y in zip(self.elements, ys)]
         deltas = []
         clip = np.zeros(len(self.elements))
         for _ in range(int(lp.iterations)):

@@ -96,6 +96,7 @@ class ElementPACfg:
     rapp_p: float = _f(2.0, "", "Rapp smoothness (CMOS PA ~1-3); used when amam=rapp")
     rapp_drive: float = _f(1.0, "", "Rapp drive at full scale (compression depth); used when amam=rapp")
     backoff_db: float = _f(0.0, "dB", "envelope full-scale headroom above the undistorted peak: the chain's full scale is raised by this, so the signal uses 10^(-backoff/20) of the code range (output power backoff; 0 = peak at full scale, polar_tx's pin)")
+    backoff_per_element_db: list = _f([], "dB", "per-element output backoff, one value per element in row-major order (empty = every element at backoff_db). Element k's full scale sits b_k above the undistorted peak, and its radiated amplitude drops by b_k - min(b): it really gives that power up (ROADMAP B9, ex20)")
     ampm_deg_at_fs: float = _f(8.0, "deg", "AM-PM at full scale, quadratic in amplitude (0 = none)")
     load_pull: LoadPullCfg = field(default_factory=LoadPullCfg)
 
@@ -263,6 +264,12 @@ class ArrayConfig:
             raise ValueError("element.outphasing.source_impedance_rel must be in [0, 1)")
         if self.element.pa.backoff_db < 0.0:
             raise ValueError("element.pa.backoff_db must be >= 0 (a negative value would clip the undistorted peak)")
+        bpe = self.element.pa.backoff_per_element_db
+        if bpe:
+            n_el = self.array.n_elements * self.array.n_rows
+            if len(bpe) != n_el or not all(isinstance(b, (int, float)) and math.isfinite(b) and b >= 0.0 for b in bpe):
+                raise ValueError(f"element.pa.backoff_per_element_db: empty, or {n_el} finite values >= 0 "
+                                 f"(one per element, row-major), got {len(bpe)}")
         lp = self.element.pa.load_pull
         if lp.iterations < 1 or not 0.0 < lp.gamma_max <= 1.0 or not 0.0 <= lp.floor < 1.0:
             raise ValueError("element.pa.load_pull: iterations >= 1, 0 < gamma_max <= 1, 0 <= floor < 1")

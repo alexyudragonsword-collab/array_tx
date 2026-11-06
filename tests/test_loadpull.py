@@ -243,3 +243,40 @@ def test_clip_fraction_reports_the_guard_when_it_acts():
     tight = ArraySim(config_from_dict({"element": {"pa": {"load_pull": {"enabled": True, "gamma_max": 0.05}}}}))
     lp = tight.run(0.0, "none", conducted_diagnostics=False).info["load_pull"]
     assert min(lp["clip_fraction"]) > 0.5 and max(lp["clip_fraction"]) <= 1.0
+
+
+def test_per_element_backoff_equal_values_are_the_uniform_backoff_bit_for_bit():
+    """backoff_per_element_db with every entry equal IS backoff_db (same full
+    scale, output gain exactly 1); an empty list is the old path."""
+    from arraytx.beam import steer
+    uni = ArraySim(config_from_dict({"element": {"pa": {"backoff_db": 2.0, "load_pull": {"enabled": True}}}}), n_symbols=2)
+    per = ArraySim(config_from_dict({"element": {"pa": {"backoff_per_element_db": [2.0] * 4, "load_pull": {"enabled": True}}}}),
+                   n_symbols=2)
+    assert [e.fs_scale for e in uni.elements] == [e.fs_scale for e in per.elements]
+    assert all(e.out_gain == 1.0 for e in per.elements)
+    d = steer(uni.x, uni.geom, 30.0, uni.fs, uni.cfg.beam.steering)
+    _, ya, ra = uni.radiate(d)
+    _, yb, rb = per.radiate(d)
+    assert np.array_equal(ya, yb) and np.array_equal(ra, rb)
+
+
+def test_per_element_backoff_gives_the_power_up_and_validates():
+    """An element backed off 3 dB more than the others radiates 10^(-3/20) of
+    their amplitude and uses 10^(-3/20) less of its code range; the draws
+    (invariant 5) do not move; a wrong length or a negative value does not load."""
+    base = {"element": {"errors": {"enabled": False}, "pa": {"amam": "ideal", "ampm_deg_at_fs": 0.0}}, "sim": {"noise": False}}
+    a = ArraySim(config_from_dict(base), n_symbols=2)
+    cfg = config_from_dict({**base, "element": {**base["element"], "pa": {**base["element"]["pa"],
+                                                                           "backoff_per_element_db": [0.0, 3.0, 0.0, 0.0]}}})
+    b = ArraySim(cfg, n_symbols=2)
+    assert b.elements[1].fs_scale == pytest.approx(a.elements[1].fs_scale * 10 ** (3 / 20))
+    assert b.elements[1].out_gain == pytest.approx(10 ** (-3 / 20)) and b.elements[0].out_gain == 1.0
+    ya = a.run(0.0, "none").ys
+    yb = b.run(0.0, "none").ys
+    ratio = np.sqrt(np.mean(np.abs(yb[1]) ** 2) / np.mean(np.abs(ya[1]) ** 2))
+    assert ratio == pytest.approx(10 ** (-3 / 20), rel=0.02)
+    assert np.array_equal(ya[0], yb[0])                                     # the others are untouched
+    assert [e.errors for e in a.elements] == [e.errors for e in b.elements]
+    for bad in ([0.0, 1.0], [0.0, -1.0, 0.0, 0.0], [0.0, float("nan"), 0.0, 0.0]):
+        with pytest.raises(ValueError):
+            config_from_dict({"element": {"pa": {"backoff_per_element_db": bad}}})

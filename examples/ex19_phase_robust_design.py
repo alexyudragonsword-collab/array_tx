@@ -24,11 +24,10 @@ Targets as ex16 (assumed design choices).  4 x 1 full burst; 8 x 8 4 symbols.
 m is measured with undistorted drives at the config's CFR 8.5 dB and no
 backoff (within 0.002 of the CFR 6.5 dB operating points on 4 x 1).
 """
-import math
-
 import numpy as np
 
-from _common import (TABLE_MARGIN_DB, banner, design_sweep, done, element_loads, meets, plt, smoke)
+from _common import (TABLE_MARGIN_DB, banner, backoff_rule, design_sweep, done, element_loads, least_backoff, meets,
+                     plt, smoke)
 from arraytx import ArraySim, load_config
 from arraytx.report import table
 
@@ -60,29 +59,6 @@ def mean_load(path, ph, theta, n_symbols):
     return float(element_loads(ArraySim(cfg, n_symbols=n_symbols), theta).mean())
 
 
-def least_backoff(rows, theta, margin):
-    """The least backoff at ``theta`` that meets the targets (NaN if none in the sweep)."""
-    ok = sorted(x["backoff dB"] for x in rows if x["beam deg"] == theta and meets(x, margin))
-    return ok[0] if ok else float("nan")
-
-
-def make_rule(ms, bs):
-    """backoff(m) from training pairs: monotone (cumulative max in m), the
-    nearest trained point at or above m; above the range, the fitted dB per
-    unit m, rounded up."""
-    order = np.argsort(ms)
-    m_sorted = np.asarray(ms)[order]
-    b_mono = np.maximum.accumulate(np.asarray(bs)[order])
-    slope = float(np.polyfit(m_sorted, b_mono, 1)[0]) if np.ptp(m_sorted) > 0 else 0.0
-
-    def rule(m):
-        i = int(np.searchsorted(m_sorted, m - 1e-9))
-        if i < len(m_sorted):
-            return float(b_mono[i]), False
-        return float(b_mono[-1] + math.ceil(max(slope, 0.0) * (m - m_sorted[-1]) - 1e-9)), True
-    return rule, m_sorted, b_mono, slope
-
-
 def row_at(rows, theta, bo):
     return next((x for x in rows if x["beam deg"] == theta and x["backoff dB"] == bo), None)
 
@@ -99,7 +75,7 @@ for lab, st in SETUPS.items():
     ms = [mean_load(st["cfg"], NOMINAL, th, st["n_symbols"]) for th in st["train"]]
     bs = [least_backoff(rows, th, margin) for th in st["train"]]
     keep = [i for i, b in enumerate(bs) if np.isfinite(b)]
-    rule, m_sorted, b_mono, slope = make_rule([ms[i] for i in keep], [bs[i] for i in keep])
+    rule, m_sorted, b_mono, slope = backoff_rule([ms[i] for i in keep], [bs[i] for i in keep])
     training[lab] = (ms, bs, m_sorted, b_mono)
     print(table([{"beam deg": th, "|1+G| mean": m, "least backoff dB": b} for th, m, b in zip(st["train"], ms, bs)]))
     print("  rule: monotone steps at |1+G| " + ", ".join(f"{m:.3f}->{b:.0f} dB" for m, b in zip(m_sorted, b_mono))

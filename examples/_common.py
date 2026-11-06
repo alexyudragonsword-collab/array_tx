@@ -165,3 +165,34 @@ def design_table(rows, angles, label, margin, aclr_target=ACLR_TARGET_DBC, evm_t
                     "eta fixed %": same["eta %"] if same else nan, "fixed meets": bool(same_ok),
                     "adaptive gain pts": (p["eta %"] - same["eta %"]) if (p and same_ok) else nan})
     return out, pick
+
+
+# ---- the |1 + Gamma| backoff rule shared by ex19 / ex20 / ex21
+
+def least_backoff(rows, theta, margin):
+    """The least backoff at ``theta`` that meets the targets (NaN if none in the sweep)."""
+    ok = sorted(x["backoff dB"] for x in rows if x["beam deg"] == theta and meets(x, margin))
+    return ok[0] if ok else float("nan")
+
+
+def backoff_rule(ms, bs, tol=0.0):
+    """backoff(m) from training pairs: monotone (cumulative max in m), the
+    nearest trained point at or above m - tol; above the range, the fitted dB
+    per unit m, rounded up.  ``tol`` reads an m within tol of a trained point
+    as that point (|1 + Gamma| repeats to ~0.002 across operating points; 0 =
+    ex19's rule).  Returns (rule, sorted m, monotone backoffs, slope);
+    rule(m) -> (backoff dB, extrapolated?)."""
+    import math
+
+    import numpy as np
+    order = np.argsort(ms)
+    m_sorted = np.asarray(ms)[order]
+    b_mono = np.maximum.accumulate(np.asarray(bs)[order])
+    slope = float(np.polyfit(m_sorted, b_mono, 1)[0]) if np.ptp(m_sorted) > 0 else 0.0
+
+    def rule(m):
+        i = int(np.searchsorted(m_sorted, m - tol - 1e-9))
+        if i < len(m_sorted):
+            return float(b_mono[i]), False
+        return float(b_mono[-1] + math.ceil(max(slope, 0.0) * (m - tol - m_sorted[-1]) - 1e-9)), True
+    return rule, m_sorted, b_mono, slope
