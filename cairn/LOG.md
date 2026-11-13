@@ -2,6 +2,13 @@
 
 本文件按时间倒序记录实质进展——新条目在顶。每条只写摘要与指针（数字写原值）；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-11-13 · 引擎行按原因与网格给免责；dtc_openloop 不再叫"线性化"
+
+- 用户同意后的第二步：`report.disclaimer_for` 按引擎给原因——response"线性化引擎"、rfdac"只有失配"、dtc_openloop"采样网格未收敛（os < 16）"；
+  只有 ex22 验证过的组合（polar、os ≥ 16）不挂免责，引擎行写"网格已收敛"并带 `os N`。
+- 没把示例默认网格提到 16：按 LOG 的全尺寸耗时（os 4 约 9 h）× ex22 单次耗时比 3–4，估约 30 h，且全部文档数字要重写。留在 ROADMAP B2。
+- 守护：去掉 response 的免责 → `test_disclaimer_follows_the_engine_and_the_grid` 红（实测），恢复后绿。指纹 304 项逐位不变。
+
 ## 2026-11-13 · B2 重新定性：dtc_openloop 不是线性化引擎，限制是网格；os 4 不收敛，规矩不动
 
 - 核实：FR2 链没有 ADPLL（nr_dtc → wifi_dtc → DTCPhaseModulator）；event / response 要 fs_bb ≤ fref 且整数比，ACLR1 / ACLR2 要 os ≥ 3 / 4，

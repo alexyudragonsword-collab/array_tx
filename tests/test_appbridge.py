@@ -54,7 +54,7 @@ def test_a_run_on_the_thread_backend_lands_the_same_report(tmp_path):
     j = _call("run", {"values": vals, "theta0_deg": 30, "scheme": "none", "n_symbols": SMOKE_SYMBOLS})["job"]
     done = _wait(j["id"])
     assert done["status"] == "done" and done["rows"][0]["ota"]["beam"]["domain"] == "ota"
-    assert "线性化引擎" in done["rows"][0]["engine_line"]
+    assert "不能背书" in done["rows"][0]["engine_line"]
     # the phone writes YAML under its own directory (relative paths land in ARRAYTX_HOME)
     saved = _call("save", {"values": vals, "path": "mine.yaml"})
     assert saved["ok"] and (tmp_path / "mine.yaml").exists() and saved["source_path"] == str(tmp_path / "mine.yaml")

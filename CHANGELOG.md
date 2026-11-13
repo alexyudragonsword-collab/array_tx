@@ -4,6 +4,14 @@
 
 ## 未发布 / Unreleased
 
+### 引擎行按原因与网格给免责：dtc_openloop 不再叫"线性化"，polar、os ≥ 16 不挂免责（2026-11-13）
+
+- `report.disclaimer_for(mode, topology, oversampling)`：response 写"线性化引擎"，rfdac 写"只有失配、网格未验证"，
+  dtc_openloop 在 os < 16 写"采样网格未收敛"（附 ex22 的偏差），非 polar 拓扑在 os ≥ 16 写"未验证"；polar、os ≥ 16 改写"网格已收敛"。
+  引擎行带上网格（`os 4`）。所有免责共用"不能背书"，测试与页面认它。
+- 守护测试：response / rfdac 在任何网格都挂免责，去掉 response 的免责测试变红（已实测）。数字不动（指纹逐位相同）。
+- 示例默认网格仍是 4，现有示例照样挂免责；提到 16 的重跑（估约 30 h）留在 ROADMAP B2。
+
 ### B2 重新定性：dtc_openloop 不是线性化引擎，但 os 4 的网格没收敛；规矩不动（2026-11-13）
 
 - 新配置键 `sim.oversampling`（0 = 标准的 4，指纹不变）；`Standard.with_oversampling` 标 assumed，对 polar_tx 原生锚点拒绝。

@@ -48,7 +48,8 @@ def banner(title: str, sim) -> float:
 
 def _engine(sim) -> str:
     from arraytx.report import engine_line
-    return engine_line([e.engine for e in sim.elements], sim.cfg.element.topology)
+    return engine_line([e.engine for e in sim.elements], sim.cfg.element.topology,
+                       int(sim.standard.oversampling.value))
 
 
 def done(t0: float, fig, name: str) -> None:

@@ -42,7 +42,7 @@ def test_the_page_speaks_only_routes_the_host_answers():
     served = set(re.findall(r'route == "([a-z/]+)"', host)) | {"jobs", "spec", "config", "version"}
     assert routes <= served, routes - served
     assert POST_HEADER in js
-    assert "线性化引擎" in (ROOT / "src" / "arraytx" / "report.py").read_text(encoding="utf-8")
+    assert "不能背书" in (ROOT / "src" / "arraytx" / "report.py").read_text(encoding="utf-8")
 
 
 def _browser():
@@ -99,7 +99,7 @@ def test_form_is_the_spec_and_a_run_lands_everywhere(server, browser):
     assert not errors, errors
     title = page.text_content("#res-title")
     assert "+30.0°" in title and "无 DPD" in title
-    assert "线性化引擎" in page.text_content("#engine")
+    assert "不能背书" in page.text_content("#engine")
     cards = page.text_content("#cards")
     assert "EVM" in cards and "ACLR1" in cards and "OTA" in cards and "stylized" in cards
     assert "conducted_" in page.text_content("details.diag summary")          # the diagnostic is labelled, collapsed
@@ -241,7 +241,7 @@ def test_the_page_works_through_an_injected_host_bridge(server, browser):
     page.wait_for_function("[...document.querySelectorAll('#table tbody tr')].some(tr => tr.textContent.includes('0°'))", timeout=180000)
     assert not errors, errors
     assert page.evaluate("window.host.calls") >= 4                      # spec, config, validate, run, jobs...
-    assert "线性化引擎" in page.text_content("#engine")
+    assert "不能背书" in page.text_content("#engine")
     ctx.close()
 
 

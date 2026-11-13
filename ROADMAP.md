@@ -45,8 +45,9 @@ ACLR2 要 os ≥ 4，即 fref ≥ 1.47 / 1.97 GHz，不是现实的 28 GHz 两�
 ACLR 0.3 dB、EVM 0.1 dB，与 os 16 比）：无 DPD 的 ACLR1 / 旁瓣 / 最差亮方向 ≤ 0.07 dB（收敛）；ACLR2 在 os 4 偏高 4.74 dB（无 DPD）、
 1.25–1.64 dB（DPD）；DPD 后 ACLR1 偏高 0.46–0.54 dB、旁瓣 ACLR1 至多 1.54 dB，os 8 不单调；os 16 与 os 32 差 ≤ 0.04 dB。
 ex07 的杂散 ΔEVM os 4 − os 16 为 −0.22…+0.19 dB；噪声开时随机底也随网格动（`cairn/dtc-openloop-grid.md`）。
-所以"不能背书"的规矩不动。要收窄成"os ≥ 16 下 dtc_openloop 的确定性杂散 / 互调结论可背书"，得把示例的默认网格提到 16
-（`sim.oversampling`，运行时间约 ×4，numbers-move），单独一轮。
+引擎行已改成按原因与网格给出（2026-11-13）：polar 拓扑、os ≥ 16 的 dtc_openloop 不再挂免责，os < 16 的写明"网格未收敛"。
+没做的：把示例默认网格提到 16 并重跑。按 LOG 里的全尺寸耗时（os 4 合计约 9 h）与 ex22 的单次耗时比（×3–4）估约 30 h，
+而且 cairn 与 README 里全部 os 4 的数字都要重写；numbers-move，单独一轮。
 
 ### B3. rfdac 拓扑：能跑 FR2，DPD 能跑但没有东西可校；outphasing 的 ρ 没有出处
 rfdac 按 FR2 的载频和 LO 建链并有测试（`tests/test_element.py::test_other_topologies_run_at_fr2`）；polar_tx@008cc90 起 `CartesianTX` 读 `fs_scale_fixed`，

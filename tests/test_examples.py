@@ -20,5 +20,5 @@ def test_example_runs_in_smoke_mode(path):
     env = dict(os.environ, ARRAYTX_SMOKE="1", MPLBACKEND="Agg")
     r = subprocess.run([sys.executable, path], capture_output=True, text=True, timeout=600, env=env)
     assert r.returncode == 0, r.stdout[-2000:] + "\n" + r.stderr[-2000:]
-    assert "engine:" in r.stdout and "线性化引擎" in r.stdout, "every example prints its engine and the disclaimer"
+    assert "engine:" in r.stdout and "不能背书" in r.stdout, "every example prints its engine and the disclaimer"
     assert "plots ->" in r.stdout

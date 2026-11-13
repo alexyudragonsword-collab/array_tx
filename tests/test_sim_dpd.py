@@ -41,7 +41,7 @@ def test_dpd_improves_the_beam_with_coupling(fr2_sim):
     assert pe < n - 3.0 and ar < n - 3.0, (n, pe, ar)
     assert rs["per_element"].dpd.n_coeffs() == 4 * rs["array"].dpd.n_coeffs()
     assert set(rs["array"].engine_modes) == {"dtc_openloop"}
-    assert "线性化引擎" in rs["array"].info["engine_line"]
+    assert "不能背书" in rs["array"].info["engine_line"]
 
 
 def test_dpd_does_not_move_the_operating_point(fr2_sim):

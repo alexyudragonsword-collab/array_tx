@@ -92,7 +92,7 @@ def test_run_job_returns_the_report(server):
     assert done["status"] == "done", done.get("error")
     rep = done["rows"][0]
     assert rep["ota"]["beam"]["domain"] == "ota" and rep["plots"]["direction"]["beam_deg"] == 30.0
-    assert rep["info"]["n_symbols"] == SMOKE_SYMBOLS and "线性化引擎" in rep["engine_line"]
+    assert rep["info"]["n_symbols"] == SMOKE_SYMBOLS and "不能背书" in rep["engine_line"]
     assert done["config_sha256"] == rep["repro"]["config_sha256"]
     listing = _get(server + "api/jobs")["jobs"]
     assert any(x["id"] == done["id"] and "rows" not in x and x["n_rows"] == 1 for x in listing)
