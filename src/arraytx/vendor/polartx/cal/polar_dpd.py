@@ -1,4 +1,4 @@
-# Vendored from polar_tx@008cc90: src/polartx/cal/polar_dpd.py
+# Vendored from polar_tx@b007e60: src/polartx/cal/polar_dpd.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Polar DPD: the two-LUT predistorter of every digital polar TX.
 

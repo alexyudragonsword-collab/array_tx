@@ -1,4 +1,4 @@
-# Vendored from polar_tx@008cc90: src/polartx/waveforms/ofdm.py
+# Vendored from polar_tx@b007e60: src/polartx/waveforms/ofdm.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Generalized OFDM: the vendored padpd 802.11-engine with configurable
 subcarrier spacing (adapted from PA_DPD src/padpd/waveform/ofdm.py).

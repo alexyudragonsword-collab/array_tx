@@ -31,6 +31,12 @@ ex19：只在 180° 训练、按平均 |1+Γ| 取回退，没训练过的相位�
 ex20 试了每单元回退（`element.pa.backoff_per_element_db`，同一条按平均值训练的规则用到每个 |1+Γ_k|）：处处达标，但平均效率与整阵列一个回退持平
 （4 × 1 50.39 对 50.48 %，8 × 8 45.31 对 45.35 %），波束功率 −0.54…+0.50 dB。没做：按每单元训练的规则（要搜每单元回退组合）、小于 1 dB 的回退台阶。
 
+### B10. FR2 的 LO 剖面是 sub-6 剖面按 (fout/f0)² 连续放大，不是可实现的倍频链
+`lo.py` 的 `ClockProfileLO` 把剖面当理想倍频 / 分频器的参考，S_φ 乘 (fout/f0)²（如 10 GHz → 28 GHz 是 ×2.8，非整数）。
+pll_simulator@5564c64 的 `export/clock_profile.py`（已随本库 vendor）有整数 ×N 倍频器：`integer_multiplier` 拒绝非整数 N，
+`multiply_curve` 在 f_in/2 以内给 N²·L_in 加白噪底、以外只剩底，`multiply_spurs` 加 20 log10 N 与 N±1 次谐波泄漏。
+换成"整数 N 的 PLL + 倍频器"（PLL 调到 f_c/N）会动 LO 相关的数字（ex05 / ex07、EVM 底），单独一轮，标 numbers-move。
+
 ### B2. 事件引擎在 FR2 不可用
 polar_tx ROADMAP B1：event 引擎 LTE-20 带宽已 29 % 相位推进不可用。FR2 400 MHz 只能用 response / dtc_openloop，
 杂散与互调结论一律标"线性化引擎，不能背书"。

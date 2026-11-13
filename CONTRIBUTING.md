@@ -39,7 +39,7 @@ python tools/fingerprint.py compare before.json after.json
 
 ## 4. 提交
 
-只提交到 `ccr-411c6423-uxcjms`。提交信息写为什么，带实测数字。每个里程碑结束：CHANGELOG 一条、`cairn/LOG.md` 一条、ROADMAP 删做完的。
+在 `feat/*` 分支上开发，开 PR 合 `main`（默认分支，2026-11-06 起），不直接推 `main`；一个 PR 只做一件事（例：重新 pin 与改数字的研究分两个 PR）。提交信息写为什么，带实测数字。每个里程碑结束：CHANGELOG 一条、`cairn/LOG.md` 一条、ROADMAP 删做完的。
 
 ## 5. GUI
 

@@ -32,7 +32,7 @@ def test_run_report_equals_the_arraysim_result_item_for_item(fr2_sim):
     assert "线性化引擎" in rep["engine_line"] and rep["engine_modes"] == ["dtc_openloop"]
     assert rep["info"]["n_elements"] == 4 and abs(rep["info"]["squint_deg"]) < 0.3
     assert rep["repro"]["seed"] == 1 and len(rep["repro"]["config_sha256"]) == 64
-    assert rep["repro"]["pins"] == {"polar_tx": "008cc90", "PA_DPD": "08b9725", "pll_simulator": "00e48a2"}
+    assert rep["repro"]["pins"] == {"polar_tx": "b007e60", "PA_DPD": "08b9725", "pll_simulator": "5564c64"}
     assert "sim.run(theta0_deg=30.0, scheme='none')" in rep["repro"]["call"]
 
 

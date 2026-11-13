@@ -1,4 +1,4 @@
-# Vendored from polar_tx@008cc90: src/polartx/measured.py
+# Vendored from polar_tx@b007e60: src/polartx/measured.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Measured-data DPA modeling via the OpenDPD data path.
 

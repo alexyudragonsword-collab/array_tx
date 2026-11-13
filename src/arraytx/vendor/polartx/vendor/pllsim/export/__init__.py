@@ -1,2 +1,2 @@
-# arraytx: pll_simulator's ``export`` package is not part of polar_tx's pllsim
-# pin (931cfaf); only the clock-profile reader is taken, from 00e48a2.
+# arraytx: polar_tx does not vendor pll_simulator's ``export`` package; only the
+# clock-profile reader is taken, at the nested tree's own pin (5564c64).

@@ -60,7 +60,7 @@ def _wait(server: str, jid: str, timeout: float = 240.0) -> dict:
 
 def test_version_spec_and_config(server):
     v = _get(server + "api/version")
-    assert v["lib"] == "arraytx" and v["pins"]["polar_tx"] == "008cc90" and v["workers"] == 1
+    assert v["lib"] == "arraytx" and v["pins"]["polar_tx"] == "b007e60" and v["workers"] == 1
     s = _get(server + "api/spec")
     assert s["ok"] and len(s["controls"]) >= 50 and s["schemes"] == ["none", "per_element", "array"]
     c = _get(server + "api/config")

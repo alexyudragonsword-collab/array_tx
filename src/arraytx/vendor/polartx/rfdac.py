@@ -1,4 +1,4 @@
-# Vendored from polar_tx@008cc90: src/polartx/rfdac.py
+# Vendored from polar_tx@b007e60: src/polartx/rfdac.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """RF-DAC: the digital I/Q transmitter's output stage.
 

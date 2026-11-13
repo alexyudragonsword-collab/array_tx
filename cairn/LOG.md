@@ -2,6 +2,16 @@
 
 本文件按时间倒序记录实质进展——新条目在顶。每条只写摘要与指针（数字写原值）；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-11-13 · 换 pin：polar_tx 008cc90 → b007e60，嵌套 pllsim 整棵 5564c64；304 项指纹 0 处变化
+
+- 先把 18 个内置时钟剖面（read_clock_profile 各字段、28 GHz 的 PSD 与杂散）和一次带剖面 + 杂散的 FR2 运行加进指纹（168 → 304 项）。
+- 换 pin 脚本先在旧 pin（008cc90 / 00e48a2）上重放：除上游已删的 `guiqt/` 外与现有 vendor 树逐字节相同，再用到新 pin。
+- 结果：304 项 0 处变化（预测 0）；vendor_check --strict 90 文件（87 verbatim / 1 extended / 2 extracted / 0 skip）；ex00 逐位相等。
+- 为什么不动：本库不建 ADPLL 链（anchor 与 FR2 都是 nr_dtc → `DTCPhaseModulator`，引擎 dtc_openloop），B1 的 TDC 量程检查碰不到；
+  outphasing.py 只多了 env_skew_s ≠ 0 时的警告；presets.py 只改 LTE-20 的 TDC 位数；clock_profile.py 的新增是倍频器函数，读取路径不变。
+- adpll.py 的 body_sha256 与 polar_tx 自己的 manifest 一致（97f1ced…）；frac.py 不一致是因为本库只剥两行归属头（多出的两行说明留在正文里）。
+- 分支：main 是默认分支，在 feat/* 上开 PR；ccr-411c6423-uxcjms 不再推。
+
 ## 2026-11-06 · ex20 每单元回退不更省；ex21 规则只在训练的 κ 下安全；工作台接上回退规则；评审
 
 - ex20（2088.8 s）：同 ex19 的规则用到每个 |1+Γ_k|。达标 / 平均效率：4 × 1 整阵列 20/20 · 50.48 %，每单元 20/20 · 50.39 %；

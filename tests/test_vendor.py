@@ -26,10 +26,17 @@ def test_manifest_entries_have_files_and_hashes():
 
 
 def test_no_gui_surface_vendored_and_clock_profile_present():
-    assert not (VENDOR / "polartx" / "guiqt").exists()
-    assert not (VENDOR / "polartx" / "guiutil.py").exists()
-    cp = VENDOR / "polartx" / "vendor" / "pllsim" / "export" / "clock_profile.py"
-    assert cp.exists() and "pll_simulator@00e48a2" in cp.read_text().splitlines()[0]
+    """polar_tx's GUI surface (b007e60: guiutil / appbridge / guispec / webhost /
+    webui) is not carried, and the grafted clock-profile reader sits on the
+    same pll_simulator commit as the rest of the nested pllsim tree."""
+    for gone in ("guiqt", "guiutil.py", "appbridge.py", "guispec.py", "webhost.py", "webui", "py.typed"):
+        assert not (VENDOR / "polartx" / gone).exists(), gone
+    pll = VENDOR / "polartx" / "vendor" / "pllsim"
+    cp = pll / "export" / "clock_profile.py"
+    assert cp.exists() and "pll_simulator@5564c64" in cp.read_text().splitlines()[0]
+    shas = {re.search(r"@(\w+):", f.read_text().splitlines()[0]).group(1)
+            for f in pll.rglob("*.py") if f.name != "__init__.py"}
+    assert shas == {"5564c64"}, shas
 
 
 def test_outside_code_imports_only_through_arraytx_vendor():

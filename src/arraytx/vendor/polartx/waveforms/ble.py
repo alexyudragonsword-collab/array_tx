@@ -1,4 +1,4 @@
-# Vendored from polar_tx@008cc90: src/polartx/waveforms/ble.py
+# Vendored from polar_tx@b007e60: src/polartx/waveforms/ble.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Bluetooth LE GFSK waveforms (LE 1M / LE 2M, stylized: raw PDU bits only).
 
