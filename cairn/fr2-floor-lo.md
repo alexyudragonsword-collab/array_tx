@@ -5,7 +5,7 @@ summary: FR2 链的底在哪——EVM 由 LO 相噪与抖动定，ACLR 由 DPD �
 tags: [lo, phase-noise, spurs, evm, aclr, dpd]
 contains: [decision, lesson]
 created: 2026-11-03
-updated: 2026-11-04
+updated: 2026-11-13
 related: [architecture-invariants.md]
 authoring_mode: ai_generated
 ---
@@ -20,6 +20,9 @@ authoring_mode: ai_generated
   DPD 后 ACLR1 ≈ −45 已逼近 DTC 量化 / 抖动 / LO 的底，再加 GMP 阶数或抽头无益（见下）。
 
 ## GMP 默认（order 7 / memory_depth 1 / 无交叉项）
+
+> 更正 2026-11-13（`dtc-openloop-grid.md`）：本节与上节的 ACLR2、DPD 后 ACLR1 都是 os 4 网格上的数，os 4 的 ACLR2 偏高 1.3–4.7 dB、
+> DPD 后 ACLR1 偏高约 0.5 dB（os 16 收敛）。"记忆抽头只伤 ACLR2"的比较是同一网格上的相对比较，量级要在 os 16 上重核。
 
 记忆抽头只伤 ACLR2（9 阶 1 抽头 −48.3，3 抽头 −45.0，5 抽头 −44.8）：单元链是 DPA + DTC，没挂记忆模型，多余抽头拟合噪声再生。
 阶数 3/5/7/9 的 ACLR1 −44.77 / −45.14 / −45.36 / −45.39，7 阶到平台。

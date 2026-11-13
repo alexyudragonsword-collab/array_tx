@@ -24,13 +24,16 @@ converged at os 4 if it is within 0.3 dB of its os-16 value (ACLR) or
           lit direction (pattern >= -15 dB) ACLR1.
           Also at os 16: the DTC and DPA clocks held at 1.966 GHz (ZOH) --
           different physics (a real update clock's images and droop), shown
-          for scale, not part of the convergence test.
+          for scale, not part of the convergence test (its EVM reads the ZOH's
+          half-update delay as error, so read its ACLR columns only).
   Part B  ex07's case: the three loudest clock-profile spur tables, spurs off
           and on (noise on -- the spurs are gated with it), no DPD and array
           DPD: the change in EVM and ACLR1 the spurs make.
   Part C  noise ON at the beam, no DPD: the random floor.  The DTC jitter is
           drawn per simulation sample, so its in-band density falls as the
           grid gets finer -- a property of the noise model, shown separately.
+  Part D  the DPD cases at os 4 / 8 / 16 / 32 (survey; beam and sidelobe):
+          whether the DPD numbers settle at all.
 """
 from dataclasses import replace
 
@@ -147,6 +150,22 @@ for k in OS:
                   "ACLR1 noise on": r.beam.aclr1_db, "ACLR1 noise off": q.beam.aclr1_db,
                   "ACLR2 noise on": r.beam.aclr2_db, "ACLR2 noise off": q.beam.aclr2_db})
 print(table(rowsC))
+
+# ------------------------------------------------------------------ Part D
+rowsD = []
+if not smoke():
+    # Part A's DPD rows did not settle by os 16 (os 8 sat further from os 16 than os 4 did):
+    # one more octave for them, beam and sidelobe only (no direction scan at 15.7 GS/s)
+    print(f"\nPart D — the DPD cases one octave further (os 32, survey, beam {THETA0:.0f} deg, noise off)")
+    for sch in ("per_element", "array"):
+        rec = {"scheme": sch}
+        for k in (4, 8, 16, 32):
+            r = sim_for("configs/fr2_4el_survey.yaml", k, noise=False).run(THETA0, sch, conducted_diagnostics=False)
+            rec.update({f"ACLR1 os{k}": r.beam.aclr1_db, f"ACLR2 os{k}": r.beam.aclr2_db, f"SL ACLR1 os{k}": r.sidelobe.aclr1_db})
+        rowsD.append(rec)
+        print("  " + sch + ": " + "  ".join(f"{m} " + " / ".join("%.2f" % rec[f"{m} os{k}"] for k in (4, 8, 16, 32))
+                                         for m in ("ACLR1", "ACLR2", "SL ACLR1")), flush=True)
+    print(table(rowsD))
 
 fig, ax = plt.subplots(1, 2, figsize=(10.5, 3.9))
 for m, mk in (("ACLR1", "o-"), ("ACLR2", "s--"), ("SL ACLR1", "^:"), ("worst lit ACLR1", "v-.")):

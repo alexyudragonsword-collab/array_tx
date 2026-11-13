@@ -4,6 +4,15 @@
 
 ## 未发布 / Unreleased
 
+### B2 重新定性：dtc_openloop 不是线性化引擎，但 os 4 的网格没收敛；规矩不动（2026-11-13）
+
+- 新配置键 `sim.oversampling`（0 = 标准的 4，指纹不变）；`Standard.with_oversampling` 标 assumed，对 polar_tx 原生锚点拒绝。
+- ex22：os 4 / 8 / 16 / 32 上重跑 ex04 与 ex07 下结论的工况。无 DPD 的 ACLR1 / 旁瓣 / 最差亮方向收敛（≤ 0.07 dB）；
+  ACLR2 在 os 4 偏高 4.74 dB；DPD 后 ACLR1 偏高 0.46–0.54 dB、旁瓣至多 1.54 dB；os 16 与 os 32 差 ≤ 0.04 dB。
+  按事先容差（ACLR 0.3 dB、EVM 0.1 dB）不收敛，免责声明与 AGENTS 规矩不动。
+- ROADMAP B2 按真实原因（fs/2 以上的折叠）与数字重写；新增 E 节"报回上游"（E1：polar_tx FR2 默认 os 4）；
+  新主题 `cairn/dtc-openloop-grid.md`；`fr2-floor-lo.md` 追加更正（os 4 上的 ACLR2 与 DPD 后 ACLR1）。
+
 ### 换 pin 到 polar_tx@b007e60（polar_tx main），嵌套 pllsim 整棵在 5564c64；数字不动（2026-11-13）
 
 - polar_tx 008cc90 → b007e60（18 个提交；008cc90 已是 main 的祖先，四处本库带回的修正经 polar_tx PR #9 进了 main）。
