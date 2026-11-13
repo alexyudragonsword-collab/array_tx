@@ -29,7 +29,7 @@ def test_run_report_equals_the_arraysim_result_item_for_item(fr2_sim):
     d = rep["diagnostic"]
     assert len(d) == fr2_sim.geom.n and d[0]["conducted_evm_db"] == r.conducted[0].evm_db
     assert all(k.startswith("conducted_") for k in d[0] if k not in ("element", "errors"))
-    assert "线性化引擎" in rep["engine_line"] and rep["engine_modes"] == ["dtc_openloop"]
+    assert "不能背书" in rep["engine_line"] and rep["engine_modes"] == ["dtc_openloop"]
     assert rep["info"]["n_elements"] == 4 and abs(rep["info"]["squint_deg"]) < 0.3
     assert rep["repro"]["seed"] == 1 and len(rep["repro"]["config_sha256"]) == 64
     assert rep["repro"]["pins"] == {"polar_tx": "b007e60", "PA_DPD": "08b9725", "pll_simulator": "5564c64"}

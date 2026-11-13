@@ -47,8 +47,11 @@ ACLR1 要 fs ≥ 3 BW，os 1 / 2 只有 1.23 / 2.46 BW。DTC 与 DPA 都在网�
 
 ## 决定
 
-按事先的标准不收敛，`report.DISCLAIMER` 与 AGENTS 的规矩不动。准确的说法是"os 4 的网格没收敛"，不是"线性化"。
-要收窄成"os ≥ 16 下 dtc_openloop 的确定性杂散 / 互调结论可背书"，得把示例默认网格提到 16（运行时间约 ×4，numbers-move），单独一轮。
+按事先的标准 os 4 不收敛，所以 os 4 的数字继续挂免责。2026-11-13 第二步（用户同意）：免责按原因与网格给出
+（`report.disclaimer_for`）——response 写"线性化引擎"，rfdac 写"只有失配"，dtc_openloop 在 os < 16 写"采样网格未收敛"并给出 ex22 的偏差；
+只有 ex22 验证过的组合（polar 拓扑、os ≥ 16）不挂免责，引擎行改写"网格已收敛"。outphasing 等拓扑在 os ≥ 16 写"未验证"。
+示例默认网格仍是 4（提到 16 估约 30 h 重跑、全部文档数字重写，另一轮），所以现有示例照样挂免责。
+守护：`tests/test_metrics.py::test_disclaimer_follows_the_engine_and_the_grid`（去掉 response 的免责会变红，已实测）。
 报回上游：ROADMAP E1（polar_tx nr_dtc FR2 默认 os 4）。
 
 ## 坑

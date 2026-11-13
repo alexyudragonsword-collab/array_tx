@@ -16,11 +16,12 @@ polar_tx 的姊妹库（polar_tx ROADMAP D：GUI 里不再加架构、不做接�
 pip install -e ".[test,dev]"
 python examples/ex00_single_element_equals_polartx.py   # sub-6、S=0、1 单元：与 polar_tx 逐位相同
 python examples/ex03_scan_angle_x_dpd.py                # 扫描角 × DPD 方案的 OTA EVM / ACLR 表
-pytest -q                                               # 203 项（页面测试无 Chromium 时跳过）
+pytest -q                                               # 205 项（页面测试无 Chromium 时跳过）
 ARRAYTX_SMOKE=1 python examples/ex04_aclr_vs_direction.py   # 短突发（CI 用的尺寸）
 ```
 
-每个示例先打印它用的相位调制引擎；response / dtc_openloop 引擎出的杂散与互调结论一律标"线性化引擎，不能背书"。
+每个示例先打印它用的相位调制引擎和采样网格，并写明杂散 / 互调结论为什么不能背书：response 是线性化引擎；rfdac 模型只有失配；
+dtc_openloop 在 os < 16 时网格没收敛（ex22：os 4 的 ACLR2 偏高约 4.7 dB）。polar 拓扑、`sim.oversampling` ≥ 16 的 dtc_openloop 不挂免责。
 
 ## 结果速览
 
