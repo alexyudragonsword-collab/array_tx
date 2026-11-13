@@ -82,7 +82,38 @@ def record() -> dict:
                 d["conducted"] = [repr(c.aclr1_db) for c in r.conducted]
                 return d
             _guarded(out, f"{name}.{theta:g}.{s}", run)
+    record_clock_profiles(out)
     return out
+
+
+def record_clock_profiles(out: dict) -> None:
+    """The bundled pll_simulator clock profiles as the vendored reader parses
+    them, the LO object built on them at 28 GHz, and one FR2 run with a
+    profile (and its spurs) in the shared LO: a re-pin of the nested pllsim
+    must read every profile the same."""
+    from arraytx import ArraySim, load_config
+    from arraytx.lo import ClockProfileLO, bundled_dir, list_bundled
+    from arraytx.vendor.polartx.vendor.pllsim.export.clock_profile import read_clock_profile
+    f = np.geomspace(1e3, 1e9, 61)
+    names = list_bundled()
+    out["profiles.names"] = repr(names)
+    for n in names:
+        def prof(n=n):
+            d = read_clock_profile(bundled_dir() / f"{n}.yaml")
+            lo = ClockProfileLO(f"bundled:{n}", fout_hz=28e9)
+            return {"f0_hz": repr(float(d["f0_hz"])), "f_hz": digest(d["f_hz"]), "l_dbc_hz": digest(d["l_dbc_hz"]),
+                    "spurs": repr(d["spurs"]), "source": repr(d["source"]),
+                    "psd_28g": digest(lo.psd(f)), "spurs_at_carrier": repr(lo.spurs_at_carrier())}
+        _guarded(out, f"profile.{n}", prof)
+
+    def lo_run():
+        cfg = load_config("configs/fr2_4el_survey.yaml")
+        cfg.element.lo.clock_profile = "bundled:adpll_100m_10g"
+        cfg.element.lo.spurs = True
+        r = ArraySim(cfg).run(30.0, "none")
+        return {"ys": digest(r.ys), "far_beam": digest(r.far["beam"][1]),
+                "beam": {k: repr(v) for k, v in r.beam.row().items()}}
+    _guarded(out, "fr2_lo_profile.30.none", lo_run)
 
 
 def flatten(d: dict, prefix: str = "") -> dict:
