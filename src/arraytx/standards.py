@@ -17,7 +17,7 @@ which the LOG records), ``derived`` means computed from survey numbers.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from .vendor.polartx import nr_dtc
@@ -54,6 +54,7 @@ class Standard:
     oversampling: Sourced
     evm_limit_pct: Sourced
     polartx_native: bool = False   # waveform and preset come from polar_tx as-is
+    oversampling_overridden: bool = False   # set by with_oversampling (config sim.oversampling)
     notes: tuple[str, ...] = field(default_factory=tuple)
 
     @property
@@ -68,6 +69,20 @@ class Standard:
         return {k: getattr(self, k) for k in
                 ("carrier_hz", "bandwidth_hz", "scs_hz", "fft_size", "n_rb",
                  "qam", "oversampling", "evm_limit_pct")}
+
+    def with_oversampling(self, k: int) -> "Standard":
+        """This standard on a k-times oversampled grid (config ``sim.oversampling``):
+        the same symbols and numerology, fs = FFT x SCS x k.  The value is a study
+        setting, so it is labelled assumed."""
+        k = int(k)
+        if self.polartx_native:
+            # the anchor's waveform is polar_tx's own preset waveform: an override
+            # would not reach it, and a silently ignored setting is worse than none
+            raise ValueError(f"{self.name}: sim.oversampling cannot override the polar_tx-native anchor")
+        if k < 1:
+            raise ValueError(f"oversampling must be >= 1, got {k}")
+        return replace(self, oversampling=Sourced(k, "assumed", "config sim.oversampling (study setting)"),
+                       oversampling_overridden=True)
 
     # ------------------------------------------------------- construction
     def preset(self, **overrides) -> TxPreset:

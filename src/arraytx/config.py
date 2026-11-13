@@ -229,6 +229,7 @@ class SimCfg:
     smoke_n_symbols: int = _f(2, "symbols", "burst length when ARRAYTX_SMOKE=1 (CI)")
     noise: bool = _f(True, "", "random impairments on (polar_tx run(noise=))")
     cfr_papr_db: float | None = _f(8.5, "dB", "CFR target PAPR applied to the common signal before steering/DPD; null = off")
+    oversampling: int = _f(0, "x", "baseband oversampling of the waveform and every chain on it (fs = FFT x SCS x this); 0 = the standard's sourced value (4). A study knob: ACLR1 needs fs >= 3 BW, ACLR2 fs >= 4.9 BW (ex22 runs 4 / 8 / 16)")
 
 
 @dataclass
@@ -262,6 +263,8 @@ class ArrayConfig:
             raise ValueError("dpd.n_iterations must be >= 1")
         if not 0.0 <= self.element.outphasing.source_impedance_rel < 1.0:
             raise ValueError("element.outphasing.source_impedance_rel must be in [0, 1)")
+        if self.sim.oversampling < 0:
+            raise ValueError("sim.oversampling must be 0 (the standard's) or a positive integer")
         if self.element.pa.backoff_db < 0.0:
             raise ValueError("element.pa.backoff_db must be >= 0 (a negative value would clip the undistorted peak)")
         bpe = self.element.pa.backoff_per_element_db
