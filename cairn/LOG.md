@@ -2,6 +2,17 @@
 
 本文件按时间倒序记录实质进展——新条目在顶。每条只写摘要与指针（数字写原值）；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-11-13 · B2 重新定性：dtc_openloop 不是线性化引擎，限制是网格；os 4 不收敛，规矩不动
+
+- 核实：FR2 链没有 ADPLL（nr_dtc → wifi_dtc → DTCPhaseModulator）；event / response 要 fs_bb ≤ fref 且整数比，ACLR1 / ACLR2 要 os ≥ 3 / 4，
+  即 fref ≥ 1.47 / 1.97 GHz。polar_tx B1 的数（127 ps 对 513 ps，LTE-20 event EVM −14.7 → −44.5 dB）见其 cairn/adpll-event-engine.md。
+- ex22（330.9 s；容差事先写进示例：ACLR 0.3、EVM 0.1 dB，对 os 16）：无 DPD ACLR1 −37.98 / −37.93 / −38.04（os 4 / 8 / 16），收敛；
+  ACLR2 −60.31 / −63.47 / −65.04；每单元 DPD ACLR1 −47.04 / −46.78 / −47.50 / −47.48（os 32），ACLR2 −52.03 → −53.30，旁瓣 −48.95 → −50.49。
+  analytic 的差与 survey 相差 ≤ 0.03 dB。杂散 ΔEVM os 4 − os 16 −0.22…+0.19 dB。噪声开的 EVM −26.40 / −26.04 / −25.75（相噪按 fs/2 合成）。
+- 判定：不收敛（ACLR2 与 DPD 后的数字）。DISCLAIMER、AGENTS 规矩不动；B2 重写；E1 报回 polar_tx。被推翻的判断："dtc_openloop 是线性化引擎"——
+  它逐样本施加全部确定性非理想，问题是 os 4 折叠，os 16 收敛。
+- 附带：更新时钟钉在 1.966 GHz 时 EVM 读成 −17.5 dB，是 ZOH 半周期延时被标量均衡当成误差。
+
 ## 2026-11-13 · 换 pin：polar_tx 008cc90 → b007e60，嵌套 pllsim 整棵 5564c64；304 项指纹 0 处变化
 
 - 先把 18 个内置时钟剖面（read_clock_profile 各字段、28 GHz 的 PSD 与杂散）和一次带剖面 + 杂散的 FR2 运行加进指纹（168 → 304 项）。

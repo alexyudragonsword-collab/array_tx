@@ -16,7 +16,7 @@ polar_tx 的姊妹库（polar_tx ROADMAP D：GUI 里不再加架构、不做接�
 pip install -e ".[test,dev]"
 python examples/ex00_single_element_equals_polartx.py   # sub-6、S=0、1 单元：与 polar_tx 逐位相同
 python examples/ex03_scan_angle_x_dpd.py                # 扫描角 × DPD 方案的 OTA EVM / ACLR 表
-pytest -q                                               # 201 项（页面测试无 Chromium 时跳过）
+pytest -q                                               # 203 项（页面测试无 Chromium 时跳过）
 ARRAYTX_SMOKE=1 python examples/ex04_aclr_vs_direction.py   # 短突发（CI 用的尺寸）
 ```
 
@@ -42,6 +42,7 @@ FR2 28 GHz / 400 MHz、survey 形状的互耦（相邻 −16 dB，source: assume
 | 相位未知的设计表 | 回退按实测 \|1+Γ\| 存、不按扫描角存：只在 180° 训练，没训练过的相位上 4 × 1 15/15、8 × 8 6/6 达标；按角度存只有 6/15、2/6 | ex19，`scan-design.md` |
 | 每单元回退 | 每单元按自己的 \|1+Γ_k\| 退处处达标，但平均效率与整阵列一个回退持平（4 × 1 50.39 对 50.48 %，8 × 8 45.31 对 45.35 %） | ex20，`scan-design.md` |
 | κ × 相位 | κ 0.5 时设计表再变一层；只在 κ 1 训练的 \|1+Γ\| 规则 15 点漏 1 点：规则替代了互耦相位，没有替代 κ | ex21，`scan-design.md` |
+| 引擎与网格 | FR2 链是开环 DTC（无 ADPLL），不是线性化引擎；但 os 4 的网格让 ACLR2 读高 4.7 dB、DPD 后 ACLR1 读高约 0.5 dB，os 16 收敛——杂散 / 互调结论仍不背书 | ex22，`dtc-openloop-grid.md` |
 
 ## 工作台（GUI）
 
@@ -126,6 +127,7 @@ print(r.info["engine_line"]); print(r.beam.row()); print(r.sidelobe.row())
 | `ex19_phase_robust_design` | 相位未知时的设计表：回退按角度存 / 按 \|1+Γ\| 存 / 各相位最坏 / 先知，在没训练过的互耦相位上谁达标、效率多少 |
 | `ex20_per_element_backoff` | 每单元回退：同一条 \|1+Γ\| 规则用到每个单元，与整阵列一个回退比达标、效率与波束功率 |
 | `ex21_kappa_x_phase` | κ 1 / 0.5 × 互耦相位 180 / 90 / 0°（4 × 1）的设计表，与只在 κ 1 训练的规则是否还安全 |
+| `ex22_oversampling_convergence` | ex04 / ex07 下结论的工况在 os 4 / 8 / 16 / 32 上重跑：杂散、互调、EVM 随网格是否收敛（ROADMAP B2） |
 
 ## 模块
 

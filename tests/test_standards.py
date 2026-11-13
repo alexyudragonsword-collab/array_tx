@@ -53,3 +53,27 @@ def test_sourced_requires_ref_for_survey():
         Sourced(1.0, "survey")
     with pytest.raises(ValueError):
         Sourced(1.0, "guess")
+
+
+def test_sim_oversampling_override():
+    """config sim.oversampling: 0 keeps the standard's sourced 4; k runs the same
+    symbols on a k-times grid (labelled assumed); the polar_tx-native anchor
+    refuses rather than ignore it; a negative value does not load."""
+    from arraytx import ArraySim, config_from_dict, load_config
+    base = ArraySim(load_config("configs/fr2_4el_survey.yaml"), n_symbols=2)
+    assert base.standard is FR2_NR400 and base.wf.fs == pytest.approx(4096 * 120e3 * 4)
+    cfg = load_config("configs/fr2_4el_survey.yaml")
+    cfg.sim.oversampling = 8
+    cfg.sim.cfr_papr_db = None
+    s8 = ArraySim(cfg, n_symbols=2)
+    assert s8.wf.fs == pytest.approx(4096 * 120e3 * 8) and s8.standard.oversampling.source == "assumed"
+    cfg.sim.oversampling = 0
+    s4 = ArraySim(cfg, n_symbols=2)
+    # the same symbols: every other os-8 sample is the os-4 waveform (to the window's interpolation)
+    assert np.max(np.abs(s8.wf.x[::2] - s4.wf.x)) < 0.01 * np.sqrt(np.mean(np.abs(s4.wf.x) ** 2))
+    anchor = load_config("configs/sub6_1el_anchor.yaml")
+    anchor.sim.oversampling = 8
+    with pytest.raises(ValueError, match="native"):
+        ArraySim(anchor, n_symbols=2)
+    with pytest.raises(ValueError):
+        config_from_dict({"sim": {"oversampling": -1}})

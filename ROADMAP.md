@@ -37,9 +37,16 @@ pll_simulator@5564c64 的 `export/clock_profile.py`（已随本库 vendor）有�
 `multiply_curve` 在 f_in/2 以内给 N²·L_in 加白噪底、以外只剩底，`multiply_spurs` 加 20 log10 N 与 N±1 次谐波泄漏。
 换成"整数 N 的 PLL + 倍频器"（PLL 调到 f_c/N）会动 LO 相关的数字（ex05 / ex07、EVM 底），单独一轮，标 numbers-move。
 
-### B2. 事件引擎在 FR2 不可用
-polar_tx ROADMAP B1：event 引擎 LTE-20 带宽已 29 % 相位推进不可用。FR2 400 MHz 只能用 response / dtc_openloop，
-杂散与互调结论一律标"线性化引擎，不能背书"。
+### B2. FR2 的杂散 / 互调数字在 os 4 的网格上没有收敛（2026-11-13 重写；原题"事件引擎在 FR2 不可用"作废）
+原写法两半都不成立：polar_tx B1 的根因是 TDC 量程（127 ps 对 513 ps 周期），不是相位推进，已修；本库的 FR2 链里没有 ADPLL
+（nr_dtc(bw > 100 MHz) → wifi_dtc，引擎 dtc_openloop）。event / response 都要 fs_bb ≤ fref 且 fref/fs_bb 为整数，ACLR1 要 os ≥ 3、
+ACLR2 要 os ≥ 4，即 fref ≥ 1.47 / 1.97 GHz，不是现实的 28 GHz 两点 ADPLL。
+真正的限制是网格：dtc_openloop 逐样本施加确定性非理想，fs/2 以上的非线性产物折回。ex22（os 4 / 8 / 16 / 32，事先定的容差
+ACLR 0.3 dB、EVM 0.1 dB，与 os 16 比）：无 DPD 的 ACLR1 / 旁瓣 / 最差亮方向 ≤ 0.07 dB（收敛）；ACLR2 在 os 4 偏高 4.74 dB（无 DPD）、
+1.25–1.64 dB（DPD）；DPD 后 ACLR1 偏高 0.46–0.54 dB、旁瓣 ACLR1 至多 1.54 dB，os 8 不单调；os 16 与 os 32 差 ≤ 0.04 dB。
+ex07 的杂散 ΔEVM os 4 − os 16 为 −0.22…+0.19 dB；噪声开时随机底也随网格动（`cairn/dtc-openloop-grid.md`）。
+所以"不能背书"的规矩不动。要收窄成"os ≥ 16 下 dtc_openloop 的确定性杂散 / 互调结论可背书"，得把示例的默认网格提到 16
+（`sim.oversampling`，运行时间约 ×4，numbers-move），单独一轮。
 
 ### B3. rfdac 拓扑：能跑 FR2，DPD 能跑但没有东西可校；outphasing 的 ρ 没有出处
 rfdac 按 FR2 的载频和 LO 建链并有测试（`tests/test_element.py::test_other_topologies_run_at_fr2`）；polar_tx@008cc90 起 `CartesianTX` 读 `fs_scale_fixed`，
@@ -59,3 +66,11 @@ APK 在 CI 上构建过一次（2026-11-03，84.7 MB，两个 ABI），桥与页
 - 天线电磁仿真：互耦矩阵是输入。
 - 替代认证测试：OTA 限值只做趋势比较。
 - 载波聚合、多波束、FR2 以外的毫米波频段。
+
+## E. 报回上游（用户转给上游）
+
+### E1. polar_tx：FR2 的 os 4 网格让 ACLR2 读高 4.7 dB
+polar_tx `nr_dtc` 的 FR2 分支默认 `oversampling=4`，`metrics/aclr_ext.py` 写的 fs ≥ 4.9·BW 是能测 ACLR2 的下限，不是测准的条件。
+本库 ex22 在同一条 wifi_dtc 链上（Rapp DPA、4 单元、30°、无噪声）：ACLR2 os 4 −60.31、os 16 −65.04 dBc；DPD 后 ACLR1 差约 0.5 dB，
+os 16 与 os 32 差 ≤ 0.04 dB。polar_tx 自己用 os 4 的宽带场景（FR2、WiFi 320 MHz）可能同样受折叠影响——没有在上游验证，建议用
+同样的做法（同一条链 os 4 / 8 / 16）复核。

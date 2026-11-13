@@ -67,6 +67,8 @@ class ArraySim:
     def __init__(self, cfg: ArrayConfig, *, n_symbols: int | None = None):
         self.cfg = cfg
         self.standard: Standard = get_standard(cfg.standard)
+        if cfg.sim.oversampling:
+            self.standard = self.standard.with_oversampling(cfg.sim.oversampling)
         self.tree = SeedTree(cfg.seed, cfg.array.n_elements * cfg.array.n_rows)
         self.geom = ArrayGeometry(cfg.array.n_elements, cfg.array.n_rows, cfg.array.spacing_lambda,
                                   cfg.array.spacing_y_lambda, float(self.standard.carrier_hz.value),
