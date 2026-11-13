@@ -51,7 +51,7 @@
 - response / dtc_openloop 引擎出的杂散、互调结论一律标"线性化引擎，不能背书"；每个示例打印用的引擎。
 - 互耦在里程碑 1 只是线性泄漏；负载调制等 PA_DPD 的 load-pull，不在这里编。
 - GUI 只画不算：控件表只从 `config.form_fields()` 生成（`guispec.py`），数字只从 `guiutil.py` → `ArraySim` 来，页面不许有第二套默认值或自己算的指标。
-- 只提交到 `ccr-411c6423-uxcjms`；不开 PR、不推 main；提交信息写为什么并带实测数字。
+- 在 `feat/*` 分支上开发，开 PR 合 `main`（默认分支）；不直接推 `main`；提交信息写为什么并带实测数字。
 
 ## 冲突仲裁与知识蒸馏
 

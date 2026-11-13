@@ -1,4 +1,4 @@
-# Vendored from polar_tx@008cc90: src/polartx/dpa/dpa.py
+# Vendored from polar_tx@b007e60: src/polartx/dpa/dpa.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Digital PA: amplitude code + phase-modulated carrier -> RF output.
 

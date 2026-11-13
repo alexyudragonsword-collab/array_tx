@@ -313,13 +313,22 @@ def _existing_field(rel: str, key: str) -> str:
 
 
 _REASONS = {
+    # polar_tx's own sanctioned changes, carried in its nested tree (wording after
+    # polar_tx's tools/vendor_manifest.json at b007e60)
+    "polartx/vendor/padpd/pa/presets.py":
+        "extraction (polar_tx's): only gmp_opendpd_510 and mp_opendpd_500 are "
+        "taken; ddr_volterra_default is dropped because DDRVolterraModel is not vendored",
     "polartx/vendor/pllsim/arch/adpll.py":
-        "two-point range-limited direct-modulation DAC (mod_freq_dp) plus an "
-        "optional online dp_cal hook (SignSignLMS) that replaces mod_dp_gain "
-        "per cycle and records cal_traces['dp_gain']",
+        "polar_tx's two extensions to the TDC kernel: mod_freq_dp, a separate "
+        "(range-limited direct-DAC) trajectory for the direct point; and an online "
+        "dp_cal hook -- a step kernel over a state vector (kernel_view/kernel_done; "
+        "calibration.lms calibrators adapted by lms_dp_step) whose value replaces "
+        "mod_dp_gain per cycle, trace in cal_traces['dp_gain'].  Defaults reproduce "
+        "upstream bit for bit",
     "polartx/vendor/pllsim/arch/frac.py":
-        "FracConfig + frac_spur_offsets extracted from cppll.py so the "
-        "vendored ADPLL does not drag in the analog charge-pump PLL blocks",
+        "polar_tx's extraction: FracConfig from cppll.py so the vendored ADPLL does "
+        "not drag in the analog charge-pump PLL blocks (frac_spur_offsets now lives "
+        "upstream in core/dtcspurs.py, vendored verbatim)",
 }
 
 

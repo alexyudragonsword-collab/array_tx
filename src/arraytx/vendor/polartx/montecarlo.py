@@ -1,4 +1,4 @@
-# Vendored from polar_tx@008cc90: src/polartx/montecarlo.py
+# Vendored from polar_tx@b007e60: src/polartx/montecarlo.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Monte Carlo yield analysis over process mismatch and impairment draws.
 

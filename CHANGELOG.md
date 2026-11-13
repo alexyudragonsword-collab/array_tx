@@ -4,6 +4,18 @@
 
 ## 未发布 / Unreleased
 
+### 换 pin 到 polar_tx@b007e60（polar_tx main），嵌套 pllsim 整棵在 5564c64；数字不动（2026-11-13）
+
+- polar_tx 008cc90 → b007e60（18 个提交；008cc90 已是 main 的祖先，四处本库带回的修正经 polar_tx PR #9 进了 main）。
+  排除清单改成 polar_tx 当前的 GUI 面：`guiutil.py`、`appbridge.py`、`guispec.py`、`webhost.py`、`webui/`（`guiqt/` 上游已删）；
+  `py.typed` 不带。新非 GUI 文件逐字搬：`cal/dp_cal_fixed.py`、`export/dp_cal_vectors.py`、`export/rtl_vectors.py`、`pllsim/core/tdcspurs.py`。
+- 嵌套 pllsim 整棵在 5564c64（polar_tx 的 C5）：`arch/adpll.py` extended、`arch/frac.py` extracted，两条 `pin_frozen` 去掉；
+  本库嫁接的 `export/clock_profile.py` 从 00e48a2 跟到 5564c64（+158/−7：整数 ×N 倍频器 #72、文件头措辞 #73）。
+- 指纹先加上 18 个内置剖面与一次带剖面的 FR2 运行（168 → 304 项），换 pin 前后逐位相同；`vendor_check --strict` 90 个文件
+  （87 verbatim、1 extended、2 extracted、0 skipped）绿；ex00 仍与 polar_tx 逐位相等。
+- 分支规矩：在 `feat/*` 上开 PR 合 `main`（AGENTS、CONTRIBUTING）。ROADMAP 新 B10：FR2 的 LO 剖面换成整数 N 倍频链（numbers-move，另一轮）。
+- fmcw_radar 所 vendor 的 `geometry.py` / `beam.py` / `coupling.py` / `touchstone.py` 本轮没有改动。
+
 ### 每单元回退（ex20）、κ × 相位（ex21）、工作台回退规则（2026-11-06）
 
 - 新配置键 `element.pa.backoff_per_element_db`：每单元满刻度与辐射幅度（多退的单元交出功率）；空 = 旧路径，指纹逐位不变。

@@ -1,4 +1,4 @@
-# Vendored from polar_tx@008cc90: src/polartx/phasemod/dtc_openloop.py
+# Vendored from polar_tx@b007e60: src/polartx/phasemod/dtc_openloop.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Wideband phase modulator: open-loop DTC / phase interpolator.
 

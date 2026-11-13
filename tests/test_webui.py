@@ -105,7 +105,7 @@ def test_form_is_the_spec_and_a_run_lands_everywhere(server, browser):
     assert "conducted_" in page.text_content("details.diag summary")          # the diagnostic is labelled, collapsed
     for pid in ("direction", "spectrum", "constellation"):
         assert page.evaluate(f"document.querySelector('#plot-{pid} svg') !== null"), pid
-    assert "seed 1" in page.text_content("#repro") and "008cc90" in page.text_content("#repro")
+    assert "seed 1" in page.text_content("#repro") and "b007e60" in page.text_content("#repro")
     # a baseline gives deltas on the cards
     page.click("#btn-pin")
     page.click("#btn-run")

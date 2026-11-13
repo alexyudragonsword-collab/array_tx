@@ -1,4 +1,4 @@
-# Vendored from polar_tx@008cc90: src/polartx/cartesian.py
+# Vendored from polar_tx@b007e60: src/polartx/cartesian.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Cartesian (digital I/Q) transmitter, the third topology beside polar and
 outphasing.
