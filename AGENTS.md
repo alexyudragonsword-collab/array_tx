@@ -48,7 +48,7 @@
 - 外部来源的每个数字都带 `source`（survey / derived / assumed / measured）和出处；没有出处就标 `assumed`，不许冒充 survey。
   `coupling.survey` 块里每个数字都要写明来历（survey 带引文，assumed / derived 带原因），裸标量不许进。
 - `src/arraytx/vendor/` 是可校验的改编副本，不是 fork：pin 到上游完整 SHA，`tools/vendor_check.py --strict` 必须绿。
-- 引擎行写明原因与网格：response（线性化）、rfdac、os < 16 的 dtc_openloop 的杂散 / 互调结论标"不能背书"；只有 polar 拓扑、os ≥ 16 的 dtc_openloop 已验证收敛（ex22）。
+- 引擎行写明原因与网格：response（线性化）、rfdac、outphasing（时钟随网格）、os < 16 的 dtc_openloop 标"不能背书"；只有 polar 拓扑、os ≥ 16（4× 时钟每次更新 ≥ 4 个网格点）的 ACLR / EVM / 可见带模板已验证收敛（ex22），全幅模板照样不背书。
 - 互耦在里程碑 1 只是线性泄漏；负载调制等 PA_DPD 的 load-pull，不在这里编。
 - GUI 只画不算：控件表只从 `config.form_fields()` 生成（`guispec.py`），数字只从 `guiutil.py` → `ArraySim` 来，页面不许有第二套默认值或自己算的指标。
 - 在 `feat/*` 分支上开发，开 PR 合 `main`（默认分支）；不直接推 `main`；提交信息写为什么并带实测数字。

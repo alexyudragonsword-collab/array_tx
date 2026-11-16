@@ -248,7 +248,7 @@ class ArraySim:
                                  "load_pull": self.last_load_pull,
                                  "efficiency": efficiency,
                                  "engine_line": engine_line(modes, cfg.element.topology,
-                                                              int(self.standard.oversampling.value))})
+                                                              int(self.standard.oversampling.value), self.hold)})
 
     def run_matrix(self, scan_deg=None, schemes=None) -> dict[tuple[float, str], ArrayResult]:
         scan = list(self.cfg.beam.scan_deg if scan_deg is None else scan_deg)

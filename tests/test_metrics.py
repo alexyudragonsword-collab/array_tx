@@ -4,7 +4,7 @@ import numpy as np
 
 from arraytx.metrics import (aclr1_vs_direction, conducted_metrics, ota_metrics,
                              power_vs_direction_db)
-from arraytx.report import CONVERGED_OVERSAMPLING, DISCLAIMERS, NOT_EVIDENCE, disclaimer_for, engine_line, table
+from arraytx.report import CONVERGED_HOLD, CONVERGED_NOTE, DISCLAIMERS, NOT_EVIDENCE, disclaimer_for, engine_line, table
 
 
 def test_domains_are_labelled(fr2_sim):
@@ -74,21 +74,28 @@ def test_disclaimer_follows_the_engine_and_the_grid():
     """Break-check (cairn/dtc-openloop-grid.md): the response engine is
     linearised and stays disclaimed on ANY grid -- dropping its disclaimer must
     turn this red; rfdac likewise.  dtc_openloop is cleared only where ex22
-    checked it (polar, os >= 16); below, on another topology or on an unknown
-    grid it keeps a disclaimer that says why."""
-    for os_ in (None, 1, 4, 16, 64):
-        assert disclaimer_for("response", "polar", os_) == DISCLAIMERS["response"]
-        assert NOT_EVIDENCE in engine_line(["response"], "polar", os_) and "线性化" in engine_line(["response"], "polar", os_)
-        assert disclaimer_for("rfdac", "rfdac", os_) is not None
-    for os_ in (None, 4, 8, CONVERGED_OVERSAMPLING - 1):
-        assert disclaimer_for("dtc_openloop", "polar", os_) == DISCLAIMERS["dtc_openloop"]
-    assert disclaimer_for("dtc_openloop", "polar", CONVERGED_OVERSAMPLING) is None
-    assert NOT_EVIDENCE not in engine_line(["dtc_openloop"], "polar", 32)
-    assert disclaimer_for("dtc_openloop", "outphasing", 32) == DISCLAIMERS["dtc_openloop_unverified"]
-    # dtc_openloop is not called linearised any more; every disclaimer says it is not evidence
+    (reading P) checked it: the polar chain, its 4x clock held >= 4 grid
+    samples per update.  Below that, on an unknown grid, or on a topology
+    whose clock follows the grid, it keeps a disclaimer that says why; the
+    full-span mask is never cleared."""
+    for hold in (None, 1, 4, 16):
+        assert disclaimer_for("response", "polar", hold) == DISCLAIMERS["response"]
+        assert NOT_EVIDENCE in engine_line(["response"], "polar", None, hold) and "线性化" in engine_line(["response"], "polar", None, hold)
+        assert disclaimer_for("rfdac", "rfdac", hold) is not None
+        # outphasing's clock follows the grid (polar_tx splits it for the polar chain only)
+        assert disclaimer_for("dtc_openloop", "outphasing", hold) == DISCLAIMERS["dtc_openloop_tied"]
+    for hold in (None, 1, 2, CONVERGED_HOLD - 1):
+        assert disclaimer_for("dtc_openloop", "polar", hold) == DISCLAIMERS["dtc_openloop"]
+    assert disclaimer_for("dtc_openloop", "polar", CONVERGED_HOLD) is None
+    line = engine_line(["dtc_openloop"], "polar", 32, 8)
+    assert CONVERGED_NOTE in line and DISCLAIMERS["full_span"] in line and DISCLAIMERS["dtc_openloop"] not in line
+    # dtc_openloop is not called linearised; every disclaimer says it is not evidence
     assert "线性化" not in DISCLAIMERS["dtc_openloop"] and all(NOT_EVIDENCE in d for d in DISCLAIMERS.values())
     # a mixed run is as weak as its weakest engine
-    assert NOT_EVIDENCE in engine_line(["dtc_openloop", "response"], "polar", 32)
+    assert DISCLAIMERS["response"] in engine_line(["dtc_openloop", "response"], "polar", 32, 8)
+    # the same threshold and phrase as polar_tx's own grid note (vendored polartx.grid)
+    from arraytx.vendor.polartx import grid as pt_grid
+    assert CONVERGED_HOLD == pt_grid.CONVERGED_HOLD and NOT_EVIDENCE == pt_grid.NOT_EVIDENCE
 
 
 def test_the_run_carries_its_grid_into_the_engine_line():
@@ -98,4 +105,6 @@ def test_the_run_carries_its_grid_into_the_engine_line():
     assert "os 4" in r.info["engine_line"] and DISCLAIMERS["dtc_openloop"] in r.info["engine_line"]
     cfg.sim.oversampling = 16
     r = ArraySim(cfg, n_symbols=2).run(0.0, "none", conducted_diagnostics=False)
-    assert "os 16" in r.info["engine_line"] and NOT_EVIDENCE not in r.info["engine_line"]
+    line = r.info["engine_line"]
+    assert "os 16, 4 grid samples per update" in line and CONVERGED_NOTE in line
+    assert DISCLAIMERS["dtc_openloop"] not in line and DISCLAIMERS["full_span"] in line

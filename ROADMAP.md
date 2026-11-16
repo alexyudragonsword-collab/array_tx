@@ -46,6 +46,7 @@ ACLR2 要 os ≥ 4，即 fref ≥ 1.47 / 1.97 GHz，不是现实的 28 GHz 两�
 ACLR1 偏保守 0.32–0.49 dB、ACLR2 2.11–2.16 dB、可见带模板 0.44–0.59 dB、旁瓣 / 最差亮方向 ACLR1 至多 0.60 dB；scalar EVM 偏乐观
 0.09–0.48 dB；per-tone EVM 收敛（≤ 0.04 dB）。os 16 与 os 32 除全幅模板（镜像电平动 0.56 dB）外差 ≤ 0.15 dB。杂散 ΔEVM / ΔACLR1
 os 4 − os 16 ≤ 0.02 dB；噪声底不再随网格动（`cairn/dtc-openloop-grid.md`）。读法 T 的第一次 ex22 作为历史留在主题笔记里。
+引擎行按 P 给出（`report.disclaimer_for`）：polar、每次更新 ≥ 4 个网格点（os ≥ 16）时 ACLR / EVM / 可见带模板不挂免责，全幅模板照挂。
 没做的：把示例默认网格提到 16 并重跑。按 LOG 里的全尺寸耗时（os 4 合计约 9 h）与 ex22 的单次耗时比（×3–4）估约 30 h，
 而且 cairn 与 README 里全部 os 4 的数字都要重写；numbers-move，单独一轮。
 
@@ -70,13 +71,4 @@ APK 在 CI 上构建过一次（2026-11-03，84.7 MB，两个 ABI），桥与页
 
 ## E. 报回上游（以上游 issue 跟踪）
 
-### E1. polar_tx：宽带链在默认 os 4 的网格上未收敛 → [polar_tx#22](https://github.com/alexyudragonsword-collab/polar_tx/issues/22)
-已交给 polar_tx（2026-11-16 开 issue），本库不改 polar_tx 的任何东西。issue 里有 ex22 的全量数字、事先写定的容差、只用 polar_tx 的
-最小复现（单单元 nr_dtc(bw=400e6)，Rapp PA：ACLR2 os 4 / 8 / 16 为 −60.14 / −63.30 / −64.66 dBc），以及两件顺带发现：理想 DPA
-（nr_dtc 默认）下 ACLR1 / ACLR2 从 os 4 到 os 16 降约 10 dB（量化底随网格，因为 f_update / f_dpa 默认等于 fs_bb）；
-`nr_dtc(oversampling=k).make_waveform()` 不管 k、总给 os 4 的波形。
-对方已回（polar_tx PR #23，main 0e7b7ac）：更深的原因是 oversampling 同时是 DTC / DPA 的更新时钟；现在时钟（`update_oversampling`，
-默认 4）与网格分开，网格比时钟细时链在时钟上跑、输出零阶保持到网格。本库已重新 pin，并跟进了时钟（波形 / CFR / DPD 在时钟上，导向、
-真延时与之后的一切在网格上，ACLR / 模板的 FFT 随网格放大），ex22 已按读法 P 重跑（B2）。还剩：`disclaimer_for` 收紧到 ACLR /
-per-tone EVM / 可见带模板（全幅模板、os 4 的 scalar EVM、outphasing / rfdac 照旧挂）；验收后在 issue 上回验收结论，把 E1 从这里删掉
-并写进 CHANGELOG。
+（暂无。E1 已由 polar_tx 0e7b7ac 解决、本库跟进，见 CHANGELOG 2026-11-16。）
