@@ -1,119 +1,134 @@
-"""ex22 — are the dtc_openloop spur / IM numbers converged in the sampling grid?
+"""ex22 — the grid around the element's 4x clock: are the FR2 numbers converged?
 
-ROADMAP B2 used to say the event engine cannot run at FR2, so the FR2 numbers
-come from a "linearised" engine and no spur / IM conclusion may be drawn from
-them.  The FR2 chain has no ADPLL at all: polar_tx nr_dtc(bw > 100 MHz) is
-wifi_dtc, an open-loop DTC (dtc_openloop) that applies its deterministic
-non-idealities sample by sample.  What it cannot see is anything above
-fs / 2: a nonlinear product there folds back.  So the question is whether the
-numbers move when the grid gets finer.
+The first ex22 (2026-11-13, cairn/dtc-openloop-grid.md) refined the grid
+with the DTC / DPA update clock tied to it: os 16 was a chip clocked 4x
+faster, not the same chip read on a finer grid (reading T).  polar_tx#22
+answered with polar_tx 0e7b7ac: the clock is the hardware's, 4 x the FFT
+rate (1966.08 MHz at FR2), and a grid finer than it holds each update.
+arraytx follows (arraytx.clock): the waveform (burst_on_grid), CFR and DPD
+run at the clock; steering, true-time delay, the held chain output,
+coupling, the far field and the metrics run on the grid.  This is reading P:
+only the grid changes, os 4 / 8 / 16 / 32 = 1 / 2 / 4 / 8 grid samples per
+update, fs 1.966 / 3.932 / 7.864 / 15.73 GS/s.
 
-Grid: sim.oversampling 4 (today, fs = 1.966 GS/s), 8 and 16 (7.864 GS/s).
-Literal x1 / x2 cannot be run: ACLR1 needs fs >= 3 BW and os 1 / 2 give
-1.23 / 2.46 BW.  The DTC and the DPA update on the simulation grid, so os ->
-infinity is the continuous-time limit of the same model; the difference
-os 4 vs os 16 is what the os-4 grid folds.
-
-Pre-registered tolerance (written before the full run): a number is
-converged at os 4 if it is within 0.3 dB of its os-16 value (ACLR) or
-0.1 dB (EVM).
+Pre-registered (written into this file before the full run): a reading
+converges at os 4 if it is within TOL of the same reading at os 16, and
+os 16 is itself converged if os 32 is within TOL of it.  ACLR and mask
+margins 0.3 dB, EVM 0.1 dB.  Against the first ex22 three readings are
+added, as polar_tx's ex22 has them: per-tone EVM (the hold's droop is a
+linear in-band response, which per-tone equalisation removes and scalar
+does not), and the stylized mask's out-of-band margin over the band the
+clock's Nyquist holds ("mask", the span os 4 sees) and over the whole grid
+("mask full", where the hold's images at multiples of the clock show --
+unfiltered: no output filter is modelled, so this reading is not a TX's).
 
   Part A  ex04's case: beam 30 deg, survey and analytic coupling, no DPD /
-          per-element / array DPD, noise OFF (the spur / IM question is a
-          deterministic one): beam ACLR1, ACLR2, EVM, sidelobe ACLR1, worst
-          lit direction (pattern >= -15 dB) ACLR1.
-          Also at os 16: the DTC and DPA clocks held at 1.966 GHz (ZOH) --
-          different physics (a real update clock's images and droop), shown
-          for scale, not part of the convergence test (its EVM reads the ZOH's
-          half-update delay as error, so read its ACLR columns only).
-  Part B  ex07's case: the three loudest clock-profile spur tables, spurs off
-          and on (noise on -- the spurs are gated with it), no DPD and array
-          DPD: the change in EVM and ACLR1 the spurs make.
-  Part C  noise ON at the beam, no DPD: the random floor.  The DTC jitter is
-          drawn per simulation sample, so its in-band density falls as the
-          grid gets finer -- a property of the noise model, shown separately.
-  Part D  the DPD cases at os 4 / 8 / 16 / 32 (survey; beam and sidelobe):
-          whether the DPD numbers settle at all.
+          per-element / array DPD, noise off: beam ACLR1 / ACLR2 / EVM
+          (scalar, per-tone) / mask (visible, full), sidelobe ACLR1, worst
+          lit direction (pattern >= -15 dB) ACLR1; os 4 / 8 / 16 / 32.
+  Part B  ex07's case: the three loudest clock-profile spur tables, spurs
+          off and on (noise on -- the spurs are gated with it), no DPD and
+          array DPD: the change in EVM and ACLR1 the spurs make; os 4 / 8 / 16.
+  Part C  noise on, no DPD, survey: the random floor.  The DTC jitter is
+          drawn per update (it times an edge) and the LO on the grid (the
+          band above the clock's Nyquist drawn fresh, the rest carried over).
 """
-from dataclasses import replace
-
 import numpy as np
 
 from _common import banner, done, plt, smoke
 from arraytx import ArraySim, load_config
 from arraytx.lo import ClockProfileLO, list_bundled
-from arraytx.metrics import aclr1_vs_direction, power_vs_direction_db
+from arraytx.metrics import aclr1_vs_direction, ota_metrics, power_vs_direction_db
 from arraytx.report import table
 
 THETA0 = 30.0
-OS = [4, 8] if smoke() else [4, 8, 16]
-REF = OS[-1]
+OS = [4, 8] if smoke() else [4, 8, 16, 32]
+REF, CHECK = (8, None) if smoke() else (16, 32)
+OS_B = [4, 8] if smoke() else [4, 8, 16]
 N_SYMBOLS = 2 if smoke() else 8
 SCHEMES = ("none", "per_element") if smoke() else ("none", "per_element", "array")
 COUPLINGS = ("survey",) if smoke() else ("survey", "analytic")
 THETAS = np.arange(-90.0, 90.0 + 0.5, 6.0 if smoke() else 3.0)
-F_CLOCK = 1966.08e6                 # today's grid = the DTC / DPA update clock of variant (ii)
-TOL_ACLR, TOL_EVM = 0.3, 0.1
+# ------------------------------------------------- written before the run
+TOL = {"ACLR1": 0.3, "ACLR2": 0.3, "EVM": 0.1, "EVM tone": 0.1, "mask": 0.3, "mask full": 0.3,
+       "SL ACLR1": 0.3, "worst lit ACLR1": 0.3}
+FFT_RATE = 4096 * 120e3
 
 
-def sim_for(cfg_path, os_, *, noise, held=False, profile=None, spurs=False):
+def sim_for(cfg_path, os_, *, noise, profile=None, spurs=False):
     cfg = load_config(cfg_path)
     cfg.sim.oversampling = os_
     cfg.sim.noise = noise
     if profile is not None:
         cfg.element.lo.clock_profile = f"bundled:{profile}"
         cfg.element.lo.spurs = spurs
-    sim = ArraySim(cfg, n_symbols=N_SYMBOLS)
-    if held and sim.fs != F_CLOCK:
-        # variant (ii): the DTC and the DPA update at today's clock, ZOH between updates
-        for el in sim.elements:
-            el.tx.cfg = replace(el.tx.cfg, f_dpa=F_CLOCK)
-            el.tx.phasemod.cfg = replace(el.tx.phasemod.cfg, f_update=F_CLOCK)
-    return sim
+    return ArraySim(cfg, n_symbols=N_SYMBOLS)
+
+
+def worst_lit(sim, rs):
+    """Worst ACLR1 over the lit directions, the far field synthesised a few
+    directions at a time (61 directions of a 15.7 GS/s burst would be 1 GB).
+    Lit: the power within the clock's Nyquist -- the hold's images radiate
+    elsewhere and would light directions the signal does not (first full run:
+    worst lit ACLR1 os 32 - os 16 up to +1.32 dB from that alone)."""
+    a, p = [], []
+    for chunk in np.array_split(THETAS, max(1, len(THETAS) // 8)):
+        e = sim.far_field_many(rs, chunk)
+        a.append(aclr1_vs_direction(e, sim.wf, chunk))
+        p.append(power_vs_direction_db(e, sim.wf))
+    a, p = np.concatenate(a), np.concatenate(p)
+    return float(np.max(a[(p - p.max()) >= -15.0]))
 
 
 def beam_numbers(sim, scheme):
     r = sim.run(THETA0, scheme, conducted_diagnostics=False)
-    e = sim.far_field_many(r.rs, THETAS)
-    a = aclr1_vs_direction(e, sim.wf, THETAS)
-    p = power_vs_direction_db(e)
-    lit = (p - p.max()) >= -15.0
-    del e
-    return {"ACLR1": r.beam.aclr1_db, "ACLR2": r.beam.aclr2_db, "EVM": r.beam.evm_db,
-            "SL ACLR1": r.sidelobe.aclr1_db, "worst lit ACLR1": float(np.max(a[lit]))}
+    tone = ota_metrics(r.far["beam"][1], sim.wf, THETA0, "beam", equalize="per_tone", with_sem=False)
+    # the out-of-band margin (polar_tx ex22's): the worst margin includes the in-band
+    # reference, which pins it at 0 once the out-of-band part passes
+    oob = r.beam.sem["oob_margin_db"]
+    return {"ACLR1": r.beam.aclr1_db, "ACLR2": r.beam.aclr2_db, "EVM": r.beam.evm_db, "EVM tone": tone.evm_db,
+            # at os 4 the grid IS the visible band: its whole-grid mask is the visible one
+            "mask": oob, "mask full": r.beam.extra.get("sem_full", {}).get("oob_margin_db", oob),
+            "SL ACLR1": r.sidelobe.aclr1_db, "worst lit ACLR1": worst_lit(sim, r.rs)}
 
 
 s0 = sim_for("configs/fr2_4el_survey.yaml", 4, noise=False)
-t0 = banner("ex22  dtc_openloop: are the spur / IM numbers converged in the sampling grid? (ROADMAP B2)", s0)
-print(f"  oversampling {OS} -> fs {', '.join(f'{4096 * 120e3 * k / 1e9:.3f}' for k in OS)} GS/s; "
-      f"{N_SYMBOLS} symbols; tolerance |os - os{REF}| <= {TOL_ACLR} dB (ACLR), {TOL_EVM} dB (EVM)")
+t0 = banner("ex22  the grid around the 4x element clock: are the FR2 numbers converged? (reading P, polar_tx#22)", s0)
+print(f"  oversampling {OS} -> fs {', '.join(f'{FFT_RATE * k / 1e9:.3f}' for k in OS)} GS/s, "
+      f"{', '.join(str(k // 4) for k in OS)} grid samples per update of the {FFT_RATE * 4 / 1e6:.2f} MHz clock; "
+      f"{N_SYMBOLS} symbols")
+print("  tolerance (pre-registered): " + ", ".join(f"{m} {t}" for m, t in TOL.items()) + " dB; "
+      f"os 4 against os {REF}" + (f", os {REF} against os {CHECK}" if CHECK else ""))
 
 # ------------------------------------------------------------------ Part A
-print(f"\nPart A — ex04's case, beam {THETA0:.0f} deg, noise off (deterministic): metric per oversampling")
-rowsA, worstA = [], {}
+print(f"\nPart A — ex04's case, beam {THETA0:.0f} deg, noise off: reading per grid")
+rowsA = []
 for cpl in COUPLINGS:
     path = f"configs/fr2_4el_{cpl}.yaml"
     for sch in SCHEMES:
-        got = {k: beam_numbers(sim_for(path, k, noise=False), sch) for k in OS}
-        if not smoke():
-            got["16 held"] = beam_numbers(sim_for(path, 16, noise=False, held=True), sch)
-        for m in got[REF]:
+        got = {}
+        for k in OS:
+            got[k] = beam_numbers(sim_for(path, k, noise=False), sch)
+            print(f"  {cpl:8s} {sch:12s} os {k:2d}: " + "  ".join(f"{m} {v:.2f}" for m, v in got[k].items()), flush=True)
+        for m in TOL:
             row = {"coupling": cpl, "scheme": sch, "metric": m}
-            row.update({f"os {k}": got[k][m] for k in got})
-            for k in OS[:-1]:
-                row[f"os{k}-os{REF}"] = got[k][m] - got[REF][m]
-            tol = TOL_EVM if m == "EVM" else TOL_ACLR
-            row["converged at os 4"] = abs(row[f"os4-os{REF}"]) <= tol
+            row.update({f"os {k}": got[k][m] for k in OS})
+            row[f"os4-os{REF}"] = got[4][m] - got[REF][m]
+            row["os 4 ok"] = abs(row[f"os4-os{REF}"]) <= TOL[m]
+            if CHECK:
+                row[f"os{CHECK}-os{REF}"] = got[CHECK][m] - got[REF][m]
+                row[f"os {REF} ok"] = abs(row[f"os{CHECK}-os{REF}"]) <= TOL[m]
             rowsA.append(row)
-        print(f"  {cpl:8s} {sch:12s}: " + "  ".join(
-            f"{m} {got[4][m]:.2f}->{got[REF][m]:.2f}" for m in got[REF]), flush=True)
 print(table(rowsA))
-for m in ("ACLR1", "ACLR2", "EVM", "SL ACLR1", "worst lit ACLR1"):
-    d = [r[f"os4-os{REF}"] for r in rowsA if r["metric"] == m]
-    d8 = [r.get(f"os8-os{REF}", np.nan) for r in rowsA if r["metric"] == m]
-    worstA[m] = (max(d, key=abs), max(d8, key=abs) if len(OS) > 2 else float("nan"))
-    print(f"  {m:16s}: os4 - os{REF} {min(d):+.2f} .. {max(d):+.2f} dB"
-          + (f"; os8 - os{REF} {min(d8):+.2f} .. {max(d8):+.2f} dB" if len(OS) > 2 else ""))
+print("\n  per metric over every case (difference to os %d):" % REF)
+for m in TOL:
+    rs_ = [r for r in rowsA if r["metric"] == m]
+    d4 = [r[f"os4-os{REF}"] for r in rs_]
+    line = f"    {m:16s}: os 4 {min(d4):+.2f} .. {max(d4):+.2f} dB, converged at {sum(r['os 4 ok'] for r in rs_)}/{len(rs_)}"
+    if CHECK:
+        dc = [r[f"os{CHECK}-os{REF}"] for r in rs_]
+        line += f"; os {CHECK} {min(dc):+.2f} .. {max(dc):+.2f} dB, os {REF} converged at {sum(r[f'os {REF} ok'] for r in rs_)}/{len(rs_)}"
+    print(line)
 
 # ------------------------------------------------------------------ Part B
 print(f"\nPart B — ex07's case: the loudest spur tables, change spurs-on minus spurs-off (noise on), beam {THETA0:.0f} deg")
@@ -121,23 +136,23 @@ names = [n for n in list_bundled() if ClockProfileLO(f"bundled:{n}").spurs]
 names.sort(key=lambda n: -ClockProfileLO(f"bundled:{n}", fout_hz=28e9).spur_rms_rad())
 names = names[:1] if smoke() else names[:3]
 schB = ("none",) if smoke() else ("none", "array")
+refB = OS_B[-1]
 rowsB = []
 for name in names:
     for sch in schB:
         rec = {"profile": name, "scheme": sch}
-        for k in OS:
+        for k in OS_B:
             off = sim_for("configs/fr2_4el_survey.yaml", k, noise=True, profile=name, spurs=False).run(
                 THETA0, sch, conducted_diagnostics=False)
             on = sim_for("configs/fr2_4el_survey.yaml", k, noise=True, profile=name, spurs=True).run(
                 THETA0, sch, conducted_diagnostics=False)
             rec[f"dEVM os{k}"] = on.beam.evm_db - off.beam.evm_db
             rec[f"dACLR1 os{k}"] = on.beam.aclr1_db - off.beam.aclr1_db
-        rec["dEVM os4-os%d" % REF] = rec["dEVM os4"] - rec[f"dEVM os{REF}"]
-        rec["dACLR1 os4-os%d" % REF] = rec["dACLR1 os4"] - rec[f"dACLR1 os{REF}"]
+        rec[f"dEVM os4-os{refB}"] = rec["dEVM os4"] - rec[f"dEVM os{refB}"]
+        rec[f"dACLR1 os4-os{refB}"] = rec["dACLR1 os4"] - rec[f"dACLR1 os{refB}"]
         rowsB.append(rec)
-        devm = ", ".join("%+.2f" % rec["dEVM os%d" % k] for k in OS)
-        daclr = ", ".join("%+.2f" % rec["dACLR1 os%d" % k] for k in OS)
-        print(f"  {name:40s} {sch:5s}: dEVM {devm} dB, dACLR1 {daclr} dB", flush=True)
+        print(f"  {name:40s} {sch:5s}: dEVM " + ", ".join("%+.2f" % rec[f"dEVM os{k}"] for k in OS_B)
+              + " dB, dACLR1 " + ", ".join("%+.2f" % rec[f"dACLR1 os{k}"] for k in OS_B) + " dB", flush=True)
 print(table(rowsB))
 
 # ------------------------------------------------------------------ Part C
@@ -146,44 +161,27 @@ rowsC = []
 for k in OS:
     r = sim_for("configs/fr2_4el_survey.yaml", k, noise=True).run(THETA0, "none", conducted_diagnostics=False)
     q = sim_for("configs/fr2_4el_survey.yaml", k, noise=False).run(THETA0, "none", conducted_diagnostics=False)
-    rowsC.append({"os": k, "fs GS/s": 4096 * 120e3 * k / 1e9, "EVM noise on": r.beam.evm_db, "EVM noise off": q.beam.evm_db,
+    rowsC.append({"os": k, "fs GS/s": FFT_RATE * k / 1e9, "EVM noise on": r.beam.evm_db, "EVM noise off": q.beam.evm_db,
                   "ACLR1 noise on": r.beam.aclr1_db, "ACLR1 noise off": q.beam.aclr1_db,
                   "ACLR2 noise on": r.beam.aclr2_db, "ACLR2 noise off": q.beam.aclr2_db})
 print(table(rowsC))
 
-# ------------------------------------------------------------------ Part D
-rowsD = []
-if not smoke():
-    # Part A's DPD rows did not settle by os 16 (os 8 sat further from os 16 than os 4 did):
-    # one more octave for them, beam and sidelobe only (no direction scan at 15.7 GS/s)
-    print(f"\nPart D — the DPD cases one octave further (os 32, survey, beam {THETA0:.0f} deg, noise off)")
-    for sch in ("per_element", "array"):
-        rec = {"scheme": sch}
-        for k in (4, 8, 16, 32):
-            r = sim_for("configs/fr2_4el_survey.yaml", k, noise=False).run(THETA0, sch, conducted_diagnostics=False)
-            rec.update({f"ACLR1 os{k}": r.beam.aclr1_db, f"ACLR2 os{k}": r.beam.aclr2_db, f"SL ACLR1 os{k}": r.sidelobe.aclr1_db})
-        rowsD.append(rec)
-        print("  " + sch + ": " + "  ".join(f"{m} " + " / ".join("%.2f" % rec[f"{m} os{k}"] for k in (4, 8, 16, 32))
-                                         for m in ("ACLR1", "ACLR2", "SL ACLR1")), flush=True)
-    print(table(rowsD))
-
 fig, ax = plt.subplots(1, 2, figsize=(10.5, 3.9))
-for m, mk in (("ACLR1", "o-"), ("ACLR2", "s--"), ("SL ACLR1", "^:"), ("worst lit ACLR1", "v-.")):
+for m, mk in (("ACLR1", "o-"), ("ACLR2", "s--"), ("EVM", "x:"), ("mask", "d-."), ("worst lit ACLR1", "v-.")):
     for cpl in COUPLINGS:
         for sch, col in zip(SCHEMES, ("#8a8a85", "#2a78d6", "#d6652a")):
             r = next(x for x in rowsA if x["coupling"] == cpl and x["scheme"] == sch and x["metric"] == m)
             ax[0].plot(OS, [r[f"os {k}"] - r[f"os {REF}"] for k in OS], mk, color=col, alpha=0.75,
                        label=f"{m}, {sch}" if cpl == COUPLINGS[0] else None)
-ax[0].axhspan(-TOL_ACLR, TOL_ACLR, color="#eef4fb", zorder=0)
+ax[0].axhspan(-0.3, 0.3, color="#eef4fb", zorder=0)
 ax[0].set_xscale("log", base=2)
 ax[0].set_xticks(OS, [str(k) for k in OS])
-ax[0].set(xlabel="oversampling (fs = 491.52 MS/s x os)", ylabel=f"metric - its os-{REF} value [dB]",
-          title="Part A: noise off, beam 30 deg (band = tolerance)" + (" (smoke)" if smoke() else ""))
-ax[0].legend(fontsize=6, ncol=2)
-ax[1].plot([r["os"] for r in rowsC], [r["ACLR1 noise on"] for r in rowsC], "o-", color="#2a78d6", label="ACLR1 noise on")
-ax[1].plot([r["os"] for r in rowsC], [r["ACLR1 noise off"] for r in rowsC], "o--", color="#2a78d6", label="ACLR1 noise off")
-ax[1].plot([r["os"] for r in rowsC], [r["ACLR2 noise on"] for r in rowsC], "s-", color="#d6652a", label="ACLR2 noise on")
-ax[1].plot([r["os"] for r in rowsC], [r["ACLR2 noise off"] for r in rowsC], "s--", color="#d6652a", label="ACLR2 noise off")
+ax[0].set(xlabel="oversampling (clock 4x; grid samples per update = os / 4)", ylabel=f"reading - its os-{REF} value [dB]",
+          title="Part A: noise off, beam 30 deg (band = ACLR tolerance)" + (" (smoke)" if smoke() else ""))
+ax[0].legend(fontsize=5, ncol=2)
+for key, mk, col in (("ACLR1", "o", "#2a78d6"), ("ACLR2", "s", "#d6652a")):
+    ax[1].plot([r["os"] for r in rowsC], [r[f"{key} noise on"] for r in rowsC], mk + "-", color=col, label=f"{key} noise on")
+    ax[1].plot([r["os"] for r in rowsC], [r[f"{key} noise off"] for r in rowsC], mk + "--", color=col, label=f"{key} noise off")
 ax[1].set_xscale("log", base=2)
 ax[1].set_xticks(OS, [str(k) for k in OS])
 ax[1].set(xlabel="oversampling", ylabel="beam ACLR [dBc]", title="Part C: no DPD, survey, noise on vs off")

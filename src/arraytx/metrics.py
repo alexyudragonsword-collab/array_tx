@@ -12,6 +12,14 @@ The metric functions themselves are polar_tx's (``PolarResult.evm``'s
 signal.  Every function here expects the signal sample-aligned with the
 waveform reference, which the far-field synthesis guarantees in the beam
 direction (array phase centre at the origin, steering compensated).
+
+On a grid finer than the element clock (``arraytx.clock``) the spectral
+estimates keep the clock grid's resolution: their FFT length scales with
+the hold (polar_tx ``PolarResult.aclr``; a fixed length smears the channel
+edge into the adjacent band).  The mask is then read twice: over the band
+the clock's Nyquist holds (``sem``, the same span os 4 sees) and over the
+whole grid (``extra["sem_full"]``), where the hold's images at multiples of
+the clock -- unfiltered, the first near -17 dBc -- show.
 """
 from __future__ import annotations
 
@@ -20,6 +28,7 @@ from typing import Any
 
 import numpy as np
 
+from .clock import clock_hold, to_clock
 from .vendor.polartx.metrics.aclr_ext import aclr_multi
 from .vendor.polartx.metrics.masks import default_mask_spec
 from .vendor.polartx.metrics.sem import check_sem
@@ -30,6 +39,10 @@ from .vendor.polartx.waveforms.base import Waveform
 #: against (polar_tx's check_sem convention); the page's mask line uses the
 #: same constant so the plot and the SEM margin number cannot diverge
 SEM_TX_POWER_DBM = 23.0
+
+#: Welch segment length of the spectral estimates on a grid at the clock;
+#: x the hold on a finer grid, so the resolution bandwidth does not change
+NFFT = 4096
 
 
 @dataclass
@@ -61,6 +74,8 @@ class DirectionMetrics:
             d["aclr2_dbc"] = self.aclr2_db
         if self.sem:
             d["sem_margin_db"] = self.sem.get("worst_margin_db")
+        if "sem_full" in self.extra:
+            d["sem_full_margin_db"] = self.extra["sem_full"]["worst_margin_db"]
         return d
 
 
@@ -71,15 +86,22 @@ def _measure(y: np.ndarray, wf: Waveform, *, offsets, equalize: str, with_sem: b
         raise ValueError(f"signal {y.shape} does not match the waveform {wf.x.shape}")
     # polar_tx's PolarResult.evm convention: scalar | per_tone equalisation
     e = evm_of_signal(y, wf.require_ofdm_ref(), equalize=equalize)
-    ac = aclr_multi(y, wf.fs, wf.bw, offsets=tuple(int(o) for o in offsets))
+    m = clock_hold(wf)
+    ac = aclr_multi(y, wf.fs, wf.bw, offsets=tuple(int(o) for o in offsets), nfft=NFFT * m)
     sem: dict[str, Any] = {}
+    extra: dict[str, Any] = {}
     if with_sem:
-        f, p = psd(y, wf.fs, nfft=4096)
+        f, p = psd(y, wf.fs, nfft=NFFT * m)
         spec = default_mask_spec(wf)
+        if m > 1:
+            full = check_sem(f, p, spec, channel_bw_hz=wf.bw, tx_power_dbm=SEM_TX_POWER_DBM)
+            extra["sem_full"] = {k: full[k] for k in ("passes", "worst_margin_db", "oob_margin_db") if k in full}
+            keep = np.abs(f) <= wf.fs / (2 * m)
+            f, p = f[keep], p[keep]
         sem = check_sem(f, p, spec, channel_bw_hz=wf.bw, tx_power_dbm=SEM_TX_POWER_DBM)
         sem["spec_source"] = spec.source
     return DirectionMetrics(domain, where, theta, float(e.db), float(e.percent),
-                            {k: float(v) for k, v in ac.items()}, sem)
+                            {k: float(v) for k, v in ac.items()}, sem, extra)
 
 
 def ota_metrics(e_theta: np.ndarray, wf: Waveform, theta_deg: float, label: str, *,
@@ -103,11 +125,17 @@ def aclr1_vs_direction(e_many: np.ndarray, wf: Waveform, thetas_deg) -> np.ndarr
     burst per direction) — the 'where does the distortion radiate' curve."""
     out = np.empty(len(thetas_deg))
     for i in range(len(thetas_deg)):
-        ac = aclr_multi(e_many[i], wf.fs, wf.bw, offsets=(1,))
+        ac = aclr_multi(e_many[i], wf.fs, wf.bw, offsets=(1,), nfft=NFFT * clock_hold(wf))
         out[i] = max(ac["aclr1_lower_dbc"], ac["aclr1_upper_dbc"])
     return out
 
 
-def power_vs_direction_db(e_many: np.ndarray) -> np.ndarray:
-    p = np.mean(np.abs(e_many) ** 2, axis=1)
+def power_vs_direction_db(e_many: np.ndarray, wf: Waveform | None = None) -> np.ndarray:
+    """Radiated power per direction, dB.  With the waveform: the power within
+    the element clock's Nyquist (the whole grid at os 4), so the hold's images
+    on a finer grid -- whose beams point elsewhere, they are at f0 + k f_clock --
+    do not light up directions the signal does not."""
+    m = 1 if wf is None else clock_hold(wf)
+    rows = e_many if m == 1 else np.stack([to_clock(e, m) for e in e_many])
+    p = np.mean(np.abs(rows) ** 2, axis=1)
     return 10 * np.log10(np.maximum(p, 1e-300))

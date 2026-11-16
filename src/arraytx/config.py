@@ -229,7 +229,7 @@ class SimCfg:
     smoke_n_symbols: int = _f(2, "symbols", "burst length when ARRAYTX_SMOKE=1 (CI)")
     noise: bool = _f(True, "", "random impairments on (polar_tx run(noise=))")
     cfr_papr_db: float | None = _f(8.5, "dB", "CFR target PAPR applied to the common signal before steering/DPD; null = off")
-    oversampling: int = _f(0, "x", "baseband oversampling of the waveform and every chain on it (fs = FFT x SCS x this); 0 = the standard's sourced value (4). A study knob: ACLR1 needs fs >= 3 BW, ACLR2 fs >= 4.9 BW (ex22 runs 4 / 8 / 16)")
+    oversampling: int = _f(0, "x", "simulation grid (fs = FFT x SCS x this); 0 = the standard's sourced value (4). The polar element's DTC / DPA clock stays at 4 x the FFT rate, so this is a multiple of 4 and a finer grid holds each update for this / 4 samples (arraytx.clock; outphasing and RF-DAC run their clock on the grid). A study knob: ex22 runs 4 / 8 / 16 / 32")
 
 
 @dataclass

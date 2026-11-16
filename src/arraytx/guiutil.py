@@ -26,7 +26,7 @@ import numpy as np
 from .beam import beamwidth_3db_deg, squint_analytic_deg
 from .config import ArrayConfig, config_from_dict
 from .guispec import to_yaml, values_from_config
-from .metrics import SEM_TX_POWER_DBM, ota_metrics
+from .metrics import NFFT, SEM_TX_POWER_DBM, ota_metrics
 from .sim import ArrayResult, ArraySim
 from .vendor.polartx.metrics.masks import default_mask_spec
 from .vendor.polartx.metrics.sem import check_sem
@@ -98,7 +98,7 @@ def _metrics_row(m, extra: dict | None = None) -> dict[str, Any]:
     return d
 
 
-def direction_scan(sim: ArraySim, rs: np.ndarray, thetas_deg, *, nperseg: int = 4096) -> tuple[np.ndarray, np.ndarray]:
+def direction_scan(sim: ArraySim, rs: np.ndarray, thetas_deg, *, nperseg: int | None = None) -> tuple[np.ndarray, np.ndarray]:
     """ACLR1 (dBc, worst side) and radiated power (dB) per direction, from
     Welch segments of the ELEMENT signals combined per direction.
 
@@ -115,7 +115,8 @@ def direction_scan(sim: ArraySim, rs: np.ndarray, thetas_deg, *, nperseg: int = 
     rs = np.asarray(rs)
     n, N = rs.shape
     fs, bw = sim.fs, sim.wf.bw
-    nperseg = min(nperseg, N)
+    # aclr_multi's segment length, which follows the grid (metrics.NFFT)
+    nperseg = min(NFFT * sim.hold if nperseg is None else nperseg, N)
     step = nperseg // 2                                      # welch default noverlap
     if n * ((N - nperseg) // step + 1) * nperseg > 40_000_000:   # > ~640 MB of segment FFTs: no overlap
         step = nperseg
@@ -139,7 +140,9 @@ def direction_scan(sim: ArraySim, rs: np.ndarray, thetas_deg, *, nperseg: int = 
         pxx = np.mean(np.abs(E) ** 2, axis=0) * scale
         p0 = pxx[b0].sum()
         aclr[i] = 10 * np.log10(max(pxx[bl].sum(), pxx[bu].sum()) / p0) if p0 > 0 else np.nan
-        power[i] = 10 * np.log10(max(pxx.sum() * fs / nperseg, 1e-300))
+        # the power within the clock's Nyquist (metrics.power_vs_direction_db): not the hold's images
+        pv = pxx if sim.hold == 1 else pxx[np.abs(f) <= fs / (2 * sim.hold)]
+        power[i] = 10 * np.log10(max(pv.sum() * fs / nperseg, 1e-300))
     return aclr, power
 
 
@@ -152,7 +155,7 @@ def _plots(sim: ArraySim, r: ArrayResult) -> dict[str, Any]:
                  "pattern_db": patt.tolist(), "beam_deg": r.theta0_deg, "sidelobe_deg": r.sidelobe_deg,
                  "null_below_db": NULL_BELOW_DB}
     e_beam = r.far["beam"][1]
-    f, p = psd(e_beam, sim.fs, nfft=PLOT_NFFT)
+    f, p = psd(e_beam, sim.fs, nfft=PLOT_NFFT * sim.hold)       # the clock grid's resolution on any grid
     spec = default_mask_spec(sim.wf)
     sem = check_sem(f, p, spec, channel_bw_hz=sim.wf.bw, tx_power_dbm=SEM_TX_POWER_DBM)
     spectrum = {"f_mhz": (f / 1e6).tolist(), "psd_db": p.tolist(), "mask_db": np.asarray(sem["limit_db"]).tolist(),

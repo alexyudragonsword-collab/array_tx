@@ -37,15 +37,15 @@ pll_simulator@5564c64 的 `export/clock_profile.py`（已随本库 vendor）有�
 `multiply_curve` 在 f_in/2 以内给 N²·L_in 加白噪底、以外只剩底，`multiply_spurs` 加 20 log10 N 与 N±1 次谐波泄漏。
 换成"整数 N 的 PLL + 倍频器"（PLL 调到 f_c/N）会动 LO 相关的数字（ex05 / ex07、EVM 底），单独一轮，标 numbers-move。
 
-### B2. FR2 的杂散 / 互调数字在 os 4 的网格上没有收敛（2026-11-13 重写；原题"事件引擎在 FR2 不可用"作废）
+### B2. FR2 的 ACLR / 模板数字在 os 4 的网格上偏保守（2026-11-16 按读法 P 重写；原题"事件引擎在 FR2 不可用"作废）
 原写法两半都不成立：polar_tx B1 的根因是 TDC 量程（127 ps 对 513 ps 周期），不是相位推进，已修；本库的 FR2 链里没有 ADPLL
 （nr_dtc(bw > 100 MHz) → wifi_dtc，引擎 dtc_openloop）。event / response 都要 fs_bb ≤ fref 且 fref/fs_bb 为整数，ACLR1 要 os ≥ 3、
 ACLR2 要 os ≥ 4，即 fref ≥ 1.47 / 1.97 GHz，不是现实的 28 GHz 两点 ADPLL。
-真正的限制是网格：dtc_openloop 逐样本施加确定性非理想，fs/2 以上的非线性产物折回。ex22（os 4 / 8 / 16 / 32，事先定的容差
-ACLR 0.3 dB、EVM 0.1 dB，与 os 16 比）：无 DPD 的 ACLR1 / 旁瓣 / 最差亮方向 ≤ 0.07 dB（收敛）；ACLR2 在 os 4 偏高 4.74 dB（无 DPD）、
-1.25–1.64 dB（DPD）；DPD 后 ACLR1 偏高 0.46–0.54 dB、旁瓣 ACLR1 至多 1.54 dB，os 8 不单调；os 16 与 os 32 差 ≤ 0.04 dB。
-ex07 的杂散 ΔEVM os 4 − os 16 为 −0.22…+0.19 dB；噪声开时随机底也随网格动（`cairn/dtc-openloop-grid.md`）。
-引擎行已改成按原因与网格给出（2026-11-13）：polar 拓扑、os ≥ 16 的 dtc_openloop 不再挂免责，os < 16 的写明"网格未收敛"。
+真正的限制是网格。DTC / DPA 时钟固定在 4 × FFT 速率（1966.08 MHz），网格更细只多出保持的下垂与镜像（读法 P，polar_tx 0e7b7ac，
+本库 `arraytx.clock` 跟进）。ex22（os 4 / 8 / 16 / 32，事先定的容差 ACLR 与模板 0.3 dB、EVM 0.1 dB，与 os 16 比；六个工况）：os 4 的
+ACLR1 偏保守 0.32–0.49 dB、ACLR2 2.11–2.16 dB、可见带模板 0.44–0.59 dB、旁瓣 / 最差亮方向 ACLR1 至多 0.60 dB；scalar EVM 偏乐观
+0.09–0.48 dB；per-tone EVM 收敛（≤ 0.04 dB）。os 16 与 os 32 除全幅模板（镜像电平动 0.56 dB）外差 ≤ 0.15 dB。杂散 ΔEVM / ΔACLR1
+os 4 − os 16 ≤ 0.02 dB；噪声底不再随网格动（`cairn/dtc-openloop-grid.md`）。读法 T 的第一次 ex22 作为历史留在主题笔记里。
 没做的：把示例默认网格提到 16 并重跑。按 LOG 里的全尺寸耗时（os 4 合计约 9 h）与 ex22 的单次耗时比（×3–4）估约 30 h，
 而且 cairn 与 README 里全部 os 4 的数字都要重写；numbers-move，单独一轮。
 
@@ -76,7 +76,7 @@ APK 在 CI 上构建过一次（2026-11-03，84.7 MB，两个 ABI），桥与页
 （nr_dtc 默认）下 ACLR1 / ACLR2 从 os 4 到 os 16 降约 10 dB（量化底随网格，因为 f_update / f_dpa 默认等于 fs_bb）；
 `nr_dtc(oversampling=k).make_waveform()` 不管 k、总给 os 4 的波形。
 对方已回（polar_tx PR #23，main 0e7b7ac）：更深的原因是 oversampling 同时是 DTC / DPA 的更新时钟；现在时钟（`update_oversampling`，
-默认 4）与网格分开，网格比时钟细时链在时钟上跑、输出零阶保持到网格。已重新 pin 到 0e7b7ac，本库暂用 `update_oversampling=None`
-（时钟随网格，旧行为逐位不变）。还剩：本库的波形 / CFR / DPD 改到时钟上（波形用 `burst_on_grid`），导向与真延时留在网格上，ACLR 的
-FFT 随网格放大；ex22 按新口径重跑；`disclaimer_for` 收紧到 ACLR / per-tone EVM / 可见带模板（全幅 SEM、scalar EVM、outphasing /
-rfdac 照旧挂）；验收后在 issue 上回验收结论，把 E1 从这里删掉并写进 CHANGELOG。
+默认 4）与网格分开，网格比时钟细时链在时钟上跑、输出零阶保持到网格。本库已重新 pin，并跟进了时钟（波形 / CFR / DPD 在时钟上，导向、
+真延时与之后的一切在网格上，ACLR / 模板的 FFT 随网格放大），ex22 已按读法 P 重跑（B2）。还剩：`disclaimer_for` 收紧到 ACLR /
+per-tone EVM / 可见带模板（全幅模板、os 4 的 scalar EVM、outphasing / rfdac 照旧挂）；验收后在 issue 上回验收结论，把 E1 从这里删掉
+并写进 CHANGELOG。
