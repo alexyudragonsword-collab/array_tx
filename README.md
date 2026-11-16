@@ -20,8 +20,9 @@ pytest -q                                               # 219 项（页面测试
 ARRAYTX_SMOKE=1 python examples/ex04_aclr_vs_direction.py   # 短突发（CI 用的尺寸）
 ```
 
-每个示例先打印它用的相位调制引擎和采样网格，并写明杂散 / 互调结论为什么不能背书：response 是线性化引擎；rfdac 模型只有失配；
-dtc_openloop 在 os < 16 时网格没收敛（ex22：os 4 的 ACLR2 偏高约 4.7 dB）。polar 拓扑、`sim.oversampling` ≥ 16 的 dtc_openloop 不挂免责。
+每个示例先打印它用的相位调制引擎和采样网格，并写明哪些数为什么不能背书：response 是线性化引擎；rfdac 模型只有失配；outphasing 的时钟随网格；
+polar 链的 dtc_openloop 时钟固定在 4 × FFT 速率，os < 16（每次更新 < 4 个网格点）时网格没收敛——ex22：os 4 的 ACLR 与模板偏保守（ACLR2 约 2.1 dB），
+scalar EVM 偏乐观，per-tone EVM 已收敛。`sim.oversampling` ≥ 16 时 ACLR / EVM / 可见带模板不挂免责；全幅模板（时钟镜像未滤波）在任何网格上都挂。
 
 ## 结果速览
 

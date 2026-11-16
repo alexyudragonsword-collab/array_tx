@@ -2,6 +2,14 @@
 
 本文件按时间倒序记录实质进展——新条目在顶。每条只写摘要与指针（数字写原值）；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-11-16 · E1 收尾：引擎行按读法 P 收紧，polar_tx#22 验收；ROADMAP E1 删除
+
+- `disclaimer_for(mode, topology, hold)`：polar 链 hold ≥ 4（os ≥ 16）放行 ACLR、两种 EVM、可见带模板；全幅模板在任何网格上都挂（镜像未滤波，os 16→32 动 0.56 dB）；
+  hold < 4 写明方向（ACLR / 模板偏保守可作上界，scalar EVM 偏乐观，per-tone 收敛）；outphasing 时钟随网格，在任何网格上都挂。
+- 与用户选项的一处出入：选项写"scalar EVM 照旧挂"，实测 os 16 时与 os 32 差 ≤ 0.05 dB，按实测只在 os < 16 挂（polar_tx grid 同）。
+- 反向检查：去掉 response 免责、或把阈值降到 2，守护测试都变红。CONVERGED_HOLD 与 polar_tx 的相同（有测试）。
+- polar_tx#22（已由其 PR #23 关闭）上回了验收结论与本库三个 PR（#5 换 pin、#6 跟进时钟、#7 引擎行）。ROADMAP E1 删除，E 节暂无条目。
+
 ## 2026-11-16 · 本库跟进 4× 时钟（读法 P）；ex22 重跑：os 4 偏保守、per-tone EVM 收敛、os 16 除全幅模板外收敛
 
 - `arraytx.clock`：波形 / CFR / DPD 在时钟上，导向 / 真延时 / 互耦 / 远场 / 指标在网格上；os 4 恒等（指纹 os 4 逐位不变，`fr2_os8` 39 项动）。

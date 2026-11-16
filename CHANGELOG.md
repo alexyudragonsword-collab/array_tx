@@ -4,6 +4,20 @@
 
 ## 未发布 / Unreleased
 
+### E1 收尾：引擎行按读法 P 收紧；polar_tx#22 验收（2026-11-16）
+
+- `report.disclaimer_for(mode, topology, hold)`：按每次更新的网格点数给免责。`CONVERGED_HOLD = 4`，与 polar_tx `grid.CONVERGED_HOLD` 相同，有测试守着。
+  - polar 链、hold ≥ 4（os ≥ 16）：ACLR、scalar / per-tone EVM、可见带模板不挂免责，引擎行写"网格已收敛"。全幅模板在任何网格上都挂
+    （`DISCLAIMERS["full_span"]`：镜像未滤波，os 16 → 32 还动 0.56 dB）。
+  - hold < 4：写明各读数偏向哪边——ACLR / 模板偏保守、可作上界；scalar EVM 偏乐观；per-tone EVM 已收敛。
+  - outphasing：时钟随网格，在任何网格上都挂免责（`dtc_openloop_tied`）。response、rfdac 照旧。
+- 用户选项原写"scalar EVM 照旧挂"。ex22 实测 os 16 时 scalar EVM 与 os 32 差 ≤ 0.05 dB，polar_tx 的 grid 也在 hold ≥ 4 时放行两种 EVM，
+  所以按实测，只在 os < 16 时挂。
+- 引擎行带上每次更新的网格点数（`os 16, 4 grid samples per update`）。AGENTS 规矩、README、主题笔记同步。
+- 守护测试（反向检查过）：去掉 response 的免责会变红；把放行阈值降到 2 也会变红。
+- ROADMAP E1 删除：polar_tx#22 已由 polar_tx PR #23（0e7b7ac）解决，本库重新 pin（#5）、跟进 4× 时钟（#6）、收紧引擎行（本条），
+  并在 issue 上回了验收结论。E 节暂无条目。
+
 ### 跟进 polar_tx 的 4× 时钟：数字前端在时钟上，网格只多出保持；ex22 按读法 P 重跑（2026-11-16）
 
 - 新模块 `arraytx.clock`：`to_grid`（polar_tx 的带限插值，更新时刻的样本逐位还原）、`to_clock`（理想抗混叠接收机，降到时钟）、
@@ -17,7 +31,6 @@
 - ex22 读法 P（570.6 s，六个工况）：os 4 的 ACLR1 偏保守 0.32–0.49、ACLR2 2.11–2.16、可见带模板 0.44–0.59 dB，scalar EVM 偏乐观至多 0.48 dB，
   per-tone EVM 收敛；os 16 与 os 32 除全幅模板（0.56 dB）外差 ≤ 0.15 dB；杂散差 ≤ 0.02 dB；噪声底不再随网格动。
 - 指纹（358 项）：os 4 的 304 项逐位不变；`fr2_os8` 的 54 项里 39 项按预期动（含新增的 4 项 `sem_full_margin_db`）。新测试 `tests/test_clock.py` 14 项。
-- 引擎行的文字（`report.py`）仍是读法 T 的数，下一个 PR 按 P 收紧（ROADMAP E1）。
 
 ### 换 pin 到 polar_tx@0e7b7ac（polar_tx main，含 E1 的 PR #23）；数字不动（2026-11-16）
 

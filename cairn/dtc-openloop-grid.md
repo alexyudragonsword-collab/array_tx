@@ -70,12 +70,17 @@ per-tone EVM −37.89 / −37.87 / −37.85 / −37.85；全幅模板带外裕�
 
 survey，无 DPD ACLR1 −37.98 / −37.93 / −38.04，ACLR2 −60.31 / −63.47 / −65.04；每单元 DPD ACLR1 −47.04 / −46.78 / −47.50（os 32 −47.48）；
 当时判"os 4 不收敛、os 16 收敛（与 os 32 差 ≤ 0.04 dB）"。os 4 的数两种读法逐位相同（os 4 时钟 = 网格）；os 8 以上 T 换的是芯片，
-os 16 收敛只说明这颗更快的芯片自身稳定，不说明 os 4 的芯片读准了。引擎行原来的"os ≥ 16 不挂免责"按 T 立的，按 P 重写见 ROADMAP E1。
+os 16 收敛只说明这颗更快的芯片自身稳定，不说明 os 4 的芯片读准了。引擎行原来的"os ≥ 16 不挂免责"按 T 立的，按 P 重写见下面"决定"。
 
 ## 决定
 
 - 本库跟进读法 P（用户 2026-11-16 选"全面跟进时钟 4×"）：`sim.oversampling` 必须是 4 的倍数；示例默认网格仍是 os 4。
-- 引擎行（`report.disclaimer_for`）按 P 的结论收紧，单独一个 PR（ROADMAP E1）。
+- 引擎行按 P 收紧（`report.disclaimer_for(mode, topology, hold)`，2026-11-16）：polar 链、每次更新 ≥ 4 个网格点（`CONVERGED_HOLD`，与 polar_tx
+  `grid.CONVERGED_HOLD` 相同、有测试）时 ACLR、scalar / per-tone EVM、可见带模板不挂免责，引擎行写"网格已收敛"；全幅模板在任何网格上都挂
+  （镜像未滤波，os 16 → 32 还动 0.56 dB）。hold < 4 的免责写明方向：ACLR / 模板偏保守可作上界、scalar EVM 偏乐观、per-tone EVM 已收敛。
+  outphasing（时钟随网格）任何网格都挂"时钟随网格"；response、rfdac 照旧。用户选项原写"scalar EVM 照旧挂"：实测 os 16 时 scalar EVM
+  与 os 32 差 ≤ 0.05 dB（polar_tx 的 grid 也在 hold ≥ 4 时放行两种 EVM），按实测只在 os < 16 挂。
+- 守护：`tests/test_metrics.py::test_disclaimer_follows_the_engine_and_the_grid`（去掉 response 的免责、或把阈值降到 2，都变红，已实测）。
 - 守护：`tests/test_clock.py`——每个网格上链读到的样本逐位相同；无 DPD、噪声关时 os 8 的远场经 `to_clock` 等于 os 4 的远场乘保持的带内响应
   （单元输出 1e-12；过互耦后 1e-6，见"坑"）；DPD 在时钟上；负载取更新时刻；outphasing 时钟随网格；网格必须容下整数次更新。
 
