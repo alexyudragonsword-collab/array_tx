@@ -1,4 +1,4 @@
-# Vendored from polar_tx@b007e60: src/polartx/outphasing.py
+# Vendored from polar_tx@0e7b7ac: src/polartx/outphasing.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Outphasing (LINC / Chireix) transmitter, a sibling of the polar chain.
 
@@ -49,7 +49,7 @@ from typing import Any
 
 import numpy as np
 
-from .chain import PolarResult, PolarTX
+from .chain import PolarResult, PolarTX, clock_hold
 from .dpa.combiner import OutphasingCombiner
 from .vendor.padpd.cfr import cfr_clip_filter
 from .waveforms.base import Waveform
@@ -270,6 +270,13 @@ class OutphasingTX:
         phase-noise sample is common to both (one LO, ``shared_lo``).
         """
         c = self.tx.cfg
+        if c.f_clock is not None and clock_hold(wf.fs, c.f_clock) > 1:
+            # the decomposition and the combiner would run on the grid
+            # while each branch holds at the clock: not one hardware
+            raise NotImplementedError(
+                "outphasing on a grid finer than its update clock is not "
+                "modeled; run it with the clock on the grid "
+                "(update_oversampling=None), cairn/wideband-grid.md")
         info: dict = {}
         x = wf.x
         if c.cfr_papr_db is not None:

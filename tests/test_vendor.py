@@ -26,7 +26,7 @@ def test_manifest_entries_have_files_and_hashes():
 
 
 def test_no_gui_surface_vendored_and_clock_profile_present():
-    """polar_tx's GUI surface (b007e60: guiutil / appbridge / guispec / webhost /
+    """polar_tx's GUI surface (0e7b7ac: guiutil / appbridge / guispec / webhost /
     webui) is not carried, and the grafted clock-profile reader sits on the
     same pll_simulator commit as the rest of the nested pllsim tree."""
     for gone in ("guiqt", "guiutil.py", "appbridge.py", "guispec.py", "webhost.py", "webui", "py.typed"):

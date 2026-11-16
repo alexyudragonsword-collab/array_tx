@@ -1,4 +1,4 @@
-# Vendored from polar_tx@b007e60: src/polartx/polar/split.py
+# Vendored from polar_tx@0e7b7ac: src/polartx/polar/split.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Polar decomposition: complex baseband -> (envelope, unwrapped phase).
 

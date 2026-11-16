@@ -5,7 +5,7 @@ summary: FR2 链的杂散 / 互调数字随采样网格收不收敛——dtc_ope
 tags: [engine, oversampling, aclr, spurs, dpd, validity]
 contains: [decision, lesson, pitfall]
 created: 2026-11-13
-updated: 2026-11-13
+updated: 2026-11-16
 related: [fr2-floor-lo.md, architecture-invariants.md]
 authoring_mode: ai_generated
 ---
@@ -53,6 +53,14 @@ ACLR1 要 fs ≥ 3 BW，os 1 / 2 只有 1.23 / 2.46 BW。DTC 与 DPA 都在网�
 示例默认网格仍是 4（提到 16 估约 30 h 重跑、全部文档数字重写，另一轮），所以现有示例照样挂免责。
 守护：`tests/test_metrics.py::test_disclaimer_follows_the_engine_and_the_grid`（去掉 response 的免责会变红，已实测）。
 报回上游：ROADMAP E1（polar_tx nr_dtc FR2 默认 os 4）。
+
+## 更正（2026-11-16，polar_tx#22 的回复）
+
+上面的 ex22 是"读法 T"：DTC 与 DPA 的更新时钟随网格走，os 16 是一颗更快的芯片，不是同一颗芯片读得更细（"坑"第二条早已写到，
+但"模型在 os 16 收敛""polar、os ≥ 16 不挂免责"把它当成了网格收敛）。polar_tx 0e7b7ac 把时钟（`update_oversampling`，默认 4）
+与网格分开（"读法 P"），它在 P 下的结论：os 4 的 ACLR1 偏保守 0.3–1.0 dB、NR ACLR2 1.8–2.4 dB、可见带模板 0.5–2.9 dB，os 16 收敛；
+per-tone EVM os 4 已收敛，scalar EVM 少算保持下垂（偏乐观至多 2.6 dB）；全幅模板要 os 32（首个时钟镜像约 −17 dBc）。
+本库已 pin 到 0e7b7ac，但暂用 `update_oversampling=None`（仍是 T）；前端改到时钟上、ex22 按 P 重跑、免责按 P 收紧，见 ROADMAP E1。
 
 ## 坑
 

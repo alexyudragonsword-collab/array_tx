@@ -90,12 +90,20 @@ class Standard:
 
         ``overrides`` are forwarded (``cfr_papr_db``, ``dpa``, ``lo_pn`` ...).
         For the native sub-6 anchor the defaults are polar_tx's own.
+
+        ``update_oversampling=None``: the DTC / DPA clock follows the grid
+        (polar_tx before 0e7b7ac), so ``sim.oversampling`` > 4 still clocks
+        the chain faster.  polar_tx's default since 0e7b7ac holds a 4x clock
+        onto a finer grid; arraytx's front end (waveform, CFR, DPD on the
+        grid) does not follow that yet -- ROADMAP E1.  At os 4 the two agree
+        bit for bit.
         """
         kw: dict[str, Any] = dict(bw=float(self.bandwidth_hz.value))
         if not self.polartx_native:
             kw.update(scs=float(self.scs_hz.value), qam=int(self.qam.value),
                       fout=float(self.carrier_hz.value),
-                      oversampling=int(self.oversampling.value))
+                      oversampling=int(self.oversampling.value),
+                      update_oversampling=None)
         kw.update(overrides)
         return nr_dtc(**kw)
 

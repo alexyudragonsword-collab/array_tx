@@ -100,7 +100,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: alexyudragonsword-collab/polar_tx
-          ref: b007e60477bac68806138db733cbafd0c0761282
+          ref: 0e7b7ac7b5074fd60f1dd3baa1e4682fe3184112
           fetch-depth: 0
           path: _siblings/polar_tx
       - name: Checkout PA_DPD (pinned)

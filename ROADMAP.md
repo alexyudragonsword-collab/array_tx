@@ -75,5 +75,8 @@ APK 在 CI 上构建过一次（2026-11-03，84.7 MB，两个 ABI），桥与页
 最小复现（单单元 nr_dtc(bw=400e6)，Rapp PA：ACLR2 os 4 / 8 / 16 为 −60.14 / −63.30 / −64.66 dBc），以及两件顺带发现：理想 DPA
 （nr_dtc 默认）下 ACLR1 / ACLR2 从 os 4 到 os 16 降约 10 dB（量化底随网格，因为 f_update / f_dpa 默认等于 fs_bb）；
 `nr_dtc(oversampling=k).make_waveform()` 不管 k、总给 os 4 的波形。
-等对方的结论（全收敛 / 只影响 ACLR2 / 要改默认值）。之后：重新 pin，按结论调整 `report.disclaimer_for` 的范围，验收后关 issue，
-把 E1 从这里删掉并写进 CHANGELOG。本库已有 `sim.oversampling` 与按网格的免责，不依赖对方改默认值。
+对方已回（polar_tx PR #23，main 0e7b7ac）：更深的原因是 oversampling 同时是 DTC / DPA 的更新时钟；现在时钟（`update_oversampling`，
+默认 4）与网格分开，网格比时钟细时链在时钟上跑、输出零阶保持到网格。已重新 pin 到 0e7b7ac，本库暂用 `update_oversampling=None`
+（时钟随网格，旧行为逐位不变）。还剩：本库的波形 / CFR / DPD 改到时钟上（波形用 `burst_on_grid`），导向与真延时留在网格上，ACLR 的
+FFT 随网格放大；ex22 按新口径重跑；`disclaimer_for` 收紧到 ACLR / per-tone EVM / 可见带模板（全幅 SEM、scalar EVM、outphasing /
+rfdac 照旧挂）；验收后在 issue 上回验收结论，把 E1 从这里删掉并写进 CHANGELOG。

@@ -4,6 +4,17 @@
 
 ## 未发布 / Unreleased
 
+### 换 pin 到 polar_tx@0e7b7ac（polar_tx main，含 E1 的 PR #23）；数字不动（2026-11-16）
+
+- polar_tx 对 [#22](https://github.com/alexyudragonsword-collab/polar_tx/issues/22) 的回复：oversampling 同时是 DTC / DPA 的更新时钟。
+  0e7b7ac 把两者分开（`update_oversampling`，默认 4 = `ChainConfig.f_clock`），新增 `grid.py`、`presets.burst_on_grid`，
+  `nr_dtc().make_waveform` 现在传 oversampling。
+- 本库的 FR2 预设显式传 `update_oversampling=None`（时钟随网格，0e7b7ac 之前的行为），所以 `sim.oversampling` > 4 的数字也不动；
+  跟进时钟 4× 是下一个 PR。sub-6 锚点用 polar_tx 自己的默认（只能 os 4，网格 = 时钟）。
+- 指纹加一项 `fr2_os8`（os 8，无 DPD 与每单元 DPD），共 354 项：在旧 pin 上录、新 pin 上比，0 处变化。不传 `None`、直接用
+  polar_tx 的默认时 os 8 的 29 项会动（os 4 不动），这就是下一个 PR 要动的数。
+- vendor：40 个文件（39 个改、`grid.py` 新），GUI 面不变（guiutil / appbridge / guispec / webhost / webui 不带），manifest 不变。
+
 ### 引擎行按原因与网格给免责：dtc_openloop 不再叫"线性化"，polar、os ≥ 16 不挂免责（2026-11-13）
 
 - `report.disclaimer_for(mode, topology, oversampling)`：response 写"线性化引擎"，rfdac 写"只有失配、网格未验证"，
