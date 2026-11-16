@@ -8,7 +8,7 @@ every CI run.  Code outside this tree imports only through
 
 Pins
 ----
-* ``polartx/`` — polar_tx @ ``b007e60477bac68806138db733cbafd0c0761282`` (polar_tx
+* ``polartx/`` — polar_tx @ ``0e7b7ac7b5074fd60f1dd3baa1e4682fe3184112`` (polar_tx
   ``main``), ``src/polartx`` minus its GUI surface (``guiutil.py``,
   ``appbridge.py``, ``guispec.py``, ``webhost.py``, ``webui/``) and the
   ``py.typed`` packaging marker (meaningful only at the root of polar_tx's own

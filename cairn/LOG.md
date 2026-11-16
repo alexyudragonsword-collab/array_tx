@@ -2,6 +2,15 @@
 
 本文件按时间倒序记录实质进展——新条目在顶。每条只写摘要与指针（数字写原值）；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-11-16 · polar_tx 回了 #22：时钟与网格分开（PR #23）；本库重新 pin 到 0e7b7ac，数字不动
+
+- 对方的结论：oversampling 同时是 DTC / DPA 的更新时钟（"读法 T"：提高 os 换的是更快的芯片，永远不收敛）。0e7b7ac 加 `update_oversampling`
+  （默认 4），网格更细时链在时钟上跑、零阶保持到网格（"读法 P"）。P 下 os 4 的 ACLR1 偏保守 0.3–1.0 dB、NR ACLR2 1.8–2.4 dB、可见带模板
+  0.5–2.9 dB，per-tone EVM 已收敛，scalar EVM 偏乐观至多 2.6 dB；全幅模板要 os 32（首个时钟镜像约 −17 dBc）。outphasing / rfdac 不分开。
+- 用户选"全面跟进时钟 4×"，分三个 PR。本 PR 只换 pin：FR2 预设传 `update_oversampling=None`（时钟随网格），数字不动。
+- 指纹加 `fr2_os8`（354 项），旧 pin 录、新 pin 比 0 处变化；用 polar_tx 默认时钟则 os 8 的 29 项动、os 4 不动。vendor_check --strict
+  91 文件（88 verbatim、1 extended、2 extracted、0 skipped）OK。ex00 与 polar_tx 逐位相等。
+
 ## 2026-11-16 · E1 交给 polar_tx：开 issue #22；只用 polar_tx 的最小复现复现了 ex22
 
 - 最小复现（单单元 nr_dtc(bw=400e6)、无 DPD、噪声关，只改 oversampling 4 / 8 / 16），在 polar_tx 自己的 b007e60（PYTHONPATH=src）

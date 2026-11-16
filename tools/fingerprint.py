@@ -37,6 +37,9 @@ SCENARIOS = [
     ("fr2_survey", "configs/fr2_4el_survey.yaml", 30.0, ("none", "per_element", "array")),
     ("fr2_analytic", "configs/fr2_4el_analytic.yaml", 60.0, ("none", "array")),
     ("fr2_ttd", "configs/fr2_4el_survey.yaml", 60.0, ("none",)),
+    # sim.oversampling 8: the grid above the DTC / DPA clock (cairn/dtc-openloop-grid.md);
+    # a re-pin or a change of how the clock follows the grid shows here, not at os 4
+    ("fr2_os8", "configs/fr2_4el_survey.yaml", 30.0, ("none", "per_element")),
 ]
 
 
@@ -63,6 +66,8 @@ def record() -> dict:
         cfg = load_config(path)
         if name == "fr2_ttd":
             cfg.beam.steering = "ttd"
+        if name == "fr2_os8":
+            cfg.sim.oversampling = 8
         sim = ArraySim(cfg)
         out[f"{name}.x"] = digest(sim.x)
         out[f"{name}.coupling.s"] = digest(sim.coupling.s)

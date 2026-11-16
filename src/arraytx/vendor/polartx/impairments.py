@@ -1,4 +1,4 @@
-# Vendored from polar_tx@b007e60: src/polartx/impairments.py
+# Vendored from polar_tx@0e7b7ac: src/polartx/impairments.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Path impairments injected by the chain."""
 from __future__ import annotations

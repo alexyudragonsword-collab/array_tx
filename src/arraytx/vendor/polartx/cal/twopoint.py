@@ -1,4 +1,4 @@
-# Vendored from polar_tx@b007e60: src/polartx/cal/twopoint.py
+# Vendored from polar_tx@0e7b7ac: src/polartx/cal/twopoint.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Two-point (direct-path) gain calibration — offline estimator.
 
