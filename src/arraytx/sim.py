@@ -7,6 +7,11 @@ Data flow for one run (one scan angle, one DPD scheme)::
       -> apply_coupling -> r_k (radiated)
       -> far_field(theta) for theta in {beam, sidelobe} -> OTA metrics
 
+The digital front end (waveform, CFR, DPD) runs at the polar element's
+update clock, 4 x the FFT rate; steering, true-time delay, the held chain
+output and everything after it run on the simulation grid, which
+``sim.oversampling`` may make finer (``arraytx.clock``).
+
 Everything random comes from ``SeedTree(cfg.seed)``; nothing here draws.
 """
 from __future__ import annotations
@@ -19,6 +24,7 @@ from typing import Any
 import numpy as np
 
 from .beam import far_field, far_field_many, highest_sidelobe_direction
+from .clock import clock_hold, to_grid
 from .config import ArrayConfig
 from .coupling import CouplingMatrix, apply_coupling, build_coupling
 from .dpd import DPDBank, predistort_drives, train
@@ -76,10 +82,18 @@ class ArraySim:
         if n_symbols is None:
             n_symbols = cfg.sim.smoke_n_symbols if smoke() else cfg.sim.n_symbols
         self.n_symbols = int(n_symbols)
-        self.wf: Waveform = self.standard.make_waveform(self.n_symbols, self.tree.int_seed("waveform"))
+        # polar_tx models the clock / grid split for the polar chain only: the
+        # other topologies keep their clock on the grid (their presets' default)
+        self.wf: Waveform = self.standard.make_waveform(self.n_symbols, self.tree.int_seed("waveform"),
+                                                        tied=cfg.element.topology != "polar")
+        #: grid samples per update of the element clock (1: the grid is the clock)
+        self.hold = clock_hold(self.wf)
         x = self.wf.x
         if cfg.sim.cfr_papr_db is not None:
-            x = cfr_clip_filter(x, cfg.sim.cfr_papr_db, self.wf.fs, self.wf.bw)
+            # CFR is digital: at the clock, on the update-instant samples
+            m = self.hold
+            xc = cfr_clip_filter(x if m == 1 else x[::m], cfg.sim.cfr_papr_db, self.wf.fs / m, self.wf.bw)
+            x = to_grid(xc, m)
         self.x = x
         self.coupling: CouplingMatrix = build_coupling(cfg, self.geom, self.wf.fs)
         self.elements: list[ElementChain] = build_elements(cfg, self.standard, self.tree, self.x, self.wf)

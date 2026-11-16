@@ -25,7 +25,7 @@ for col, (k, sim) in enumerate(sims.items()):
         r = sim.run(theta0, s, conducted_diagnostics=False)
         e = sim.far_field_many(r.rs, thetas)
         a = aclr1_vs_direction(e, sim.wf, thetas)
-        p = power_vs_direction_db(e)
+        p = power_vs_direction_db(e, sim.wf)
         p -= p.max()
         i_beam = int(np.argmin(np.abs(thetas - theta0)))
         # ACLR in a pattern null is the distortion of the neighbours over a

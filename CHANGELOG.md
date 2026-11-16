@@ -4,6 +4,21 @@
 
 ## 未发布 / Unreleased
 
+### 跟进 polar_tx 的 4× 时钟：数字前端在时钟上，网格只多出保持；ex22 按读法 P 重跑（2026-11-16）
+
+- 新模块 `arraytx.clock`：`to_grid`（polar_tx 的带限插值，更新时刻的样本逐位还原）、`to_clock`（理想抗混叠接收机，降到时钟）、
+  `clock_hold(wf)`（波形的 `meta["clock_hold"]`）。os 4 时都是恒等。
+- 在时钟上：波形（`Standard.make_waveform` 走 polar_tx `burst_on_grid`）、CFR、DPD（GMP 在更新时刻的样本上算，观测经 `to_clock`，
+  `DPDBank.hold`）、满刻度的参考（`reference_full_scale` 读更新时刻）。负载牵引：Γ 在网格上算，DPA 取更新时刻的值，`ElementChain.load` 仍是网格上的。
+- 在网格上：导向、真延时、保持后的输出、单元模拟误差、互耦、远场、指标。ACLR / 模板 / 方向扫描的 FFT 长度 × hold；模板分可见带
+  （`sem`，时钟奈奎斯特以内，= os 4 的范围）与全幅（`extra["sem_full"]`、行里的 `sem_full_margin_db`）；亮方向按可见带功率判。
+- `Standard.update_oversampling`（4，survey：polar_tx nr_dtc 默认）；`sim.oversampling` 必须是 4 的倍数。outphasing / rfdac 时钟仍随网格
+  （polar_tx 没给它们分开）。
+- ex22 读法 P（570.6 s，六个工况）：os 4 的 ACLR1 偏保守 0.32–0.49、ACLR2 2.11–2.16、可见带模板 0.44–0.59 dB，scalar EVM 偏乐观至多 0.48 dB，
+  per-tone EVM 收敛；os 16 与 os 32 除全幅模板（0.56 dB）外差 ≤ 0.15 dB；杂散差 ≤ 0.02 dB；噪声底不再随网格动。
+- 指纹（358 项）：os 4 的 304 项逐位不变；`fr2_os8` 的 54 项里 39 项按预期动（含新增的 4 项 `sem_full_margin_db`）。新测试 `tests/test_clock.py` 14 项。
+- 引擎行的文字（`report.py`）仍是读法 T 的数，下一个 PR 按 P 收紧（ROADMAP E1）。
+
 ### 换 pin 到 polar_tx@0e7b7ac（polar_tx main，含 E1 的 PR #23）；数字不动（2026-11-16）
 
 - polar_tx 对 [#22](https://github.com/alexyudragonsword-collab/polar_tx/issues/22) 的回复：oversampling 同时是 DTC / DPA 的更新时钟。

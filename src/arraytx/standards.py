@@ -21,7 +21,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from .vendor.polartx import nr_dtc
-from .vendor.polartx.presets import TxPreset
+from .vendor.polartx.presets import TxPreset, burst_on_grid
 from .vendor.polartx.waveforms.base import Waveform
 from .vendor.polartx.waveforms.ofdm import NR_NUMEROLOGY, nr_waveform
 
@@ -53,6 +53,7 @@ class Standard:
     qam: Sourced
     oversampling: Sourced
     evm_limit_pct: Sourced
+    update_oversampling: Sourced            # the polar element's DTC / DPA clock, x FFT rate
     polartx_native: bool = False   # waveform and preset come from polar_tx as-is
     oversampling_overridden: bool = False   # set by with_oversampling (config sim.oversampling)
     notes: tuple[str, ...] = field(default_factory=tuple)
@@ -68,19 +69,29 @@ class Standard:
     def numbers(self) -> dict[str, Sourced]:
         return {k: getattr(self, k) for k in
                 ("carrier_hz", "bandwidth_hz", "scs_hz", "fft_size", "n_rb",
-                 "qam", "oversampling", "evm_limit_pct")}
+                 "qam", "oversampling", "update_oversampling", "evm_limit_pct")}
+
+    def clock_hold(self, *, tied: bool = False) -> int:
+        """Grid samples per update of the polar element's clock; 1 when the
+        clock is ``tied`` to the grid (outphasing / RF-DAC: polar_tx models the
+        clock / grid split for the polar chain only)."""
+        return 1 if tied else int(self.oversampling.value) // int(self.update_oversampling.value)
 
     def with_oversampling(self, k: int) -> "Standard":
         """This standard on a k-times oversampled grid (config ``sim.oversampling``):
         the same symbols and numerology, fs = FFT x SCS x k.  The value is a study
-        setting, so it is labelled assumed."""
+        setting, so it is labelled assumed.  The polar element's clock stays at
+        ``update_oversampling`` (4 x the FFT rate): a finer grid holds each
+        update for k / 4 samples (arraytx.clock), so k must be a multiple of 4."""
         k = int(k)
         if self.polartx_native:
             # the anchor's waveform is polar_tx's own preset waveform: an override
             # would not reach it, and a silently ignored setting is worse than none
             raise ValueError(f"{self.name}: sim.oversampling cannot override the polar_tx-native anchor")
-        if k < 1:
-            raise ValueError(f"oversampling must be >= 1, got {k}")
+        u = int(self.update_oversampling.value)
+        if k < u or k % u:
+            raise ValueError(f"sim.oversampling must be a multiple of the element clock's {u} "
+                             f"(the grid holds a whole number of samples per update), got {k}")
         return replace(self, oversampling=Sourced(k, "assumed", "config sim.oversampling (study setting)"),
                        oversampling_overridden=True)
 
@@ -89,27 +100,31 @@ class Standard:
         """polar_tx's ``nr_dtc`` preset for this standard.
 
         ``overrides`` are forwarded (``cfr_papr_db``, ``dpa``, ``lo_pn`` ...).
-        For the native sub-6 anchor the defaults are polar_tx's own.
-
-        ``update_oversampling=None``: the DTC / DPA clock follows the grid
-        (polar_tx before 0e7b7ac), so ``sim.oversampling`` > 4 still clocks
-        the chain faster.  polar_tx's default since 0e7b7ac holds a 4x clock
-        onto a finer grid; arraytx's front end (waveform, CFR, DPD on the
-        grid) does not follow that yet -- ROADMAP E1.  At os 4 the two agree
-        bit for bit.
+        For the native sub-6 anchor the defaults are polar_tx's own.  The
+        DTC / DPA clock is ``update_oversampling`` x the FFT rate on any grid
+        (polar_tx's ``ChainConfig.f_clock``): a finer grid holds its output,
+        it does not clock the chain faster.
         """
         kw: dict[str, Any] = dict(bw=float(self.bandwidth_hz.value))
         if not self.polartx_native:
             kw.update(scs=float(self.scs_hz.value), qam=int(self.qam.value),
                       fout=float(self.carrier_hz.value),
                       oversampling=int(self.oversampling.value),
-                      update_oversampling=None)
+                      update_oversampling=int(self.update_oversampling.value))
         kw.update(overrides)
         return nr_dtc(**kw)
 
-    def make_waveform(self, n_symbols: int, seed: int) -> Waveform:
+    def make_waveform(self, n_symbols: int, seed: int, *, tied: bool = False) -> Waveform:
+        """The burst on the simulation grid, generated at the element clock and
+        interpolated onto the grid (polar_tx ``burst_on_grid``: the chain reads
+        the update-rate burst bit for bit at any grid, so a grid study compares
+        one input).  ``tied``: the clock is the grid (outphasing / RF-DAC), the
+        burst is generated on the grid.  ``meta["clock_hold"]`` carries the
+        grid samples per update (arraytx.clock)."""
+        m = self.clock_hold(tied=tied)
         if self.polartx_native:
-            return self.preset().make_waveform(n_symbols=n_symbols, seed=seed)
+            wf = self.preset().make_waveform(n_symbols=n_symbols, seed=seed)
+            return replace(wf, meta={**wf.meta, "clock_hold": m})
         # polar_tx@008cc90 carries the 400 MHz @ 120 kHz row, so the FR2
         # waveform is polar_tx's own nr_waveform; the table's FFT / RB must
         # agree with this standard's sourced numbers (tested).
@@ -117,9 +132,13 @@ class Standard:
         if (fft, n_rb) != (int(self.fft_size.value), int(self.n_rb.value)):
             raise ValueError(f"{self.name}: polar_tx numerology {(fft, n_rb)} disagrees with "
                              f"the standard's {(self.fft_size.value, self.n_rb.value)}")
-        return nr_waveform(float(self.bandwidth_hz.value), float(self.scs_hz.value),
-                           int(self.qam.value), n_symbols=int(n_symbols),
-                           oversampling=int(self.oversampling.value), seed=int(seed))
+        k = int(self.oversampling.value)
+        wf = burst_on_grid(
+            lambda os_: nr_waveform(float(self.bandwidth_hz.value), float(self.scs_hz.value),
+                                    int(self.qam.value), n_symbols=int(n_symbols),
+                                    oversampling=os_, seed=int(seed)),
+            k, None if m == 1 else k // m)
+        return replace(wf, meta={**wf.meta, "clock_hold": m})
 
 
 FR2_NR400 = Standard(
@@ -132,6 +151,8 @@ FR2_NR400 = Standard(
     qam=Sourced(64, "survey", f"{TS38101_2} Table 6.4.2.1-1: FR2 UE EVM limit given up to 64-QAM (polar_tx's nr_dtc FR2 branch uses the same)"),
     oversampling=Sourced(4, "derived", "fs >= 4.9*BW is what aclr_multi needs for ACLR2 (polar_tx metrics/aclr_ext.py); 4 x 491.52 = 1966.08 MS/s"),
     evm_limit_pct=Sourced(8.0, "survey", f"{TS38101_2} Table 6.4.2.1-1: 64-QAM EVM 8 %"),
+    update_oversampling=Sourced(4, "survey", "polar_tx@0e7b7ac presets.py nr_dtc update_oversampling default: "
+                                             "the DTC / DPA update clock is 4 x the FFT rate, 1966.08 MHz"),
     notes=("Relative bandwidth 400 MHz / 28 GHz = 1.43 %: wide enough for squint and wideband coupling to show.",
            "The FR2 element chain is polar_tx nr_dtc's bw>100 MHz branch (open-loop DTC, -100 dBc/Hz @ 1 MHz LO)."),
 )
@@ -146,6 +167,8 @@ SUB6_NR100 = Standard(
     qam=Sourced(256, "survey", "polar_tx presets.py nr_dtc FR1 default"),
     oversampling=Sourced(4, "survey", "polar_tx waveforms/ofdm.py nr_waveform default"),
     evm_limit_pct=Sourced(3.5, "survey", "polar_tx presets.py nr_dtc docstring: 256-QAM 3.5 %"),
+    update_oversampling=Sourced(4, "survey", "polar_tx@0e7b7ac presets.py nr_dtc update_oversampling default "
+                                             "(4 x 122.88 MHz = 491.52 MHz)"),
     polartx_native=True,
     notes=("Regression anchor: waveform and chain are polar_tx's nr_dtc() verbatim; one element with S = 0 must reproduce it bit for bit.",),
 )

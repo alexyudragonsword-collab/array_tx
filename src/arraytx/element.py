@@ -36,12 +36,14 @@ from typing import Any
 
 import numpy as np
 
+from .clock import clock_hold
 from .config import ArrayConfig
 from .lo import ClockProfileLO, spur_phase_rad
 from .loadpull import LoadPulledDPA, SourceImpedanceCombiner, loaded_power_terms
 from .seeds import SeedTree
 from .standards import Standard
 from .vendor.polartx import DPAConfig
+from .vendor.polartx.chain import clock_hold as chain_clock_hold
 from .vendor.polartx.impairments import fractional_delay
 from .vendor.polartx.polar.split import polar_split
 from .vendor.polartx.presets import wifi_outphasing, wifi_rfdac
@@ -107,7 +109,11 @@ def reference_full_scale(tx: Any, topology: str, x: np.ndarray, wf: Waveform) ->
     """The envelope full scale polar_tx would pin for drive ``x`` on this run
     — the same expression as ``PolarTX.run`` (chain.py), evaluated once on
     the undistorted common drive and then frozen for every element and
-    every DPD scheme."""
+    every DPD scheme.  On a grid finer than the clock the chain splits the
+    update-instant samples at the clock, so the full scale is read there."""
+    m = clock_hold(wf)
+    if m > 1:
+        x, wf = x[::m], replace(wf, x=x[::m], fs=wf.fs / m)
     if topology == "polar":
         c = tx.cfg
         env, _, _ = polar_split(x, c.env_floor, phase_slew_max_hz=c.phase_slew_max_hz,
@@ -136,6 +142,8 @@ class ElementChain:
         mismatch_seed = tree.int_seed("dpa_mismatch", k) if cfg.element.errors.enabled else 0
         self.dpa_cfg = dpa_config(cfg, self.errors, mismatch_seed)
         self.run_seed = tree.int_seed("run", k)
+        #: the array's load on the grid, as last set (``load``); the DPA takes it at the clock
+        self._load_grid: np.ndarray | None = None
         self.lo_pn_seed = lo_pn_seed
         self.fs_scale = fs_scale
         # per-element backoff (element.pa.backoff_per_element_db): the power this
@@ -187,6 +195,10 @@ class ElementChain:
                 self.preset = wifi_rfdac(**kw2)
             self.tx = self.preset.tx
         self._pin()
+        base = self.tx.tx if self.topology == "outphasing" else self.tx
+        f_clock = getattr(getattr(base, "cfg", None), "f_clock", None)
+        #: grid samples per update of this chain's clock (1: the clock is the grid)
+        self.hold = 1 if f_clock is None else chain_clock_hold(standard.fs_hz, f_clock)
         # load modulation (A2): the polar DPA becomes load-pulled; the RF-DAC
         # has no compression, so the switch is reported inert for it; the
         # outphasing branches run at full scale, and the load reaches their
@@ -213,13 +225,19 @@ class ElementChain:
         """Active reflection coefficient per sample (None = matched); a no-op
         on topologies with nothing for the load to act on."""
         t = self._load_target()
-        if t is not None:
-            t.set_load(gamma)
+        if t is None:
+            return
+        self._load_grid = None if gamma is None else np.asarray(gamma, dtype=complex)
+        g = self._load_grid
+        if g is not None and self.hold > 1:
+            # the DPA is set at each update and held: it takes the load of the update instant
+            g = g[::self.hold]
+        t.set_load(g)
 
     @property
     def load(self):
-        t = self._load_target()
-        return None if t is None else t.gamma
+        """The load last set, on the grid (None = matched or nothing to load)."""
+        return None if self._load_target() is None else self._load_grid
 
     def load_gain(self, gamma) -> np.ndarray:
         """|what the load does| per sample: the factor on the polar DPA's knee,
@@ -348,6 +366,9 @@ def build_elements(cfg: ArrayConfig, standard: Standard, tree: SeedTree,
     lo_seed = tree.int_seed("lo") if cfg.element.lo.shared else None
     # full scale: build element 0's chain unpinned just to read its ChainConfig
     probe = ElementChain(cfg, standard, tree, 0, fs_scale=None, lo_pn_seed=None, lo_obj=lo_obj)
+    if probe.hold != clock_hold(wf):
+        raise ValueError(f"the element clock holds {probe.hold} grid samples per update, "
+                         f"the waveform was built for {clock_hold(wf)}")
     fs_scale = reference_full_scale(probe.tx, cfg.element.topology, x_ref, wf)
     n_el = cfg.array.n_elements * cfg.array.n_rows
     bpe = [float(b) for b in cfg.element.pa.backoff_per_element_db]

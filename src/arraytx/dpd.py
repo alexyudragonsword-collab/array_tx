@@ -20,6 +20,13 @@ beam; the bank then does not depend on the angle it is used at.
 Nothing in the chain moves between training and use: the
 envelope full scale is pinned (element.py) and each element's run seed is
 fixed, so the ILA iterates against one deterministic device.
+
+The predistorter is digital: it runs at the element's update clock on the
+update-instant samples, and its output is interpolated onto the grid
+(``arraytx.clock``) before steering.  It observes through an ideal receiver
+at the same clock (``to_clock``): the hold's images are filtered out, its
+in-band droop is part of what it sees.  On a grid at the clock (os 4) all
+of this is the identity.
 """
 from __future__ import annotations
 
@@ -29,6 +36,7 @@ from typing import Any, Callable
 import numpy as np
 
 from .beam import far_field, steer
+from .clock import clock_hold, to_clock, to_grid
 from .config import ArrayConfig
 from .coupling import CouplingMatrix, apply_coupling
 from .element import ElementChain
@@ -57,6 +65,8 @@ class DPDBank:
     per_element: list[ILAPredistorter] = field(default_factory=list)
     array: ILAPredistorter | None = None
     info: dict[str, Any] = field(default_factory=dict)
+    #: grid samples per update of the clock the predistorters run at
+    hold: int = 1
 
     def n_coeffs(self) -> int:
         if self.scheme == "per_element":
@@ -92,7 +102,7 @@ def train(cfg: ArrayConfig, scheme: str, *, elements: list[ElementChain], x: np.
         raise ValueError(f"unknown DPD scheme {scheme!r}; one of {SCHEMES}")
     noise = cfg.sim.noise
     fs, f0 = wf.fs, geom.f0_hz
-    bank = DPDBank(scheme)
+    bank = DPDBank(scheme, hold=clock_hold(wf))
     if scheme == "none":
         return bank
     joint = bool(cfg.dpd.train_angles_deg)
@@ -142,7 +152,8 @@ def _train_joint(cfg: ArrayConfig, scheme: str, *, elements, x, wf, geom, coupli
     every ILA pass and needs neither."""
     noise = cfg.sim.noise
     fs, f0 = wf.fs, geom.f0_hz
-    bank = DPDBank(scheme)
+    m = clock_hold(wf)
+    bank = DPDBank(scheme, hold=m)
     angles = [float(a) for a in angles]
     drives = {th: steer(x, geom, th, fs, cfg.beam.steering) for th in angles}
     tag = {"train_angles_deg": angles} if joint else {}
@@ -158,23 +169,25 @@ def _train_joint(cfg: ArrayConfig, scheme: str, *, elements, x, wf, geom, coupli
             def make_pa(th, k=k, el=el):
                 def pa(u):
                     el.set_load(loads[th][k])
-                    y = el.run(u, wf, noise=noise).y
+                    y = el.run(to_grid(u, m), wf, noise=noise).y
                     if observe == "pa_output":
-                        return y
+                        return to_clock(y, m)
                     ys = ys_fixed[th].copy()      # neighbours fixed while element k trains: O(n), not O(n^2)
                     ys[k] = y
-                    return apply_coupling(ys, coupling, fs, f0)[k]
+                    return to_clock(apply_coupling(ys, coupling, fs, f0)[k], m)
                 return pa
-            bank.per_element.append(_joint_ila(cfg, [make_pa(th) for th in angles], [drives[th][k] for th in angles]))
+            bank.per_element.append(_joint_ila(cfg, [make_pa(th) for th in angles],
+                                               [_at_clock(drives[th][k], m) for th in angles]))
         bank.info = {"observe": observe, **tag, "target_gain": [complex(d.target_gain) for d in bank.per_element]}
         return bank
 
     def make_pa_array(th):
         def pa(u):
-            rs = _radiate(steer(u, geom, th, fs, cfg.beam.steering))[2]
-            return far_field(rs, geom, th, fs)
+            rs = _radiate(steer(to_grid(u, m), geom, th, fs, cfg.beam.steering))[2]
+            return to_clock(far_field(rs, geom, th, fs), m)
         return pa
-    bank.array = _joint_ila(cfg, [make_pa_array(th) for th in angles], [x for _ in angles])
+    xc = _at_clock(x, m)
+    bank.array = _joint_ila(cfg, [make_pa_array(th) for th in angles], [xc for _ in angles])
     observe = ("far field, jointly at " + ", ".join(f"{a:+.1f}" for a in angles) + " deg") if joint else f"far field {angles[0]:+.1f} deg"
     bank.info = {"observe": observe, **tag, "target_gain": complex(bank.array.target_gain)}
     return bank
@@ -189,6 +202,8 @@ def blend_banks(a: DPDBank, b: DPDBank, w) -> DPDBank:
     import copy
     if a.scheme != b.scheme or a.scheme == "none":
         raise ValueError(f"blend needs two trained banks of one scheme, got {a.scheme!r} and {b.scheme!r}")
+    if a.hold != b.hold:
+        raise ValueError(f"blend needs banks at one clock, got {a.hold} and {b.hold} grid samples per update")
     ws = np.atleast_1d(np.asarray(w, dtype=float))
     if ws.size > 1 and (a.scheme != "per_element" or ws.size != len(a.per_element)):
         raise ValueError(f"per-element weights need the per_element scheme and one weight per element, got {ws.size}")
@@ -213,11 +228,18 @@ def blend_banks(a: DPDBank, b: DPDBank, w) -> DPDBank:
 
 def predistort_drives(bank: DPDBank, x: np.ndarray, geom: ArrayGeometry, theta0_deg: float,
                       fs: float, steering: str) -> list[np.ndarray]:
-    """The element drives for the common signal ``x`` under the bank's scheme."""
+    """The element drives for the common signal ``x`` under the bank's scheme
+    (each predistorter at the clock it was trained at, ``bank.hold``)."""
     if bank.scheme == "none":
         return steer(x, geom, theta0_deg, fs, steering)
+    m = bank.hold
     if bank.scheme == "per_element":
         drives = steer(x, geom, theta0_deg, fs, steering)
-        return [d(dr) for d, dr in zip(bank.per_element, drives)]
+        return [to_grid(d(_at_clock(dr, m)), m) for d, dr in zip(bank.per_element, drives)]
     assert bank.array is not None
-    return steer(bank.array(x), geom, theta0_deg, fs, steering)
+    return steer(to_grid(bank.array(_at_clock(x, m)), m), geom, theta0_deg, fs, steering)
+
+
+def _at_clock(x: np.ndarray, m: int) -> np.ndarray:
+    """The update-instant samples of a grid signal (the signal itself at m = 1)."""
+    return x if m == 1 else x[::m]
