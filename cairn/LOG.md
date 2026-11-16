@@ -2,6 +2,17 @@
 
 本文件按时间倒序记录实质进展——新条目在顶。每条只写摘要与指针（数字写原值）；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-11-16 · E1 交给 polar_tx：开 issue #22；只用 polar_tx 的最小复现复现了 ex22
+
+- 最小复现（单单元 nr_dtc(bw=400e6)、无 DPD、噪声关，只改 oversampling 4 / 8 / 16），在 polar_tx 自己的 b007e60（PYTHONPATH=src）
+  与本库 vendored 副本上输出逐字相同。Rapp p=2 + AM-PM 8°：ACLR1 −37.29 / −37.60 / −37.55，ACLR2 −60.14 / −63.30 / −64.66 dBc——
+  os 4 读高 4.52 dB，与 ex22 的 4.74 dB 一致。
+- 顺带发现：理想 DPA（nr_dtc 默认）下 ACLR1 −64.54 / −70.19 / −74.37、ACLR2 −61.81 / −67.61 / −73.24：没有 PA 非线性，是量化底随网格
+  （f_update / f_dpa 默认 = fs_bb，oversampling 同时是模型的更新时钟）。另：`nr_dtc(oversampling=k).make_waveform()` 不传 k，总给 os 4 波形，
+  直接拿预设做收敛检查会悄悄算错（本库的 standards 自己调 nr_waveform，不受影响）。
+- 开 [polar_tx#22](https://github.com/alexyudragonsword-collab/polar_tx/issues/22)：现象与数字、原因、复现、没验证的（WiFi 320 MHz、outphasing、
+  rfdac）、请求的三种结论、对本库的影响。ROADMAP E1 改成指向它。只改文档，指纹不动。
+
 ## 2026-11-13 · 引擎行按原因与网格给免责；dtc_openloop 不再叫"线性化"
 
 - 用户同意后的第二步：`report.disclaimer_for` 按引擎给原因——response"线性化引擎"、rfdac"只有失配"、dtc_openloop"采样网格未收敛（os < 16）"；

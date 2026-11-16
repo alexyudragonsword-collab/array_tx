@@ -68,10 +68,12 @@ APK 在 CI 上构建过一次（2026-11-03，84.7 MB，两个 ABI），桥与页
 - 替代认证测试：OTA 限值只做趋势比较。
 - 载波聚合、多波束、FR2 以外的毫米波频段。
 
-## E. 报回上游（用户转给上游）
+## E. 报回上游（以上游 issue 跟踪）
 
-### E1. polar_tx：FR2 的 os 4 网格让 ACLR2 读高 4.7 dB
-polar_tx `nr_dtc` 的 FR2 分支默认 `oversampling=4`，`metrics/aclr_ext.py` 写的 fs ≥ 4.9·BW 是能测 ACLR2 的下限，不是测准的条件。
-本库 ex22 在同一条 wifi_dtc 链上（Rapp DPA、4 单元、30°、无噪声）：ACLR2 os 4 −60.31、os 16 −65.04 dBc；DPD 后 ACLR1 差约 0.5 dB，
-os 16 与 os 32 差 ≤ 0.04 dB。polar_tx 自己用 os 4 的宽带场景（FR2、WiFi 320 MHz）可能同样受折叠影响——没有在上游验证，建议用
-同样的做法（同一条链 os 4 / 8 / 16）复核。
+### E1. polar_tx：宽带链在默认 os 4 的网格上未收敛 → [polar_tx#22](https://github.com/alexyudragonsword-collab/polar_tx/issues/22)
+已交给 polar_tx（2026-11-16 开 issue），本库不改 polar_tx 的任何东西。issue 里有 ex22 的全量数字、事先写定的容差、只用 polar_tx 的
+最小复现（单单元 nr_dtc(bw=400e6)，Rapp PA：ACLR2 os 4 / 8 / 16 为 −60.14 / −63.30 / −64.66 dBc），以及两件顺带发现：理想 DPA
+（nr_dtc 默认）下 ACLR1 / ACLR2 从 os 4 到 os 16 降约 10 dB（量化底随网格，因为 f_update / f_dpa 默认等于 fs_bb）；
+`nr_dtc(oversampling=k).make_waveform()` 不管 k、总给 os 4 的波形。
+等对方的结论（全收敛 / 只影响 ACLR2 / 要改默认值）。之后：重新 pin，按结论调整 `report.disclaimer_for` 的范围，验收后关 issue，
+把 E1 从这里删掉并写进 CHANGELOG。本库已有 `sim.oversampling` 与按网格的免责，不依赖对方改默认值。
