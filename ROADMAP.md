@@ -37,6 +37,13 @@ pll_simulator@5564c64 的 `export/clock_profile.py`（已随本库 vendor）有�
 `multiply_curve` 在 f_in/2 以内给 N²·L_in 加白噪底、以外只剩底，`multiply_spurs` 加 20 log10 N 与 N±1 次谐波泄漏。
 换成"整数 N 的 PLL + 倍频器"（PLL 调到 f_c/N）会动 LO 相关的数字（ex05 / ex07、EVM 底），单独一轮，标 numbers-move。
 
+### B11. 联合 ILA 固定跑 `dpd.n_iterations`（默认 2）轮，第 2 轮拿频谱换 EVM（array_tx#8 提出，2026-11-17 实测）
+PA_DPD a9220d6 的 `ILAPredistorter.fit` 默认 keep-best（按训练信号 NMSE、1 dB 容差保留最好一轮）；本库的 `dpd._joint_ila` 是自己的固定轮数循环，
+没跟。FR2 4 × 1、30°、噪声关，每单元 DPD 1 / 2 / 3 轮：波束 ACLR1 −46.99 / −47.04 / −45.78，ACLR2 −54.05 / −52.03 / −49.06，
+EVM −36.97 / −37.11 / −36.99，旁瓣 ACLR1 −51.01 / −48.95 / −46.52 dBc（阵列 DPD、开负载牵引同趋势）：第 2 轮 EVM 好 0.14 dB、ACLR2 与旁瓣差约 2 dB，
+第 3 轮发散。NMSE 判据主要看带内，多半仍选第 2 轮、挡不住频谱上的 2 dB；要按频谱 / 方向选轮次得本库自己定判据。
+做法候选：一个示例扫轮数 × 方案 × 波束 / 旁瓣，比 NMSE 与频谱两种判据各选哪轮，再定默认值或判据。会动 DPD 之后的数字，numbers-move，单独一轮。
+
 ### B2. FR2 的 ACLR / 模板数字在 os 4 的网格上偏保守（2026-11-16 按读法 P 重写；原题"事件引擎在 FR2 不可用"作废）
 原写法两半都不成立：polar_tx B1 的根因是 TDC 量程（127 ps 对 513 ps 周期），不是相位推进，已修；本库的 FR2 链里没有 ADPLL
 （nr_dtc(bw > 100 MHz) → wifi_dtc，引擎 dtc_openloop）。event / response 都要 fs_bb ≤ fref 且 fref/fs_bb 为整数，ACLR1 要 os ≥ 3、

@@ -1,4 +1,4 @@
-# Vendored from polar_tx@0e7b7ac: src/polartx/selector.py
+# Vendored from polar_tx@83a02b5: src/polartx/selector.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Architecture selector: four transmitter topologies scored against one requirement.
 

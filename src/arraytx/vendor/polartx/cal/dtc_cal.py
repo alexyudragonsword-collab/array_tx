@@ -1,4 +1,4 @@
-# Vendored from polar_tx@0e7b7ac: src/polartx/cal/dtc_cal.py
+# Vendored from polar_tx@83a02b5: src/polartx/cal/dtc_cal.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Open-loop DTC gain/INL calibration from demodulated phase error.
 

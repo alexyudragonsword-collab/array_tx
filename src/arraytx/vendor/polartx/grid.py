@@ -1,4 +1,4 @@
-# Vendored from polar_tx@0e7b7ac: src/polartx/grid.py
+# Vendored from polar_tx@83a02b5: src/polartx/grid.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Is a wideband run's output converged on its simulation grid?
 

@@ -1,4 +1,4 @@
-# Vendored from polar_tx@0e7b7ac: src/polartx/outphasing.py
+# Vendored from polar_tx@83a02b5: src/polartx/outphasing.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Outphasing (LINC / Chireix) transmitter, a sibling of the polar chain.
 

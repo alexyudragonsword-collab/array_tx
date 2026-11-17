@@ -4,6 +4,15 @@
 
 ## 未发布 / Unreleased
 
+### 换 pin 到 polar_tx@83a02b5，内嵌 padpd 整棵在 PA_DPD a9220d6；数字不动（2026-11-17，array_tx#8）
+
+- polar_tx 83a02b5（其 #25）把自己 vendor 的 padpd 统一 pin 到 PA_DPD a9220d6（原来 44cbcb3，`pa/thermal.py` 与 `gain_modulation.py` 在 08b9725）。
+  本库经嵌套继承同一份。vendor 69 个文件（多为两行头的 SHA），manifest 只改 `pa/presets.py` 的 pin。
+- PA_DPD 里会改数的只有 `ILAPredistorter.fit` 默认 keep-best（d5750c2 / 70d6cc3）；本库的 `_joint_ila` 是自己的固定轮数循环、不调 `fit`，
+  所以不动。GMP 的 `tap_spacing` 默认 1，即旧行为。`_joint_ila` 与 `train` 的 docstring 改为等价于 `fit(keep_best=False)`。
+- 指纹 358 项与 main 逐位相同；vendor_check --strict 91 文件 0 skipped；CI 的 polar_tx 与 PA_DPD ref 改到 83a02b5… / a9220d6…；四处写死 pin 的测试 / 注释更新。
+- 联合 ILA 要不要做 keep-best：实测第 2 轮拿约 2 dB 的 ACLR2 / 旁瓣 ACLR1 换 0.14 dB EVM、第 3 轮发散，记为 ROADMAP B11，另一轮。
+
 ### E1 收尾：引擎行按读法 P 收紧；polar_tx#22 验收（2026-11-16）
 
 - `report.disclaimer_for(mode, topology, hold)`：按每次更新的网格点数给免责。`CONVERGED_HOLD = 4`，与 polar_tx `grid.CONVERGED_HOLD` 相同，有测试守着。

@@ -1,4 +1,4 @@
-# Vendored from polar_tx@0e7b7ac: src/polartx/presets.py
+# Vendored from polar_tx@83a02b5: src/polartx/presets.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """End-to-end transmitter presets: technology-plausible defaults wired
 into ready-to-run PolarTX chains (pllsim.presets convention)."""

@@ -314,7 +314,7 @@ def _existing_field(rel: str, key: str) -> str:
 
 _REASONS = {
     # polar_tx's own sanctioned changes, carried in its nested tree (wording after
-    # polar_tx's tools/vendor_manifest.json at 0e7b7ac)
+    # polar_tx's tools/vendor_manifest.json at 83a02b5)
     "polartx/vendor/padpd/pa/presets.py":
         "extraction (polar_tx's): only gmp_opendpd_510 and mp_opendpd_500 are "
         "taken; ddr_volterra_default is dropped because DDRVolterraModel is not vendored",

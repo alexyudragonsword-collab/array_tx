@@ -1,4 +1,4 @@
-# Vendored from polar_tx@0e7b7ac: src/polartx/phasemod/adpll_tp.py
+# Vendored from polar_tx@83a02b5: src/polartx/phasemod/adpll_tp.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Narrowband phase modulator: ADPLL with two-point injection.
 
