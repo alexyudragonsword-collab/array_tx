@@ -1,4 +1,4 @@
-# Vendored from polar_tx@0e7b7ac: src/polartx/metrics/dpsk.py
+# Vendored from polar_tx@83a02b5: src/polartx/metrics/dpsk.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Differential EVM (DEVM) for the EDR DPSK payloads.
 

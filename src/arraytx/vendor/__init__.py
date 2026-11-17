@@ -8,7 +8,7 @@ every CI run.  Code outside this tree imports only through
 
 Pins
 ----
-* ``polartx/`` — polar_tx @ ``0e7b7ac7b5074fd60f1dd3baa1e4682fe3184112`` (polar_tx
+* ``polartx/`` — polar_tx @ ``83a02b58faa7540c2d36e492d17a791228e2a128`` (polar_tx
   ``main``), ``src/polartx`` minus its GUI surface (``guiutil.py``,
   ``appbridge.py``, ``guispec.py``, ``webhost.py``, ``webui/``) and the
   ``py.typed`` packaging marker (meaningful only at the root of polar_tx's own
@@ -16,8 +16,9 @@ Pins
   name ``guiutil``).  Everything else is verbatim, package ``__init__``
   included.  polar_tx's own nested vendor tree comes along unchanged, with
   ITS attribution headers, and is checked against ITS upstreams:
-  - ``polartx/vendor/padpd/`` — PA_DPD @ ``44cbcb3`` (``pa/thermal.py`` and
-    ``gain_modulation.py`` @ ``08b9725595748b290c76d1b70355f7e6014a709e``),
+  - ``polartx/vendor/padpd/`` — PA_DPD @ ``a9220d68fa3c0ca8fe2e58ce1efe25dccb3d7a89``,
+    one commit for the whole tree since polar_tx 83a02b5 (it was 44cbcb3 with
+    ``pa/thermal.py`` and ``gain_modulation.py`` at 08b9725);
     ``pa/presets.py`` is polar_tx's extraction (manifest-pinned);
   - ``polartx/vendor/pllsim/`` — pll_simulator @ ``5564c64``, the whole tree
     (polar_tx's C5: ``arch/adpll.py`` is polar_tx's extension of upstream's

@@ -86,7 +86,7 @@ def train(cfg: ArrayConfig, scheme: str, *, elements: list[ElementChain], x: np.
     """Train the scheme's predistorter(s) for the beam at theta0, or jointly
     over ``dpd.train_angles_deg`` when that is set (one path: a single angle
     is the joint fit over one pair, the same least-squares problem as
-    ``ILAPredistorter.fit``, bit for bit -- tests/test_loadpull.py).
+    ``ILAPredistorter.fit(keep_best=False)``, bit for bit -- tests/test_loadpull.py).
 
     ``radiate(drives) -> (results, ys, rs)`` is the simulator's own path
     (``ArraySim.radiate``); with load modulation on it iterates the PAs'
@@ -113,7 +113,9 @@ def train(cfg: ArrayConfig, scheme: str, *, elements: list[ElementChain], x: np.
 
 def _joint_ila(cfg: ArrayConfig, pas: list[Callable[[np.ndarray], np.ndarray]], xs: list[np.ndarray]) -> ILAPredistorter:
     """ILA over several (PA, input) pairs at once: the same loop as
-    ``ILAPredistorter.fit`` (target gain from the first pass, post-inverse
+    ``ILAPredistorter.fit(keep_best=False)``, the fixed ``dpd.n_iterations``
+    passes (PA_DPD a9220d6's ``fit`` keeps the best pass by default; this
+    loop does not -- ROADMAP B11) (target gain from the first pass, post-inverse
     fitted on y/G -> u, then u = DPD(x)), with the GMP basis matrices of
     all pairs stacked into ONE least-squares problem.  Stacking the bases
     instead of concatenating the signals keeps the memory taps from

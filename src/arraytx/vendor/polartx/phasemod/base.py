@@ -1,4 +1,4 @@
-# Vendored from polar_tx@0e7b7ac: src/polartx/phasemod/base.py
+# Vendored from polar_tx@83a02b5: src/polartx/phasemod/base.py
 # Adapted-copy policy: see src/arraytx/vendor/__init__.py
 """Phase-modulator interface: the block the two TX flavors swap."""
 from __future__ import annotations

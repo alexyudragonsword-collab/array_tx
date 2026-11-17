@@ -2,6 +2,14 @@
 
 本文件按时间倒序记录实质进展——新条目在顶。每条只写摘要与指针（数字写原值）；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-11-17 · array_tx#8：换 pin 到 polar_tx 83a02b5（padpd 整棵 PA_DPD a9220d6），数字不动；联合 ILA 轮数记 B11
+
+- issue 的说法逐条复核：0e7b7ac → 83a02b5 的 `src/polartx` 改动 30 个文件，28 个在内嵌 padpd；会改数的只有 `ILAPredistorter.fit` 的 keep-best，
+  本库 `_joint_ila` 不调 `fit`；GMP `tap_spacing` 默认 1。临时工作树换 pin 后指纹 358 项与 main 逐位相同，vendor_check --strict OK。
+- 联合 ILA 轮数（FR2 4 × 1、30°、噪声关，每单元 DPD 1 / 2 / 3 轮）：ACLR2 −54.05 / −52.03 / −49.06，旁瓣 ACLR1 −51.01 / −48.95 / −46.52，
+  EVM −36.97 / −37.11 / −36.99；阵列 DPD、负载牵引同趋势。第 2 轮拿频谱换 EVM，第 3 轮发散——与 polar_tx 的观察同一现象。
+- 用户选"先换 pin，轮数另议"：ROADMAP B11。
+
 ## 2026-11-16 · E1 收尾：引擎行按读法 P 收紧，polar_tx#22 验收；ROADMAP E1 删除
 
 - `disclaimer_for(mode, topology, hold)`：polar 链 hold ≥ 4（os ≥ 16）放行 ACLR、两种 EVM、可见带模板；全幅模板在任何网格上都挂（镜像未滤波，os 16→32 动 0.56 dB）；
